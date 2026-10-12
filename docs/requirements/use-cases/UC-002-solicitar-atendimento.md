@@ -24,7 +24,7 @@
 
 ## Fluxos alternativos
 
-- **A1 — Unidade indiferente:** no passo 3, o paciente não escolhe unidade; `unidade_preferida_id` fica nulo. Em qual fila a solicitação aparece depende de **ABERTO-3**.
+- **A1 — Unidade indiferente:** no passo 3, o paciente não escolhe unidade; `unidade_preferida_id` fica nulo. No MVP, a solicitação aparece em todas as filas da especialidade ([ADR-023](../../decisions/ADR-023-escopo-todas-as-unidades.md), provisório).
 
 ## Exceções
 

@@ -39,4 +39,4 @@ flowchart LR
   uc6 -. "libera vaga para" .-> uc3
 ```
 
-UC-003 aparece ligado ao Sistema e ao Atendente porque quem propõe a vaga depende de **ABERTO-1**; só uma das duas ligações vai permanecer.
+UC-003 aparece ligado ao Sistema e ao Atendente. No MVP, quem propõe é o Sistema ([ADR-021](../../decisions/ADR-021-matching-automatico.md), provisório); a ligação com o Atendente é a proposta manual, de fase futura.

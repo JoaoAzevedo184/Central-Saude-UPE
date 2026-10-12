@@ -2,17 +2,17 @@
 
 | | |
 | --- | --- |
-| **Ator principal** | Sistema (matching automático) ou Atendente (proposta manual) — **ABERTO-1** |
+| **Ator principal** | Sistema (Worker) no MVP ([ADR-021](../../decisions/ADR-021-matching-automatico.md)); Atendente em fase futura |
 | **Objetivo** | Oferecer uma vaga livre ao próximo paciente elegível da fila |
 | **Requisitos** | RF-010, RF-011, RF-016, RF-018 |
 | **Regras** | RN-001, RN-002, RN-003, RN-005, RN-006, RN-008, RN-010, RN-011 |
 
-Este caso de uso está escrito para funcionar nas duas respostas de ABERTO-1. Os passos que mudam estão marcados.
+No MVP, a proposta é automática (ADR-021, provisório). Os passos da proposta manual pelo atendente ficam marcados como futuros.
 
 ## Gatilho
 
 - Uma vaga é criada, desbloqueada ou liberada por cancelamento ou expiração.
-- *(Manual)* O atendente decide propor uma vaga a partir da fila.
+- *(Futuro — proposta manual)* O atendente decide propor uma vaga a partir da fila.
 
 ## Pré-condições
 
@@ -21,9 +21,9 @@ Este caso de uso está escrito para funcionar nas duas respostas de ABERTO-1. Os
 
 ## Fluxo principal
 
-1. *(Automático)* O Worker identifica a vaga livre. *(Manual)* O atendente abre a fila da especialidade e escolhe a vaga.
+1. *(Automático)* O Worker identifica a vaga livre. *(Futuro — proposta manual)* O atendente abre a fila da especialidade e escolhe a vaga.
 2. O sistema ordena as solicitações compatíveis pelas regras de prioridade ativas.
-3. *(Automático)* O sistema escolhe a primeira. *(Manual)* O atendente escolhe uma solicitação; o sistema mostra a posição dela na ordem calculada.
+3. *(Automático)* O sistema escolhe a primeira. *(Futuro — proposta manual)* O atendente escolhe uma solicitação; o sistema mostra a posição dela na ordem calculada.
 4. O sistema calcula `expira_em` = agora + prazo de resposta da especialidade naquela unidade.
 5. O sistema verifica que `expira_em` não ultrapassa o horário da vaga menos a antecedência mínima.
 6. Numa única transação, o sistema cria o agendamento `PROPOSTO`, muda a solicitação para `EM_PROPOSTA`, registra a auditoria e grava o evento na outbox.
@@ -31,13 +31,13 @@ Este caso de uso está escrito para funcionar nas duas respostas de ABERTO-1. Os
 
 ## Fluxos alternativos
 
-- **A1 — Prazo não cabe antes da vaga (RN-008):** no passo 5, o sistema não propõe aquela vaga para ninguém da fila. A vaga continua livre, e o caso é registrado para o painel.
+- **A1 — Prazo não cabe antes da vaga (RN-008):** no passo 5, o sistema não propõe aquela vaga para ninguém da fila. A vaga fica livre e aparece no painel como "vaga sem proposta".
 - **A2 — Nenhuma solicitação compatível:** a vaga continua livre.
 - **A3 — Preferência de turno:** se a vaga não bate com o turno preferido do paciente, o sistema passa para a próxima solicitação *(regra proposta; validar com o grupo e a UPE)*.
 
 ## Exceções
 
-- **E1 — Vaga ocupada por outra transação ao mesmo tempo:** o índice único rejeita a inserção. O sistema descarta a tentativa (automático) ou responde `409` (manual) e nada é gravado.
+- **E1 — Vaga ocupada por outra transação ao mesmo tempo:** o índice único rejeita a inserção. O sistema descarta a tentativa (automático) ou, na proposta manual futura, responde `409` e nada é gravado.
 - **E2 — Solicitação já tem agendamento ativo:** o índice único de RN-002 rejeita a inserção, com o mesmo tratamento de E1.
 
 ## Pós-condições
@@ -53,7 +53,7 @@ Este caso de uso está escrito para funcionar nas duas respostas de ABERTO-1. Os
 
 ## Segurança
 
-- *(Manual)* Só Atendente, e dentro do escopo de unidade de **ABERTO-3** ([controle de acesso](../../security/access-control.md)).
+- *(Futuro — proposta manual)* Só Atendente, dentro do escopo de `escopo_da_equipe()` ([ADR-023](../../decisions/ADR-023-escopo-todas-as-unidades.md), [controle de acesso](../../security/access-control.md)).
 - A posição na fila é mostrada ao atendente, nunca ao paciente (RN-007).
 
 Diagrama: [atividades da fila](../../architecture/diagrams/activity-queue.md).

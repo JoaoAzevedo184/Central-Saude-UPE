@@ -7,7 +7,7 @@ Protótipo acadêmico (Extensão III, UNINASSAU Olinda) de teleagendamento para 
 - **Nunca faça commit, push, merge ou rebase**, nem crie branches, sem pedido explícito. Deixe as mudanças no working tree para a pessoa revisar.
 - Nunca use dados reais de pessoas (nem em testes, seeds, exemplos ou prints). CPFs válidos, porém fictícios.
 - Nunca versione segredos. Configuração nova vai para o `.env.example` com valor de exemplo.
-- Não decida as questões em aberto (`ABERTO-1` a `ABERTO-4` em `docs/requirements/open-questions.md`). Se a tarefa depender de uma, pare e pergunte, ou implemente atrás de uma configuração, marcada com `# ABERTO-N`.
+- ABERTO-1, 2 e 3 têm decisão provisória (ADR-021 a 023): implemente a decisão provisória, sempre pelo ponto único de troca (`propor_vaga`, `ordenar_fila`, `escopo_da_equipe`) e nunca espalhada pelo código. ABERTO-4 continua aberto: se a tarefa depender dele, pare e pergunte.
 
 ## Stack
 

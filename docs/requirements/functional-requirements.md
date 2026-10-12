@@ -14,7 +14,7 @@
 | RF-008 | Paciente registra uma solicitação de atendimento com preferências de turno, unidade e canal de aviso | Paciente | M | UC-002 | RN-009 |
 | RF-009 | Atendente valida a solicitação, que passa a aguardar vaga | Atendente | M | UC-007 | — |
 | RF-010 | Atendente e gestor veem a fila de cada especialidade, ordenada pelas regras de prioridade | Atendente, Gestor | M | UC-003 | RN-006 |
-| RF-011 | O sistema ou o atendente propõe uma vaga ao paciente, com prazo de resposta | Sistema ou Atendente (**ABERTO-1**) | M | UC-003 | RN-001, RN-002, RN-003, RN-008 |
+| RF-011 | O sistema ou o atendente propõe uma vaga ao paciente, com prazo de resposta | Sistema ([ADR-021](../decisions/ADR-021-matching-automatico.md)); proposta manual pelo atendente em fase futura | M | UC-003 | RN-001, RN-002, RN-003, RN-008 |
 | RF-012 | Paciente confirma uma proposta | Paciente | M | UC-004 | RN-001, RN-003 |
 | RF-013 | Paciente pede outra data e continua na fila | Paciente | M | UC-005 | RN-004 |
 | RF-014 | Paciente cancela ("não vou precisar") | Paciente | M | UC-005 | RN-004 |

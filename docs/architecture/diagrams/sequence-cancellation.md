@@ -1,6 +1,6 @@
 # Sequência — pedir outra data e liberar a vaga
 
-Cenário de [UC-005](../../requirements/use-cases/UC-005-pedir-outra-data-ou-cancelar.md). O trecho final depende de **ABERTO-1**; aqui está a variante automática.
+Cenário de [UC-005](../../requirements/use-cases/UC-005-pedir-outra-data-ou-cancelar.md). O trecho final mostra a variante automática, que é a do MVP ([ADR-021](../../decisions/ADR-021-matching-automatico.md)).
 
 ```mermaid
 sequenceDiagram
@@ -32,4 +32,4 @@ sequenceDiagram
   W->>P2: aviso de nova vaga (site e e-mail)
 ```
 
-Na variante manual, os passos de matching saem do Worker: a vaga aparece como livre na fila do atendente, que faz a proposta pela API ([UC-003](../../requirements/use-cases/UC-003-propor-vaga.md)).
+A variante automática é a do MVP (ADR-021). Na variante manual, de fase futura, os passos de matching saem do Worker: a vaga aparece como livre na fila do atendente, que faz a proposta pela API ([UC-003](../../requirements/use-cases/UC-003-propor-vaga.md)).

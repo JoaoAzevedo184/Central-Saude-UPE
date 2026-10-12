@@ -4,6 +4,7 @@ Cada decisão relevante vira um arquivo `NNN-titulo.md` com contexto, decisão e
 
 **Status possíveis**
 - **Proposto:** em discussão.
+- **Provisório:** aceito para o MVP, a confirmar com a instituição.
 - **Aceito:** vale para o projeto.
 - **Progressivo:** aceito, mas entra depois do MVP.
 - **Adiado:** só entra se o gatilho for atingido.
@@ -23,6 +24,9 @@ Cada decisão relevante vira um arquivo `NNN-titulo.md` com contexto, decisão e
 | [010](ADR-010-integracoes-por-interface.md) | Integrações atrás de interfaces com implementação simulada | Aceito |
 | [011](ADR-011-regras-de-prioridade.md) | Regras de prioridade em tabela, marcadas como simuladas | Aceito |
 | [012](ADR-012-implantacao.md) | Uma VM Oracle com Docker Compose e Nginx; CI no GitHub Actions | Aceito |
+| [021](ADR-021-matching-automatico.md) | Matching automático pelo Worker; proposta manual depois (ABERTO-1) | Provisório |
+| [022](ADR-022-ordem-da-fila-sem-aging.md) | Ordem fixa da fila (risco, prioridade legal, data), sem aging (ABERTO-2) | Provisório |
+| [023](ADR-023-escopo-todas-as-unidades.md) | Equipe vê todas as unidades, sempre via `escopo_da_equipe()` (ABERTO-3) | Provisório |
 
 ## Depois do MVP
 

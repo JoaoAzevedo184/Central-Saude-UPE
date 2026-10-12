@@ -18,7 +18,7 @@ Visão gráfica: [diagrama de casos de uso](../../architecture/diagrams/use-case
 | --- | --- | --- | --- |
 | [UC-001](UC-001-cadastrar-paciente.md) | Cadastrar paciente | Paciente | Detalhado |
 | [UC-002](UC-002-solicitar-atendimento.md) | Solicitar atendimento | Paciente | Detalhado |
-| [UC-003](UC-003-propor-vaga.md) | Propor vaga | Sistema ou Atendente | Detalhado, depende de **ABERTO-1** |
+| [UC-003](UC-003-propor-vaga.md) | Propor vaga | Sistema (Worker); Atendente em fase futura | Detalhado; ADR-021 (provisório) |
 | [UC-004](UC-004-confirmar-proposta.md) | Confirmar proposta | Paciente | Detalhado |
 | [UC-005](UC-005-pedir-outra-data-ou-cancelar.md) | Pedir outra data ou cancelar | Paciente | Detalhado |
 | [UC-006](UC-006-expirar-proposta.md) | Expirar proposta | Sistema | Detalhado |

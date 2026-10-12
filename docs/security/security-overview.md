@@ -21,7 +21,7 @@ Controles de segurança do sistema e onde cada um é detalhado. Documentar esses
 | Autenticação | Limite de tentativas de login e de cadastro | Proposto | AM-004 |
 | Sessão | Header contra CSRF em toda requisição que altera estado | Decidido | [ADR-003](../decisions/ADR-003-autenticacao-web.md) |
 | Autorização | Papéis + verificação de dono do recurso em toda rota com ID | Decidido | [controle de acesso](access-control.md) |
-| Autorização | Escopo por unidade para a equipe | Depende de **ABERTO-3** | [controle de acesso](access-control.md) |
+| Autorização | Escopo por unidade para a equipe | Provisório: todas as unidades, via `escopo_da_equipe()`, mitigado pela auditoria ([ADR-023](../decisions/ADR-023-escopo-todas-as-unidades.md)) | [controle de acesso](access-control.md) |
 | Integridade | Índice único parcial na ocupação da vaga; transições com `FOR UPDATE` | Decidido | [ADR-004](../decisions/ADR-004-ocupacao-da-vaga.md) |
 | Auditoria | Registro append-only de toda mudança de estado, com ator | Decidido | RN-010 |
 | Dados | Minimização, mascaramento de CPF, consentimento por finalidade, só dados sintéticos | Decidido | [proteção de dados](data-protection.md) |

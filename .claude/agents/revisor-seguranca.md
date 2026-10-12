@@ -19,7 +19,7 @@ Você revisa a segurança do backend da Central de Teleagendamento. **Você não
 
 - [ ] **AM-001 IDOR:** toda rota com ID filtra pelo paciente da sessão **dentro da query**; recurso alheio → `404`. Existe teste de acesso negado.
 - [ ] **Papéis:** a rota usa a dependência de papel correta, conforme a matriz. Nenhuma rota nova sem regra explícita.
-- [ ] **AM-007 / ABERTO-3:** consultas da equipe passam pelo escopo de unidade, se adotado.
+- [ ] **AM-007 / ADR-023:** toda rota da equipe usa `escopo = Depends(escopo_da_equipe)` e as consultas recebem o escopo.
 - [ ] **AM-013 atribuição em massa:** schemas de entrada do paciente não aceitam `papel`, `status`, `classificacao_risco`, `prioridade_legal` nem IDs de outros usuários.
 - [ ] **AM-014:** schemas de saída do paciente não têm posição, tamanho da fila nem dados de terceiros.
 - [ ] **AM-002 CSRF:** rotas de escrita exigem `X-CSRF-Token`.

@@ -1,14 +1,14 @@
 # Modelo de dados
 
-PostgreSQL. Identificadores `uuid`; datas e horas como `timestamptz` ([ADR-008](../decisions/ADR-008-datas-e-fuso.md)). Campos marcados com **ABERTO-n** dependem de [decisões em aberto](../requirements/open-questions.md).
+PostgreSQL. Identificadores `uuid`; datas e horas como `timestamptz` ([ADR-008](../decisions/ADR-008-datas-e-fuso.md)). Campos marcados com ADR-021 a ADR-023 seguem decisões provisórias de [decisões em aberto](../requirements/open-questions.md).
 
 ```mermaid
 erDiagram
   USUARIO ||--o| PACIENTE : "conta de"
   USUARIO ||--o{ AUDITORIA : "ator"
   USUARIO ||--o{ NOTIFICACAO : "destinatario"
-  USUARIO ||--o{ USUARIO_UNIDADE : "ABERTO-3 lotacao"
-  UNIDADE ||--o{ USUARIO_UNIDADE : "ABERTO-3"
+  USUARIO ||--o{ USUARIO_UNIDADE : "ADR-023 lotacao futura"
+  UNIDADE ||--o{ USUARIO_UNIDADE : "ADR-023"
   PACIENTE ||--o{ CONSENTIMENTO : "concede"
   PACIENTE ||--o{ SOLICITACAO : "faz"
   UNIDADE ||--o{ UNIDADE_ESPECIALIDADE : "oferece"
@@ -19,7 +19,7 @@ erDiagram
   UNIDADE |o--o{ SOLICITACAO : "preferida"
   SOLICITACAO ||--o{ AGENDAMENTO : "recebe propostas"
   VAGA ||--o{ AGENDAMENTO : "ocupada por"
-  USUARIO |o--o{ AGENDAMENTO : "ABERTO-1 propos"
+  USUARIO |o--o{ AGENDAMENTO : "ADR-021 propos"
   SOLICITACAO |o--o{ NOTIFICACAO : "sobre"
   AGENDAMENTO |o--o{ NOTIFICACAO : "sobre"
 
@@ -49,7 +49,7 @@ erDiagram
     timestamptz revogado_em "nulo = vigente"
   }
   USUARIO_UNIDADE {
-    uuid usuario_id PK, FK "ABERTO-3 so existe se o escopo for por unidade"
+    uuid usuario_id PK, FK "ADR-023 so sera criada se o escopo virar por unidade"
     uuid unidade_id PK, FK
   }
   UNIDADE {
@@ -92,7 +92,7 @@ erDiagram
     uuid id PK
     uuid paciente_id FK
     uuid especialidade_id FK
-    uuid unidade_preferida_id FK "nulo = qualquer unidade; ver ABERTO-3"
+    uuid unidade_preferida_id FK "nulo = qualquer unidade; ver ADR-023"
     enum classificacao_risco "vem da regulacao"
     enum prioridade_legal "retrato no momento do pedido"
     enum turno_preferido
@@ -106,16 +106,16 @@ erDiagram
     uuid solicitacao_id FK
     uuid vaga_id FK
     enum status "PROPOSTO CONFIRMADO CANCELADO EXPIRADO REALIZADO FALTOU"
-    uuid proposto_por_usuario_id FK "ABERTO-1 nulo = automatico"
+    uuid proposto_por_usuario_id FK "ADR-021 nulo = automatico; anulavel"
     timestamptz proposto_em
-    timestamptz expira_em "ABERTO-1 regra de antecedencia"
+    timestamptz expira_em "RN-008 antecedencia; ADR-021"
     timestamptz respondido_em
     text motivo_cancelamento
   }
   REGRA_PRIORIDADE {
     uuid id PK
     smallint ordem
-    enum criterio "CLASSIFICACAO_RISCO PRIORIDADE_LEGAL DATA_PEDIDO; ABERTO-2 AGING"
+    text criterio "CHECK CLASSIFICACAO_RISCO PRIORIDADE_LEGAL DATA_PEDIDO; ADR-022"
     jsonb parametros
     bool simulada
     bool ativa
@@ -188,6 +188,10 @@ CREATE UNIQUE INDEX ux_consentimento_vigente
 -- Worker: busca eficiente de eventos pendentes e propostas a expirar
 CREATE INDEX ix_outbox_pendente ON outbox (proximo_retry_em) WHERE status = 'PENDENTE';
 CREATE INDEX ix_agendamento_expiracao ON agendamento (expira_em) WHERE status = 'PROPOSTO';
+
+-- ADR-022: critérios da fila; acrescentar AGING exige só mudar este CHECK
+ALTER TABLE regra_prioridade ADD CONSTRAINT ck_regra_prioridade_criterio
+  CHECK (criterio IN ('CLASSIFICACAO_RISCO', 'PRIORIDADE_LEGAL', 'DATA_PEDIDO'));
 ```
 
 ## Observações
@@ -197,4 +201,4 @@ CREATE INDEX ix_agendamento_expiracao ON agendamento (expira_em) WHERE status = 
 - **Notificação** pode se referir a uma solicitação, a um agendamento ou a nenhum dos dois (avisos de conta).
 - **Auditoria** é append-only: a aplicação nunca faz `UPDATE` nem `DELETE` nessa tabela.
 - **Outbox** é gravada na mesma transação da mudança de estado e consumida pelo Worker com `FOR UPDATE SKIP LOCKED`.
-- Se houver aging (**ABERTO-2**), a ordem da fila passa a depender do tempo e é calculada na consulta, não gravada.
+- Sem aging no MVP ([ADR-022](../decisions/ADR-022-ordem-da-fila-sem-aging.md)). Se houver aging, a ordem da fila passa a depender do tempo e é calculada na consulta, não gravada.

@@ -14,7 +14,7 @@ Você implementa código Python no backend da Central de Teleagendamento, seguin
 1. Leia a tarefa recebida e identifique os IDs (UC-, RN-, RF-).
 2. Leia o caso de uso em `docs/requirements/use-cases/` e as regras em `docs/requirements/business-rules.md`.
 3. Leia o código vizinho em `apps/backend/app/` e siga os padrões que já existem. Não invente estrutura nova se houver um padrão equivalente.
-4. Se a tarefa depender de uma questão em aberto (ABERTO-1 a 4) ou exigir mudar o modelo de dados além do que está em `docs/architecture/data-model.md`, **pare e devolva a dúvida** em vez de decidir.
+4. ABERTO-1, 2 e 3 têm decisão provisória (ADR-021 a 023): implemente a decisão provisória, sempre pelo ponto único de troca (`propor_vaga`, `ordenar_fila`, `escopo_da_equipe`) e nunca espalhada pelo código. ABERTO-4 continua aberto: se a tarefa depender dele, ou exigir mudar o modelo de dados além do que está em `docs/architecture/data-model.md`, **pare e devolva a dúvida** em vez de decidir.
 
 ## Como implementar
 

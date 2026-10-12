@@ -48,9 +48,9 @@
 ### Equipe (atendente e gestor)
 | Método | Rota | Descrição |
 | --- | --- | --- |
-| GET | `/filas?especialidade_id=&unidade_id=` | Fila ordenada pelas regras de prioridade (escopo por unidade conforme **ABERTO-3**) |
+| GET | `/filas?especialidade_id=&unidade_id=` | Fila ordenada pelas regras de prioridade (escopo vem de `escopo_da_equipe()`; no MVP, todas as unidades — [ADR-023](../decisions/ADR-023-escopo-todas-as-unidades.md)) |
 | POST | `/solicitacoes/{id}/validar` | `EM_ANALISE` → `NA_FILA` |
-| POST | `/agendamentos` | Propõe uma vaga para uma solicitação — só existe se **ABERTO-1** for "manual" |
+| POST | `/agendamentos` | Propõe uma vaga para uma solicitação — fase futura (proposta manual, [ADR-021](../decisions/ADR-021-matching-automatico.md)) |
 | POST | `/agendamentos/{id}/registrar-comparecimento` | `CONFIRMADO` → `REALIZADO` |
 | POST | `/agendamentos/{id}/registrar-falta` | `CONFIRMADO` → `FALTOU` |
 | GET | `/indicadores?de=&ate=&unidade_id=` | Confirmação, faltas, tempo até confirmação, vagas reaproveitadas, fila por especialidade |

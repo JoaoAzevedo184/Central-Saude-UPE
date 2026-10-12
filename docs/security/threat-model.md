@@ -33,7 +33,7 @@ flowchart LR
 | AM-004 | Negação de serviço / Falsificação | Força bruta de senhas ou criação de contas em massa | Médio | Média | Limite de tentativas por IP e por CPF no Nginx ou na API; atraso progressivo | Proposto |
 | AM-005 | Divulgação | Descobrir quais CPFs têm conta pelas mensagens de login ou cadastro | Médio | Alta | Mensagens genéricas; mesmo tempo de resposta nos dois casos | Decidido (UC-001) |
 | AM-006 | Adulteração | Duas propostas simultâneas entregam a mesma vaga a dois pacientes | Alto | Média | Índice único parcial; teste de concorrência | Decidido |
-| AM-007 | Divulgação | Atendente consulta dados de pacientes de unidades em que não trabalha | Médio | Média | Escopo por unidade, se adotado; auditoria das consultas da equipe | **ABERTO-3** |
+| AM-007 | Divulgação | Atendente consulta dados de pacientes de unidades em que não trabalha | Médio | Média | Escopo via `escopo_da_equipe()`; auditoria das consultas da equipe | Aceito no MVP ([ADR-023](../decisions/ADR-023-escopo-todas-as-unidades.md)): visão de todas as unidades, mitigada pela auditoria |
 | AM-008 | Divulgação | Dados pessoais aparecem em logs ou no corpo dos e-mails | Médio | Alta | Logs sem CPF, nome nem corpo de requisição; e-mail com o mínimo e link para o site | Proposto |
 | AM-009 | Divulgação | Segredos (senha do banco, chave de token) vazam pelo repositório | Alto | Média | `.env` no `.gitignore`; varredura de segredos na CI; rotação se vazar | Parcial |
 | AM-010 | Adulteração | Injeção de SQL | Alto | Baixa | ORM ou consultas parametrizadas; validação com Pydantic | Decidido |

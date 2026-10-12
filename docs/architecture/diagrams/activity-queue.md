@@ -1,6 +1,6 @@
 # Atividades — da solicitação ao atendimento
 
-Percurso completo de uma solicitação pela fila, com as decisões e os caminhos alternativos. Os losangos marcados com ABERTO dependem de [questões em aberto](../../requirements/open-questions.md).
+Percurso completo de uma solicitação pela fila, com as decisões e os caminhos alternativos. Os losangos marcados com ABERTO dependem de [questões em aberto](../../requirements/open-questions.md); o marcado com ADR segue uma decisão provisória.
 
 ```mermaid
 flowchart TD
@@ -14,13 +14,13 @@ flowchart TD
   fila --> vaga{Há vaga livre<br/>compatível?}
   vaga -- não --> espera[Aguarda vaga<br/>criada ou liberada] --> vaga
   vaga -- sim --> ordena[Ordena a fila pelas<br/>regras de prioridade]
-  ordena --> quem{ABERTO-1<br/>quem propõe?}
-  quem -- automático --> escolheA[Sistema escolhe<br/>o primeiro elegível]
-  quem -- manual --> escolheM[Atendente escolhe]
+  ordena --> quem{Quem propõe?<br/>ADR-021}
+  quem -->|"automático (MVP)"| escolheA[Sistema escolhe<br/>o primeiro elegível]
+  quem -.->|"manual (futuro)"| escolheM[Atendente escolhe]
   escolheA --> prazo
   escolheM --> prazo
   prazo{Prazo de resposta cabe<br/>antes da vaga? RN-008}
-  prazo -- não --> fila
+  prazo -- não --> semprop[Vaga fica livre<br/>painel: vaga sem proposta] --> fila
   prazo -- sim --> proposta[Agendamento PROPOSTO<br/>solicitação EM_PROPOSTA<br/>aviso ao paciente]
 
   proposta --> resposta{Resposta do paciente}

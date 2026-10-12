@@ -60,7 +60,7 @@ flowchart LR
 | --- | --- | --- |
 | Nginx | TLS, arquivos estáticos do frontend, proxy de `/api/v1` | Lógica de negócio |
 | API | Autenticação, autorização, cadastros, fila, transições de solicitação e agendamento, leituras e indicadores | Jobs agendados, envio de e-mail |
-| Worker | Expiração de propostas, consumo da outbox, envio e retentativa de avisos, matching automático (se **ABERTO-1** = automático) | Atender HTTP |
+| Worker | Expiração de propostas, consumo da outbox, envio e retentativa de avisos, matching automático ([ADR-021](../decisions/ADR-021-matching-automatico.md)) | Atender HTTP |
 | PostgreSQL | Todo o estado, inclusive a ocupação das vagas (derivada) e a outbox | — |
 
 ## 2. Organização do código
@@ -166,7 +166,17 @@ Ver [UC-005](../requirements/use-cases/UC-005-pedir-outra-data-ou-cancelar.md) e
 | Expirar propostas | a cada 1 min | `PROPOSTO` com `expira_em < agora` | Idempotente; `SKIP LOCKED` |
 | Processar outbox | a cada 10 s | `PENDENTE` com `proximo_retry_em <= agora` | Pelo menos uma vez; o consumo tolera evento repetido |
 | Retentar avisos | junto com a outbox | `FALHOU` com tentativas abaixo do limite | Recuo progressivo entre tentativas |
-| Matching automático | ao processar eventos de vaga livre | Só se **ABERTO-1** = automático | Índice único decide a corrida |
+| Matching automático | ao processar eventos de vaga livre | Ativo no MVP ([ADR-021](../decisions/ADR-021-matching-automatico.md)) | Índice único decide a corrida |
+
+### 5.6 Pontos únicos de troca
+
+Decisões provisórias do MVP ficam num único lugar do código, para a troca não se espalhar.
+
+| Ponto | Flag | Decisão |
+| --- | --- | --- |
+| `propor_vaga(solicitacao, vaga, proposto_por)` | `MATCHING_AUTOMATICO` | [ADR-021](../decisions/ADR-021-matching-automatico.md) |
+| `ordenar_fila(solicitacoes, regras)` em `dominio/fila` | — (CHECK de `regra_prioridade.criterio`) | [ADR-022](../decisions/ADR-022-ordem-da-fila-sem-aging.md) |
+| `escopo_da_equipe()` | `ESCOPO_POR_UNIDADE` | [ADR-023](../decisions/ADR-023-escopo-todas-as-unidades.md) |
 
 ## 6. Concorrência
 
@@ -214,4 +224,5 @@ Ver [implantação](../operations/deployment.md) e o [diagrama de implantação]
 ## 11. Decisões e pendências
 
 - Decisões: [ADRs](../decisions/README.md).
-- Pendências que mudam este design: **ABERTO-1** (quem propõe a vaga → job do Worker ou endpoint), **ABERTO-3** (escopo por unidade → filtro em todas as consultas da equipe) e **ABERTO-4** (efeito da falta). Ver [questões em aberto](../requirements/open-questions.md).
+- Provisórias: [ADR-021](../decisions/ADR-021-matching-automatico.md) (matching automático), [ADR-022](../decisions/ADR-022-ordem-da-fila-sem-aging.md) (ordem da fila sem aging) e [ADR-023](../decisions/ADR-023-escopo-todas-as-unidades.md) (equipe vê todas as unidades). Trocam pelos pontos da seção 5.6.
+- Em aberto: **ABERTO-4** (efeito da falta). Ver [questões em aberto](../requirements/open-questions.md).

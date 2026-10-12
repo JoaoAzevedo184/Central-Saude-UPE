@@ -1,0 +1,63 @@
+# --- Segredos e ambiente ------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+infra/nginx/certs/
+
+# --- Python (apps/backend) ----------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.python-version
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# --- Node (apps/web, apps/mobile) --------------------------------------------
+node_modules/
+dist/
+build/
+.vite/
+*.tsbuildinfo
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- React Native / Expo (apps/mobile) ---------------------------------------
+.expo/
+apps/mobile/android/
+apps/mobile/ios/
+*.apk
+*.aab
+*.ipa
+
+# --- Backups e dumps (nunca no Git) -------------------------------------------
+backups/
+*.dump
+*.sql.gz
+
+# --- Claude Code (configuração pessoal) ---------------------------------------
+# .claude/agents/ e CLAUDE.md são do time e vão para o Git.
+.claude/settings.local.json
+CLAUDE.local.md
+
+# --- Editores e sistema -------------------------------------------------------
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# --- Logs ---------------------------------------------------------------------
+*.log
+logs/

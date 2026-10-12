@@ -1,0 +1,107 @@
+# Central Inteligente de Teleagendamento — CH/UPE
+#
+# Uso:
+#   docker compose up -d                     # postgres + migrate + api + worker
+#   docker compose --profile dev up -d       # + mailpit (caixa de e-mail falsa em http://localhost:8025)
+#   docker compose --profile proxy up -d     # + nginx (exige infra/nginx/default.conf e o build do frontend)
+#
+# API e Worker usam a MESMA imagem (apps/backend) com comandos diferentes (ADR-005).
+# O serviço "migrate" aplica as migrações uma vez antes de API e Worker subirem.
+
+name: central-saude-upe
+
+x-backend: &backend
+  build:
+    context: ./apps/backend
+  image: central-saude-upe/backend:local
+  env_file: .env
+  environment:
+    DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+  networks: [interna]
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: UTC
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Só na máquina local (127.0.0.1), para DBeaver/psql. Nunca exposto para fora da VM.
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT_HOST:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [interna]
+    restart: unless-stopped
+
+  migrate:
+    <<: *backend
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    <<: *backend
+    command: ["uvicorn", "app.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    # Só na máquina local; em produção o acesso externo é pelo nginx.
+    ports:
+      - "127.0.0.1:${API_PORT_HOST:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+    networks: [interna, borda]
+
+  worker:
+    <<: *backend
+    command: ["python", "-m", "app.worker"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  mailpit:
+    image: axllent/mailpit:latest
+    profiles: [dev]
+    ports:
+      - "127.0.0.1:8025:8025"   # interface web para ver os e-mails enviados
+    networks: [interna]
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:stable-alpine
+    profiles: [proxy]
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./apps/web/dist:/usr/share/nginx/html:ro
+      - ./infra/nginx/certs:/etc/nginx/certs:ro
+    networks: [borda]
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+
+networks:
+  # borda: nginx ↔ api. interna: api, worker, migrate, postgres, mailpit.
+  # O postgres não está na rede borda e não publica porta para fora de 127.0.0.1.
+  borda:
+  interna:

@@ -6,7 +6,7 @@ import time
 from collections.abc import Callable
 
 from app.config import Settings, get_settings
-from app.logging import configurar_logging
+from app.logging import configurar_logging, resumo_do_erro
 from app.worker import jobs
 
 logger = logging.getLogger("app.worker")
@@ -40,8 +40,8 @@ def rodar(agenda: list[tuple[Job, float]], parar: Callable[[], bool]) -> None:
                 continue
             try:
                 job()
-            except Exception:
-                logger.exception("job %s falhou", job.__name__)
+            except Exception as exc:
+                logger.error("job %s falhou: %s", job.__name__, resumo_do_erro(exc))
             proxima[i] = time.monotonic() + intervalo
         espera = min(proxima) - time.monotonic()
         if espera > 0:

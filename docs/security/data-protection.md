@@ -9,23 +9,29 @@
 | Nome | `paciente` | Identificar o paciente nas telas e avisos | Não | Completo para o próprio paciente; abreviado na fila da equipe |
 | CPF | `paciente` | Identificação única e login | Não | Mascarado (`***.482.***-10`) em todas as telas |
 | Cartão do SUS | `paciente` | Vínculo com o SUS e com a regulação | Não | Mascarado |
-| Data de nascimento | `paciente` | Prioridade legal por idade | Não | Só para o próprio paciente e a equipe |
+| Data de nascimento | `paciente` | Elegibilidade por idade da fila e critérios de idade do protocolo | Não | Só para o próprio paciente e a equipe |
+| Sexo | `paciente` | **Só** a elegibilidade da fila (por exemplo, laqueadura e mamografia). Anulável; sem ele, o paciente fica inelegível só para filas que restringem sexo | Não | Só para o próprio paciente e a equipe |
+| Município | `paciente` | **Só** direcionar o paciente para a unidade e as filas adequadas. Anulável | Não | Só para o próprio paciente e a equipe |
 | Celular, e-mail | `paciente`, `usuario` | Avisos | Não | Só para o próprio paciente |
 | Especialidade solicitada | `solicitacao` | Fila e agendamento | **Sim** (revela condição de saúde) | Paciente e equipe |
 | Classificação de risco | `solicitacao` | Ordem da fila | **Sim** | Só a equipe |
-| Prioridade legal (gestação, deficiência, idade) | `solicitacao` | Ordem da fila | **Sim** | Só a equipe |
+| Respostas aos critérios da fila (por exemplo, número de filhos, uso de anticoagulante, prioridade legal) e a nota | `resposta_criterio`, `solicitacao.nota` | Ordem da fila ([ADR-024](../decisions/ADR-024-protocolo-por-fila.md)) | **Sim** | Só a equipe das filas do escopo; o paciente vê as próprias respostas, não os pontos nem a nota |
+| Histórico familiar (por exemplo, "mãe ou irmã teve câncer de mama?") | `resposta_criterio` | Critério da fila ([ADR-030](../decisions/ADR-030-historico-familiar-como-criterio.md)) | **Sim** | Igual às demais respostas |
+| Linha do tempo da solicitação | `historico_solicitacao` | Transparência para o paciente e motivo das mudanças para a equipe | Não (sem posição) | O paciente vê só os eventos com `visivel_paciente = true` |
+| Situação da conta da equipe (suspensão, data, motivo) | `usuario` | Controle de acesso ([ADR-028](../decisions/ADR-028-suspensao-de-acesso.md)) | Não | Só o admin |
 | IP e ações | `auditoria` | Rastreabilidade e segurança | Não | Só o admin |
 
 O sistema **não** guarda diagnóstico, prontuário, resultados de exames nem qualquer dado clínico além do necessário para agendar.
 
 ## Princípios aplicados
 
-- **Minimização:** cada campo só existe se um fluxo usa. Campos novos com dado pessoal precisam aparecer nesta tabela no mesmo pull request.
+- **Minimização:** cada campo só existe se um fluxo usa. Campos novos com dado pessoal precisam aparecer nesta tabela no mesmo pull request. `sexo` e `municipio` servem só à elegibilidade e ao direcionamento; não entram em indicadores nem em e-mails.
+- **Sem dados de terceiros:** o histórico familiar é guardado só como a resposta do paciente ao critério. O sistema nunca cadastra parentes, nunca liga o cadastro de um paciente ao de outro e nunca guarda nome, CPF ou qualquer dado pessoal dos parentes ([ADR-030](../decisions/ADR-030-historico-familiar-como-criterio.md)).
 - **Consentimento por finalidade:** `AGENDAMENTO` (obrigatório para usar o serviço) e `LEMBRETE_EMAIL` (opcional), com versão do termo e data; revogável a qualquer momento (RN-009).
 - **Mascaramento:** CPF e cartão do SUS mascarados nas interfaces e nas respostas da API, exceto para o próprio titular quando necessário.
-- **Separação de visão:** o paciente não vê nada sobre outros pacientes, nem a posição na fila (RN-007).
+- **Separação de visão:** o paciente não vê nada sobre outros pacientes, nem a posição, o tamanho da fila, a nota ou os pontos (RN-007). A equipe vê só as filas do seu escopo ([ADR-025](../decisions/ADR-025-escopo-por-fila.md)).
 - **E-mails mínimos:** o e-mail avisa que há uma novidade e leva ao site; não contém especialidade, classificação nem CPF *(proposta)*.
-- **Logs sem dados pessoais:** os logs da aplicação usam IDs, nunca nome, CPF ou corpo de requisição.
+- **Logs sem dados pessoais:** os logs da aplicação usam IDs, nunca nome, CPF ou corpo de requisição. Erros inesperados (API e Worker) registram só o tipo da exceção e o SQLSTATE, porque a mensagem do Postgres pode repetir valores, como um CPF duplicado.
 - **Auditoria minimizada:** `dados_antes` e `dados_depois` guardam só os campos alterados de estado, não cópias completas do registro.
 
 ## Retenção *(a definir com a UPE)*

@@ -7,7 +7,7 @@ Controles de segurança do sistema e onde cada um é detalhado. Documentar esses
 | Ativo | Por que importa |
 | --- | --- |
 | Dados pessoais do paciente (nome, CPF, cartão do SUS, nascimento, contato) | Identificam a pessoa |
-| Dados de saúde implícitos (especialidade pedida, classificação de risco, prioridade legal) | Revelam condição de saúde; são dados sensíveis na LGPD |
+| Dados de saúde implícitos (fila pedida, classificação de risco, respostas aos critérios da fila, histórico familiar) | Revelam condição de saúde; são dados sensíveis na LGPD |
 | Integridade da fila e das vagas | Uma vaga entregue errado ou duas vezes prejudica o paciente |
 | Trilha de auditoria | É a prova de quem fez o quê |
 | Credenciais e segredos | Dão acesso a todo o resto |
@@ -21,9 +21,10 @@ Controles de segurança do sistema e onde cada um é detalhado. Documentar esses
 | Autenticação | Limite de tentativas de login e de cadastro | Proposto | AM-004 |
 | Sessão | Header contra CSRF em toda requisição que altera estado | Decidido | [ADR-003](../decisions/ADR-003-autenticacao-web.md) |
 | Autorização | Papéis + verificação de dono do recurso em toda rota com ID | Decidido | [controle de acesso](access-control.md) |
-| Autorização | Escopo por unidade para a equipe | Provisório: todas as unidades, via `escopo_da_equipe()`, mitigado pela auditoria ([ADR-023](../decisions/ADR-023-escopo-todas-as-unidades.md)) | [controle de acesso](access-control.md) |
+| Autorização | Escopo por fila para a equipe: atendente nas filas atribuídas, gestor por hospital ou central, admin tudo | Decidido ([ADR-025](../decisions/ADR-025-escopo-por-fila.md)) | [controle de acesso](access-control.md), AM-007, AM-016 |
+| Autorização | Profissional suspenso, nunca apagado; suspenso não entra | Decidido ([ADR-028](../decisions/ADR-028-suspensao-de-acesso.md)) | AM-017 |
 | Integridade | Índice único parcial na ocupação da vaga; transições com `FOR UPDATE` | Decidido | [ADR-004](../decisions/ADR-004-ocupacao-da-vaga.md) |
-| Auditoria | Registro append-only de toda mudança de estado, com ator | Decidido | RN-010 |
+| Auditoria | Registro append-only de toda mudança de estado, com ator; `auditoria` e `historico_solicitacao` protegidas por gatilho no banco | Decidido | RN-010 |
 | Dados | Minimização, mascaramento de CPF, consentimento por finalidade, só dados sintéticos | Decidido | [proteção de dados](data-protection.md) |
 | Entrada | Validação com Pydantic; SQL só pelo ORM ou com parâmetros | Decidido | AM-010 |
 | Saída | Schemas de resposta explícitos por papel; nada de devolver o modelo do banco inteiro | Proposto | AM-013, AM-014 |

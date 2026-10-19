@@ -1,6 +1,6 @@
 # 023 — Equipe vê todas as unidades no MVP
 
-- **Status:** Provisório
+- **Status:** Substituído por [ADR-025](ADR-025-escopo-por-fila.md) em 2026-10-15
 - **Data:** 2026-10-12
 
 ## Contexto

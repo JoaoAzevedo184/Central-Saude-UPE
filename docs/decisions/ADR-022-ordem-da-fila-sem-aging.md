@@ -1,6 +1,6 @@
 # 022 — Ordem fixa da fila, sem aging
 
-- **Status:** Provisório
+- **Status:** Substituído por [ADR-024](ADR-024-protocolo-por-fila.md) em 2026-10-15
 - **Data:** 2026-10-12
 
 ## Contexto

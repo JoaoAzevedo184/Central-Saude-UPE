@@ -1,6 +1,6 @@
 # 011 — Regras de prioridade em tabela, marcadas como simuladas
 
-- **Status:** Aceito
+- **Status:** Aceito. O formato das regras mudou com o [ADR-024](ADR-024-protocolo-por-fila.md); a marca de "simulado" continua valendo.
 - **Data:** 2026-10-12
 
 ## Contexto
@@ -8,6 +8,8 @@
 O próprio desafio avisa que as regras de prioridade devem ser definidas pela instituição, não inventadas pela equipe. Ainda assim, o MVP precisa de uma fila ordenada para funcionar e ser demonstrado.
 
 ## Decisão
+
+> Desde o [ADR-024](ADR-024-protocolo-por-fila.md), as regras não ficam mais em `regra_prioridade`. Cada fila tem critérios com peso em `criterio_fila`, também marcados como simulados (`simulado = true`). O texto abaixo é o registro original.
 
 - As regras ficam na tabela `regra_prioridade`, com `ordem`, `criterio`, `parametros` e a marca `simulada`.
 - Regras de exemplo, aplicadas em sequência:

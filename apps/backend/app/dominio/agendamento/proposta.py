@@ -1,4 +1,4 @@
-"""Proposta de vaga (UC-003, ADR-021)."""
+"""Proposta de vaga (UC-003, ADR-021: automática, na ordem da fila)."""
 
 from typing import Any
 from uuid import UUID
@@ -13,8 +13,9 @@ def propor_vaga(solicitacao: Any, vaga: Any, proposto_por: UUID | None, relogio:
     - RN-001 e RN-002: no máximo um agendamento ativo por vaga; a corrida é decidida pelo
       índice único parcial em `agendamento(vaga_id)`, e a violação vira 409 ou descarte;
     - RN-003: as regras de estado da solicitação e do agendamento;
-    - RN-008: não propor se o prazo de resposta passar do horário da vaga menos
-      `PROPOSTA_ANTECEDENCIA_MINIMA_HORAS`; a vaga fica livre ("vaga sem proposta");
+    - RN-008 / ADR-026: `expira_em` vem de `prazos.calcular_expira_em()` (prazo da fila,
+      antecedência mínima e janela mínima); se ela devolver `None`, não propor e deixar a
+      vaga livre no painel;
     - auditoria e evento na outbox gravados na mesma transação da proposta;
     - `proposto_por=None` significa proposta automática (Worker); senão, o ID do atendente.
 

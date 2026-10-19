@@ -4,11 +4,13 @@ from alembic import context
 from sqlalchemy import create_engine, pool
 
 from app.config import get_settings
+from app.infra import modelos  # noqa: F401  (registra as tabelas em Base.metadata)
 from app.infra.db import Base
 
 config = context.config
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # Sem desligar os loggers já criados pela aplicação (ex.: quando os testes migram o banco).
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
 url = get_settings().database_url

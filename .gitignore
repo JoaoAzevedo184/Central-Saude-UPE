@@ -48,6 +48,7 @@ backups/
 # .claude/agents/ e CLAUDE.md são do time e vão para o Git.
 .claude/settings.local.json
 CLAUDE.local.md
+.claude/agents/
 
 # --- Editores e sistema -------------------------------------------------------
 .vscode/*
@@ -61,3 +62,4 @@ Thumbs.db
 # --- Logs ---------------------------------------------------------------------
 *.log
 logs/
+graphify-out/

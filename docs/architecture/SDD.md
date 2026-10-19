@@ -130,6 +130,7 @@ O esquema, as restrições e os índices estão no [modelo de dados](data-model.
 1. **Solicitação separada de agendamento:** a fila é feita de solicitações; cada proposta é um agendamento novo.
 2. **Ocupação derivada:** um índice único parcial impede dois agendamentos ativos na mesma vaga ([ADR-004](../decisions/ADR-004-ocupacao-da-vaga.md)).
 3. **Outbox na mesma transação:** nenhum aviso é perdido ou enviado sobre algo não gravado ([ADR-006](../decisions/ADR-006-outbox.md)).
+4. **Fila como entidade, com protocolo próprio:** cada fila tem elegibilidade, prazos e critérios com peso; a posição é calculada na consulta, nunca gravada ([ADR-024](../decisions/ADR-024-protocolo-por-fila.md), [ADR-027](../decisions/ADR-027-fila-como-entidade.md)).
 
 ## 5. Fluxos técnicos
 
@@ -163,20 +164,24 @@ Ver [UC-005](../requirements/use-cases/UC-005-pedir-outra-data-ou-cancelar.md) e
 
 | Job | Frequência *(proposta)* | Seleção | Garantia |
 | --- | --- | --- | --- |
-| Expirar propostas | a cada 1 min | `PROPOSTO` com `expira_em < agora` | Idempotente; `SKIP LOCKED` |
+| Expirar propostas | a cada 1 min | `PROPOSTO` com `expira_em < agora`; a solicitação volta ao fim da fila ([ADR-026](../decisions/ADR-026-prazos-e-volta-ao-fim-da-fila.md)) | Idempotente; `SKIP LOCKED` |
 | Processar outbox | a cada 10 s | `PENDENTE` com `proximo_retry_em <= agora` | Pelo menos uma vez; o consumo tolera evento repetido |
 | Retentar avisos | junto com a outbox | `FALHOU` com tentativas abaixo do limite | Recuo progressivo entre tentativas |
 | Matching automático | junto com o processamento da outbox (mesmo intervalo, `WORKER_INTERVALO_OUTBOX_S`) | Disparado por eventos de vaga livre; só com `MATCHING_AUTOMATICO=true` ([ADR-021](../decisions/ADR-021-matching-automatico.md)) | Índice único decide a corrida |
 
 ### 5.6 Pontos únicos de troca
 
-Decisões provisórias do MVP ficam num único lugar do código, para a troca não se espalhar.
+Cada regra de negócio que a UPE pode ajustar fica num único lugar do código, para a mudança não se espalhar.
 
 | Ponto | Flag | Decisão |
 | --- | --- | --- |
 | `propor_vaga(solicitacao, vaga, proposto_por)` | `MATCHING_AUTOMATICO` | [ADR-021](../decisions/ADR-021-matching-automatico.md) |
-| `ordenar_fila(solicitacoes, regras)` em `dominio/fila` | — (CHECK de `regra_prioridade.criterio`) | [ADR-022](../decisions/ADR-022-ordem-da-fila-sem-aging.md) |
-| `escopo_da_equipe()` | `ESCOPO_POR_UNIDADE` | [ADR-023](../decisions/ADR-023-escopo-todas-as-unidades.md) |
+| `calcular_expira_em()` em `dominio/agendamento/prazos.py` | `PROPOSTA_ANTECEDENCIA_MINIMA_HORAS`, `PROPOSTA_JANELA_MINIMA_HORAS` | [ADR-021](../decisions/ADR-021-matching-automatico.md), [ADR-026](../decisions/ADR-026-prazos-e-volta-ao-fim-da-fila.md) |
+| `ordenar_fila(solicitacoes)` em `dominio/fila/ordenacao.py`; `calcular_pontos()` e `calcular_nota()` em `dominio/fila/criterios.py` | — (protocolo em `criterio_fila`) | [ADR-024](../decisions/ADR-024-protocolo-por-fila.md) |
+| `calcular_escopo()` em `dominio/acesso.py`, exposto pela dependência `escopo_da_equipe()` | — (atribuições em `usuario_fila` e `usuario_unidade`) | [ADR-025](../decisions/ADR-025-escopo-por-fila.md) |
+| `pode_marcar_falta()` e `reentrar_no_fim_da_fila()` | — (prazo e tolerância na `fila`) | [ADR-026](../decisions/ADR-026-prazos-e-volta-ao-fim-da-fila.md) |
+| `verificar_elegibilidade()` em `dominio/fila/elegibilidade.py` | — (elegibilidade na `fila`) | [ADR-027](../decisions/ADR-027-fila-como-entidade.md) |
+| `pode_autenticar()` em `dominio/acesso.py` | — (`usuario.situacao`) | [ADR-028](../decisions/ADR-028-suspensao-de-acesso.md) |
 
 ## 6. Concorrência
 
@@ -190,7 +195,7 @@ Decisões provisórias do MVP ficam num único lugar do código, para a troca n�
 ## 7. Erros
 
 - Respostas de erro em *Problem Details* (RFC 9457), com `type` estável para o frontend tratar cada caso.
-- Violações de unicidade conhecidas (vaga ocupada, proposta ativa) são traduzidas para `409`; qualquer outra vira `500`, registrada nos logs sem dados pessoais.
+- Violações de unicidade conhecidas (vaga ocupada, proposta ativa) são traduzidas para `409`; qualquer outra vira `500`. O erro inesperado é tratado por um middleware que registra só o tipo da exceção e o SQLSTATE, nunca a mensagem nem o traceback, porque a mensagem do Postgres pode repetir valores (ex.: `Key (cpf)=...`). Não é um `exception_handler(Exception)`: esse handler roda no `ServerErrorMiddleware` do Starlette, que relança a exceção para o servidor logar com a mensagem. Erros HTTP e de domínio (`404`, `409`...) não passam por esse middleware.
 - Recurso de outro paciente responde `404`, nunca `403`, para não revelar que existe.
 
 ## 8. Configuração
@@ -203,14 +208,16 @@ Toda configuração vem de variáveis de ambiente (nomes definitivos no `.env.ex
 - SMTP;
 - intervalo dos jobs;
 - limite de retentativas;
-- antecedência mínima para propor (RN-008).
+- antecedência mínima para propor (RN-008) e janela mínima para o paciente responder (RN-016).
+
+Prazo de confirmação, tolerância de atraso, elegibilidade e critérios de prioridade não são variáveis de ambiente: ficam nos dados de cada fila ([ADR-027](../decisions/ADR-027-fila-como-entidade.md)).
 
 ## 9. Estratégia de testes
 
 | Nível | Cobre | Como |
 | --- | --- | --- |
 | Unidade | Regras de `dominio` (transições, ordenação da fila, prazos) | Sem banco; `Relogio` fixo; implementações falsas das interfaces |
-| Integração | Repositórios, restrições do banco, rotas da API | PostgreSQL real do Docker Compose, banco limpo por teste |
+| Integração | Repositórios, restrições do banco, migração, seed, rotas da API | PostgreSQL real do Docker Compose, num banco separado `<POSTGRES_DB>_test`, recriado e migrado a cada execução; cada teste roda numa transação desfeita no fim |
 | Concorrência | RN-001, RN-002, confirmação × expiração | Duas sessões em threads disputando o mesmo registro |
 | Segurança | Dono do recurso, papéis, CSRF | Um teste de acesso negado por rota com ID |
 | Contrato | Esquema OpenAPI | Gerado pelo FastAPI e verificado na CI |
@@ -224,5 +231,6 @@ Ver [implantação](../operations/deployment.md) e o [diagrama de implantação]
 ## 11. Decisões e pendências
 
 - Decisões: [ADRs](../decisions/README.md).
-- Provisórias: [ADR-021](../decisions/ADR-021-matching-automatico.md) (matching automático), [ADR-022](../decisions/ADR-022-ordem-da-fila-sem-aging.md) (ordem da fila sem aging) e [ADR-023](../decisions/ADR-023-escopo-todas-as-unidades.md) (equipe vê todas as unidades). Trocam pelos pontos da seção 5.6.
-- Em aberto: **ABERTO-4** (efeito da falta). Ver [questões em aberto](../requirements/open-questions.md).
+- As questões ABERTO-1 a 4 foram respondidas pela UPE em 15/10/2026: [ADR-021](../decisions/ADR-021-matching-automatico.md) e [ADR-024](../decisions/ADR-024-protocolo-por-fila.md) a [ADR-028](../decisions/ADR-028-suspensao-de-acesso.md). Os pontos de troca estão na seção 5.6.
+- Propostas para depois: [ADR-029](../decisions/ADR-029-overbooking-por-vagas-extras.md) (overbooking) e [ADR-030](../decisions/ADR-030-historico-familiar-como-criterio.md) (histórico familiar).
+- Não há questões em aberto ([histórico](../requirements/open-questions.md)).

@@ -22,6 +22,12 @@
   - `422`: validação
 - **Ações de estado** são sub-recursos com `POST` (`/agendamentos/{id}/confirmar`), não `PATCH` no campo `status`. Assim cada transição tem validação, autorização e auditoria próprias.
 - **Paginação** de listas: `?limite=&cursor=`.
+- **Escopo da equipe por fila** ([ADR-025](../decisions/ADR-025-escopo-por-fila.md)): toda rota da equipe recebe `escopo = Depends(escopo_da_equipe)`, um conjunto de `fila_id`, e filtra por `fila_id IN escopo` **dentro da query**. Recurso de fila fora do escopo responde `404`, como recurso de outro paciente. Usuário suspenso não tem sessão ([ADR-028](../decisions/ADR-028-suspensao-de-acesso.md)).
+- **O que o paciente vê** ([ADR-007](../decisions/ADR-007-paciente-ve-status.md)):
+  - status da solicitação, a fila (nome e descrição) e a linha do tempo, com só os eventos de `historico_solicitacao` em que `visivel_paciente = true` (tipo, data e motivo);
+  - **nunca** posição na fila, tamanho da fila, nota, pontos dos critérios, classificação de risco ou estimativa derivada deles;
+  - os schemas de entrada do paciente aceitam só as respostas dos critérios com origem `PACIENTE`; os pontos e a nota são calculados no servidor.
+- **O que a equipe vê:** além do que o paciente vê, a posição calculada na consulta (`ordenar_fila()`), o risco, a nota, as respostas e o motivo da última mudança de posição.
 
 ## Endpoints
 
@@ -40,8 +46,11 @@
 | GET | `/pacientes/me/consentimentos` | Consentimentos vigentes e histórico |
 | POST | `/pacientes/me/consentimentos` | Concede um consentimento (finalidade, versão do termo) |
 | POST | `/pacientes/me/consentimentos/{id}/revogar` | Revoga um consentimento |
+| GET | `/filas/disponiveis?especialidade_id=` | Filas para as quais o paciente é elegível, com a descrição para o paciente (RN-017) |
 | GET | `/pacientes/me/solicitacoes` | Solicitações com status, **sem posição na fila** (RN-007) |
-| POST | `/solicitacoes` | Nova solicitação |
+| GET | `/solicitacoes/{id}/linha-do-tempo` | Eventos visíveis ao paciente, com motivo; sem posição |
+| GET | `/pacientes/me/historico` | Histórico de atendimentos: realizados, faltas, propostas expiradas e canceladas |
+| POST | `/solicitacoes` | Nova solicitação numa fila, com as respostas dos critérios de origem `PACIENTE` |
 | POST | `/solicitacoes/{id}/cancelar` | "Não vou precisar" |
 | GET | `/pacientes/me/agendamentos` | Propostas, próximos e anteriores |
 | GET | `/agendamentos/{id}` | Detalhe da proposta ou do agendamento |
@@ -54,22 +63,26 @@
 ### Equipe (atendente e gestor)
 | Método | Rota | Descrição |
 | --- | --- | --- |
-| GET | `/filas?especialidade_id=&unidade_id=` | Fila ordenada pelas regras de prioridade (escopo vem de `escopo_da_equipe()`; no MVP, todas as unidades — [ADR-023](../decisions/ADR-023-escopo-todas-as-unidades.md)) |
-| POST | `/solicitacoes/{id}/validar` | `EM_ANALISE` → `NA_FILA` |
+| GET | `/filas` | Filas do escopo do usuário |
+| GET | `/filas/{id}/solicitacoes` | Fila ordenada por risco, nota e hora de chegada, com posição e motivo da última mudança (só filas do escopo) |
+| POST | `/solicitacoes/{id}/validar` | `EM_ANALISE` → `NA_FILA`, com a classificação de risco |
 | POST | `/agendamentos` | Propõe uma vaga para uma solicitação — fase futura (proposta manual, [ADR-021](../decisions/ADR-021-matching-automatico.md)) |
 | POST | `/agendamentos/{id}/registrar-comparecimento` | `CONFIRMADO` → `REALIZADO` |
-| POST | `/agendamentos/{id}/registrar-falta` | `CONFIRMADO` → `FALTOU` |
-| GET | `/indicadores?de=&ate=&unidade_id=` | Confirmação, faltas, tempo até confirmação, vagas reaproveitadas, fila por especialidade |
+| POST | `/agendamentos/{id}/registrar-falta` | `CONFIRMADO` → `FALTOU`, só depois da tolerância; a solicitação volta ao fim da fila (RN-013, RN-014) |
+| GET | `/indicadores?de=&ate=&unidade_id=` | Confirmação, faltas, tempo até confirmação, vagas reaproveitadas, tamanho de cada fila (gestor: unidades do escopo) |
 
 ### Administração
 | Método | Rota | Descrição |
 | --- | --- | --- |
 | GET, POST, PATCH | `/unidades` | Unidades |
 | GET, POST, PATCH | `/especialidades` | Especialidades |
-| GET, POST, PATCH | `/ofertas` | Especialidade numa unidade, com prazo de resposta |
+| GET, POST, PATCH | `/filas` | Filas: descrição para o paciente, elegibilidade, prazo de confirmação e tolerância |
+| GET, POST, PATCH | `/filas/{id}/criterios` | Protocolo da fila: critérios, tipos, pesos e parâmetros |
 | GET, POST, PATCH | `/agendas` | Agendas; criar uma agenda gera as vagas da vigência |
 | POST | `/vagas/{id}/bloquear` e `/vagas/{id}/desbloquear` | Estado administrativo da vaga |
-| GET, PUT | `/regras-prioridade` | Ordem e parâmetros das regras da fila |
+| GET, POST | `/usuarios` | Contas da equipe |
+| POST | `/usuarios/{id}/suspender` e `/usuarios/{id}/reativar` | Suspensão de acesso, com motivo ([ADR-028](../decisions/ADR-028-suspensao-de-acesso.md)) |
+| PUT | `/usuarios/{id}/filas` e `/usuarios/{id}/unidades` | Atribuições de escopo; filas só para ATENDENTE e unidades só para GESTOR |
 | GET | `/auditoria?entidade=&entidade_id=` | Trilha de auditoria |
 
 ### Operação

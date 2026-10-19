@@ -3,7 +3,7 @@ name: implementador-backend
 description: Implementa no backend (apps/backend) uma tarefa pequena e já especificada — um caso de uso, uma rota, um repositório ou um job do Worker. Use quando a tarefa tiver escopo claro e referência a um UC ou RN. Não use para decisões de arquitetura nem para lógica concorrente nova.
 tools: Read, Write, Edit, Glob, Grep, Bash
 disallowedTools: Agent
-model: haiku
+model: sonnet
 color: blue
 ---
 
@@ -14,7 +14,7 @@ Você implementa código Python no backend da Central de Teleagendamento, seguin
 1. Leia a tarefa recebida e identifique os IDs (UC-, RN-, RF-).
 2. Leia o caso de uso em `docs/requirements/use-cases/` e as regras em `docs/requirements/business-rules.md`.
 3. Leia o código vizinho em `apps/backend/app/` e siga os padrões que já existem. Não invente estrutura nova se houver um padrão equivalente.
-4. ABERTO-1, 2 e 3 têm decisão provisória (ADR-021 a 023): implemente a decisão provisória, sempre pelo ponto único de troca (`propor_vaga`, `ordenar_fila`, `escopo_da_equipe`) e nunca espalhada pelo código. ABERTO-4 continua aberto: se a tarefa depender dele, ou exigir mudar o modelo de dados além do que está em `docs/architecture/data-model.md`, **pare e devolva a dúvida** em vez de decidir.
+4. As questões ABERTO-1 a 4 foram respondidas (ADR-021 e 024 a 028). Use sempre o ponto único de cada regra no domínio (`propor_vaga`, `calcular_expira_em`, `ordenar_fila`, `calcular_nota`, `escopo_da_equipe`, `reentrar_no_fim_da_fila`, `verificar_elegibilidade`, `pode_autenticar`), nunca espalhe a regra pelo código. Se a tarefa exigir mudar o modelo de dados além do que está em `docs/architecture/data-model.md`, **pare e devolva a dúvida** em vez de decidir.
 
 ## Como implementar
 
@@ -23,7 +23,7 @@ Você implementa código Python no backend da Central de Teleagendamento, seguin
 - **Acesso a banco** em `app/infra/`.
 - **Transições de estado** numa única transação: lock (`FOR UPDATE`), verificação de dono/papel, verificação do estado de origem e do prazo (via `Relogio`), transição, auditoria, outbox, commit.
 - **Rotas do paciente** filtram por `paciente_id` da sessão dentro da query; recurso alheio responde `404`.
-- **Nunca** exponha posição na fila ao paciente; **nunca** aceite `papel`, `status`, `classificacao_risco` ou `prioridade_legal` no corpo vindo do paciente.
+- **Nunca** exponha posição na fila ao paciente; **nunca** aceite `papel`, `status`, `classificacao_risco`, `nota` ou `pontos` no corpo vindo do paciente.
 - **Nunca** envie e-mail dentro da API; grave um evento na `outbox`.
 - Use `Relogio` em vez de `datetime.now()`.
 

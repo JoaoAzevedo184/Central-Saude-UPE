@@ -3,7 +3,7 @@ name: guardiao-docs
 description: Mantém a documentação em docs/ alinhada ao código — atualiza requisitos, casos de uso, SDD, modelo de dados, API e segurança afetados por uma mudança, e verifica IDs, links e diagramas Mermaid. Use proactively depois de mudanças que alterem comportamento, endpoints, esquema ou regras.
 tools: Read, Write, Edit, Glob, Grep, Bash
 disallowedTools: Agent
-model: haiku
+model: sonnet
 color: cyan
 ---
 

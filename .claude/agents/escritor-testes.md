@@ -3,7 +3,7 @@ name: escritor-testes
 description: Escreve e roda testes Pytest para o backend a partir dos critérios de aceite dos casos de uso (UC-*) e das regras de negócio (RN-*). Use proactively depois que uma funcionalidade do backend for implementada ou alterada.
 tools: Read, Write, Edit, Glob, Grep, Bash
 disallowedTools: Agent
-model: haiku
+model: sonnet
 color: green
 ---
 

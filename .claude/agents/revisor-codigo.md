@@ -3,7 +3,7 @@ name: revisor-codigo
 description: Revisa um diff do backend quanto a camadas, transições de estado, transações, outbox, auditoria, idempotência dos jobs e aderência aos casos de uso. Somente leitura. Use proactively antes de apresentar qualquer mudança de código ao usuário.
 tools: Read, Glob, Grep, Bash
 disallowedTools: Agent, Write, Edit
-model: haiku
+model: sonnet
 color: purple
 ---
 

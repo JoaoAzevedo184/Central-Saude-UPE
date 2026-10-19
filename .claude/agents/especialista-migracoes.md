@@ -3,7 +3,7 @@ name: especialista-migracoes
 description: Cria ou revisa migrações Alembic e models SQLAlchemy do backend, conferindo com docs/architecture/data-model.md (tabelas, enums, índices únicos parciais, constraints). Use sempre que uma tarefa mudar o esquema do banco.
 tools: Read, Write, Edit, Glob, Grep, Bash
 disallowedTools: Agent
-model: haiku
+model: sonnet
 color: orange
 ---
 
@@ -20,7 +20,10 @@ Você cuida do esquema PostgreSQL da Central de Teleagendamento.
   - `ux_agendamento_vaga_ativa` — único parcial em `agendamento(vaga_id)` onde `status IN ('PROPOSTO','CONFIRMADO')`;
   - `ux_agendamento_solicitacao_ativa` — único parcial em `agendamento(solicitacao_id)` com o mesmo filtro;
   - `UNIQUE (agenda_id, inicio)` em `vaga`;
-  - `UNIQUE (unidade_id, especialidade_id)` em `unidade_especialidade`;
+  - `UNIQUE (unidade_id, nome)` em `fila`;
+  - FKs compostas de `resposta_criterio` com `fila_id` para `solicitacao (id, fila_id)` e `criterio_fila (id, fila_id)`;
+  - `CHECK` de risco classificado e de `data_entrada_fila` em `solicitacao`, e de suspensão datada em `usuario`;
+  - gatilho append-only em `auditoria` e `historico_solicitacao`;
   - único parcial de consentimento vigente;
   - índices do Worker em `outbox` e em `agendamento(expira_em)`.
 - **`vaga` não tem coluna de ocupação.** Só `status_admin`.

@@ -1,62 +1,29 @@
-"""Ordenação da fila (RN-006, ADR-022).
+"""Ordenação da fila (RN-006, ADR-024).
 
-Este é o ÚNICO lugar do sistema que ordena a fila. As regras são simuladas (ADR-011):
-os critérios oficiais são da instituição e chegam pela tabela `regra_prioridade`.
+Este é o ÚNICO lugar do sistema que ordena a fila. A ordem é:
+1. classificação de risco: VERMELHO, AMARELO, VERDE;
+2. nota do protocolo da fila, decrescente (`calcular_nota`);
+3. hora de chegada na fila (`data_entrada_fila`), crescente;
+4. `id`, só para a ordem ser sempre determinística.
+
+A posição resultante nunca é gravada nem mostrada ao paciente (ADR-007).
 """
 
-from collections.abc import Callable, Iterable
-from dataclasses import dataclass
-from datetime import date, datetime
-from typing import Any
-from uuid import UUID
+from collections.abc import Iterable
 
-_PESO_RISCO = {"VERMELHO": 0, "AMARELO": 1, "VERDE": 2, "AZUL": 3}
+from app.dominio.solicitacao import Solicitacao
+
+_PESO_RISCO = {"VERMELHO": 0, "AMARELO": 1, "VERDE": 2}
 
 
-@dataclass(frozen=True)
-class SolicitacaoNaFila:
-    id: UUID
-    classificacao_risco: str
-    prioridade_legal: str | None
-    data_pedido: date
-    criada_em: datetime
+def _chave(s: Solicitacao) -> tuple:
+    if s.classificacao_risco not in _PESO_RISCO:
+        raise ValueError(f"classificação de risco desconhecida: {s.classificacao_risco!r}")
+    if s.data_entrada_fila is None:
+        raise ValueError(f"solicitação {s.id} sem data de entrada na fila")
+    return (_PESO_RISCO[s.classificacao_risco], -s.nota, s.data_entrada_fila, s.id)
 
 
-@dataclass(frozen=True)
-class RegraPrioridade:
-    criterio: str
-    ordem: int
-    ativa: bool = True
-
-
-def _risco(s: SolicitacaoNaFila) -> int:
-    try:
-        return _PESO_RISCO[s.classificacao_risco]
-    except KeyError:
-        raise ValueError(
-            f"classificação de risco desconhecida: {s.classificacao_risco!r}"
-        ) from None
-
-
-_CHAVES: dict[str, Callable[[SolicitacaoNaFila], Any]] = {
-    "CLASSIFICACAO_RISCO": _risco,
-    "PRIORIDADE_LEGAL": lambda s: s.prioridade_legal is None,  # com prioridade primeiro
-    "DATA_PEDIDO": lambda s: s.data_pedido,  # mais antigo primeiro
-}
-
-
-def ordenar_fila(
-    solicitacoes: Iterable[SolicitacaoNaFila], regras: Iterable[RegraPrioridade]
-) -> list[SolicitacaoNaFila]:
-    """Devolve as solicitações na ordem da fila.
-
-    Aplica as regras ativas em ordem crescente de `ordem`. Desempate final por `criada_em`
-    e depois por `id`, para a ordem ser sempre determinística. Critério desconhecido
-    levanta `ValueError`.
-    """
-    chaves = []
-    for regra in sorted((r for r in regras if r.ativa), key=lambda r: r.ordem):
-        if regra.criterio not in _CHAVES:
-            raise ValueError(f"critério de prioridade desconhecido: {regra.criterio!r}")
-        chaves.append(_CHAVES[regra.criterio])
-    return sorted(solicitacoes, key=lambda s: (*(c(s) for c in chaves), s.criada_em, s.id))
+def ordenar_fila(solicitacoes: Iterable[Solicitacao]) -> list[Solicitacao]:
+    """Devolve as solicitações na ordem da fila."""
+    return sorted(solicitacoes, key=_chave)

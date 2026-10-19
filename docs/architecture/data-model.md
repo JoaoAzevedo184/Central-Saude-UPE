@@ -94,7 +94,7 @@ erDiagram
     uuid especialidade_id FK
     uuid unidade_preferida_id FK "nulo = qualquer unidade; ver ADR-023"
     enum classificacao_risco "vem da regulacao"
-    enum prioridade_legal "retrato no momento do pedido"
+    enum prioridade_legal "IDOSO_80_MAIS IDOSO_60_MAIS GESTANTE PCD; nulo = sem prioridade; simulados ADR-011"
     enum turno_preferido
     text origem_encaminhamento
     date data_pedido
@@ -197,7 +197,7 @@ ALTER TABLE regra_prioridade ADD CONSTRAINT ck_regra_prioridade_criterio
 ## Observações
 
 - **Vaga livre** = `status_admin = 'ATIVA'` e nenhum agendamento ativo apontando para ela. A tabela `vaga` não guarda "ocupada", para não existir estado duplicado que possa divergir.
-- **Prioridade legal** é gravada na solicitação no momento do pedido, para a ordem da fila continuar auditável mesmo que os dados do paciente mudem.
+- **Prioridade legal** é gravada na solicitação no momento do pedido, para a ordem da fila continuar auditável mesmo que os dados do paciente mudem. Valores: `IDOSO_80_MAIS`, `IDOSO_60_MAIS`, `GESTANTE`, `PCD`; nulo = sem prioridade legal. São valores simulados ([ADR-011](../decisions/ADR-011-regras-de-prioridade.md)).
 - **Notificação** pode se referir a uma solicitação, a um agendamento ou a nenhum dos dois (avisos de conta).
 - **Auditoria** é append-only: a aplicação nunca faz `UPDATE` nem `DELETE` nessa tabela.
 - **Outbox** é gravada na mesma transação da mudança de estado e consumida pelo Worker com `FOR UPDATE SKIP LOCKED`.

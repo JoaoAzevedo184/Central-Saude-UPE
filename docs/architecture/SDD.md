@@ -82,7 +82,7 @@ apps/backend/app/
 └── worker/         # laço de jobs e agendamento das execuções
 ```
 
-**Regra de dependência:** `api` e `worker` dependem de `dominio`; `dominio` depende só de interfaces que ele mesmo declara; `infra` implementa essas interfaces. Assim as regras de negócio são testadas sem banco nem HTTP (RNF-042).
+**Regra de dependência:** `api` e `worker` dependem de `dominio`; `dominio` depende só de interfaces que ele mesmo declara; `infra` implementa essas interfaces. As interfaces do domínio (inclusive `Relogio`, em `app/dominio/relogio.py`) ficam em `app/dominio`, e as implementações (`RelogioReal`, `RelogioFixo`, repositórios, SMTP) em `app/infra`. Nenhum módulo de `app/dominio` importa de `app/infra`. Assim as regras de negócio são testadas sem banco nem HTTP (RNF-042).
 
 Os subpacotes de `dominio` seguem as frentes verticais da equipe ([CONTRIBUTING](../../CONTRIBUTING.md)).
 
@@ -166,7 +166,7 @@ Ver [UC-005](../requirements/use-cases/UC-005-pedir-outra-data-ou-cancelar.md) e
 | Expirar propostas | a cada 1 min | `PROPOSTO` com `expira_em < agora` | Idempotente; `SKIP LOCKED` |
 | Processar outbox | a cada 10 s | `PENDENTE` com `proximo_retry_em <= agora` | Pelo menos uma vez; o consumo tolera evento repetido |
 | Retentar avisos | junto com a outbox | `FALHOU` com tentativas abaixo do limite | Recuo progressivo entre tentativas |
-| Matching automático | ao processar eventos de vaga livre | Ativo no MVP ([ADR-021](../decisions/ADR-021-matching-automatico.md)) | Índice único decide a corrida |
+| Matching automático | junto com o processamento da outbox (mesmo intervalo, `WORKER_INTERVALO_OUTBOX_S`) | Disparado por eventos de vaga livre; só com `MATCHING_AUTOMATICO=true` ([ADR-021](../decisions/ADR-021-matching-automatico.md)) | Índice único decide a corrida |
 
 ### 5.6 Pontos únicos de troca
 

@@ -7,7 +7,13 @@
 - **Base:** `/api/v1`. Uma versão nova de URL só para mudanças incompatíveis.
 - **Formato:** JSON com campos em `snake_case`. Datas em ISO 8601 com fuso (`2026-10-08T08:30:00-03:00`).
 - **Autenticação:** cookie `httpOnly` com o refresh token; requisições que alteram estado (`POST`, `PUT`, `PATCH`, `DELETE`) enviam o header `X-CSRF-Token`. O mobile, quando existir, usa `Authorization: Bearer` ([ADR-003](../decisions/ADR-003-autenticacao-web.md)).
-- **Erros:** formato *Problem Details* (RFC 9457), `application/problem+json`, com `type`, `title`, `status` e `detail`.
+- **Erros:** formato *Problem Details* (RFC 9457), `application/problem+json`, com `type`, `title`, `status` e `detail`. O `type` é um caminho relativo estável; o frontend decide o tratamento pelo `type`, nunca pelo texto. Valores em uso:
+
+  | `type` | Status | Quando aparece |
+  | --- | --- | --- |
+  | `about:blank` | conforme o erro (`404`, `405`, `422`, `500`, `503`…) | Erros HTTP genéricos: rota inexistente, método não permitido, validação da entrada (com a lista `errors`), erro inesperado, banco indisponível no `/health` |
+  | `/problemas/transicao-invalida` | `409` | O estado de origem não permite a transição pedida (ex.: proposta já respondida) |
+  | `/problemas/erro-de-dominio` | `409` | Outra regra de negócio violada, sem `type` mais específico |
 - **Códigos de status mais usados:**
   - `401`: sem sessão
   - `403`: sem permissão para o papel ou o escopo

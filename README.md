@@ -73,7 +73,19 @@ Uma API FastAPI e um Worker Python compartilham o mesmo código e o mesmo Postgr
 
 ## Como rodar
 
-Em construção. Esta seção será preenchida junto com o setup do Docker Compose.
+Requisitos: Docker com Compose v2.
+
+```bash
+cp .env.example .env                                    # ajuste a senha e o JWT_SECRET_KEY
+docker compose --profile dev up -d --build              # postgres, migrate, api, worker e mailpit
+curl http://127.0.0.1:8000/api/v1/health                # {"status":"ok"}
+docker compose exec api pytest                          # testes
+docker compose exec api sh -c "ruff check . && ruff format --check ."   # lint
+docker compose logs -f worker                           # laço de jobs
+```
+
+- Documentação da API: http://127.0.0.1:8000/api/v1/docs
+- E-mails enviados em desenvolvimento (mailpit): http://127.0.0.1:8025
 
 ## Documentação
 

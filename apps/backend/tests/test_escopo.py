@@ -1,15 +1,13 @@
 import pytest
+from fastapi import HTTPException
 
-from app.api.deps import EscopoEquipe, escopo_da_equipe
-from app.config import Settings
-
-
-def test_adr023_padrao_ve_todas_as_unidades():
-    escopo = escopo_da_equipe(Settings(escopo_por_unidade=False))
-
-    assert escopo == EscopoEquipe(unidade_ids=None)
+from app.api.deps import usuario_da_sessao
 
 
-def test_adr023_escopo_por_unidade_ainda_nao_implementado():
-    with pytest.raises(NotImplementedError, match="ADR-023"):
-        escopo_da_equipe(Settings(escopo_por_unidade=True))
+def test_adr025_sem_autenticacao_o_escopo_falha_fechado():
+    # A regra do escopo está em dominio/acesso.py (tests/dominio/test_acesso.py). Até existir
+    # autenticação, a dependência não identifica usuário e nenhuma rota da equipe responde.
+    with pytest.raises(HTTPException) as erro:
+        usuario_da_sessao()
+
+    assert erro.value.status_code == 401

@@ -13,5 +13,6 @@ def test_erro_de_sql_nao_expoe_valor_do_parametro():
         # Tabela inexistente: o erro vem do SQLAlchemy com o SQL, sem o Postgres ecoar o valor.
         conexao.execute(text("SELECT * FROM tabela_inexistente WHERE x = :valor"), {"valor": valor})
 
+    assert erro.value.orig.sqlstate == "42P01"  # tabela inexistente, não falha de conexão
     assert engine.hide_parameters
     assert valor not in str(erro.value)

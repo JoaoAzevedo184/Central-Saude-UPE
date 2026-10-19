@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/backend
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: teleagendamento
+          POSTGRES_USER: teleagendamento
+          POSTGRES_PASSWORD: teleagendamento
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U teleagendamento -d teleagendamento"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      APP_ENV: test
+      DATABASE_URL: postgresql+psycopg://teleagendamento:teleagendamento@localhost:5432/teleagendamento
+      JWT_SECRET_KEY: segredo-somente-para-ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Instalar dependências (com o grupo dev)
+        run: |
+          python -c "import tomllib; d = tomllib.load(open('pyproject.toml', 'rb')); print('\n'.join(d['project']['dependencies'] + d['dependency-groups']['dev']))" > /tmp/requirements.txt
+          pip install -r /tmp/requirements.txt
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: alembic upgrade head
+      - run: pytest
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build apps/backend

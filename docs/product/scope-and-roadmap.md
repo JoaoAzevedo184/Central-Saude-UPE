@@ -4,12 +4,12 @@
 
 | Área | Entra no MVP | Requisitos |
 | --- | --- | --- |
-| Conta e acesso | Cadastro de paciente com consentimento LGPD, login, papéis (Paciente, Atendente, Gestor, Admin) | RF-001 a RF-004 |
-| Cadastros | Unidades, especialidades com prazo de resposta por unidade, agendas e geração de vagas, bloqueio de vaga | RF-005 a RF-007 |
-| Fila | Solicitação, validação pela equipe, fila ordenada por regras configuráveis | RF-008 a RF-010, RF-022 |
+| Conta e acesso | Cadastro de paciente com consentimento LGPD, sexo e município; login; papéis (Paciente, Atendente, Gestor, Admin); escopo por fila; suspensão de acesso | RF-001 a RF-004, RF-033 a RF-035 |
+| Cadastros | Unidades, especialidades, filas (elegibilidade, prazo de confirmação, tolerância), agendas e geração de vagas, bloqueio de vaga | RF-005 a RF-007 |
+| Fila | Filas com elegibilidade e protocolo próprios, solicitação, validação pela equipe, ordem por risco, nota e chegada, linha do tempo sem posição | RF-008 a RF-010, RF-022, RF-028 a RF-032 |
 | Agendamento | Proposta com prazo, confirmação, pedido de outra data, cancelamento, expiração automática, reaproveitamento de vaga, registro de comparecimento e falta | RF-011 a RF-017 |
 | Comunicação | Avisos no site e por e-mail | RF-018, RF-019 |
-| Acompanhamento | Paciente vê o status das solicitações e dos agendamentos | RF-020 |
+| Acompanhamento | Paciente vê o status, a linha do tempo e o histórico de atendimentos, sem posição na fila | RF-020, RF-029, RF-030 |
 | Gestão | Painel de indicadores, trilha de auditoria | RF-021, RF-023 |
 | Plataforma | Web responsivo, Docker Compose, CI, deploy numa VM Oracle, backup | RNF-* |
 

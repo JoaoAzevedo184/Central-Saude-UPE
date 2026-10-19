@@ -6,7 +6,7 @@
 | **Origem** | Desafio do programa [Desafios PE](https://desafios.pe.gov.br/), lançado pela Coordenação de Saúde Digital do CH/UPE |
 | **Contexto acadêmico** | Projeto de Intervenção — Atividades Práticas Interdisciplinares de Extensão III, Sistemas de Informação, UNINASSAU Olinda |
 | **Versão** | 0.1 — outubro/2026 |
-| **Status** | Escopo do MVP definido; regras da fila dependem da UPE ([questões em aberto](../requirements/open-questions.md)) |
+| **Status** | Escopo do MVP definido; questões sobre a fila respondidas pela UPE em 15/10/2026 ([histórico](../requirements/open-questions.md)) |
 
 ## 1. Problema
 
@@ -25,9 +25,9 @@ Parte da marcação e da remarcação ainda depende de ligações, atendimento p
 | Persona | Quem é | O que precisa |
 | --- | --- | --- |
 | **Paciente** | Usuário do SUS encaminhado ao Complexo, muitas vezes de outro município, com letramento digital variado, acessando principalmente pelo celular | Saber o status do pedido, receber a vaga com antecedência, confirmar ou remarcar sem ligar, saber onde ir e o que levar |
-| **Atendente** | Profissional da central ou da regulação interna | Ver a fila de cada especialidade, validar pedidos e acompanhar propostas pendentes |
+| **Atendente** | Profissional da central ou da regulação interna | Ver as filas atribuídas a ele, validar pedidos e acompanhar propostas pendentes |
 | **Gestor** | Coordenação da unidade ou do Complexo | Indicadores de fila, confirmação, faltas e vagas reaproveitadas para tomar decisões |
-| **Administrador** | Responsável pela configuração do sistema | Cadastrar unidades, especialidades, agendas e regras da fila |
+| **Administrador** | Responsável pela configuração do sistema | Cadastrar unidades, especialidades, filas, agendas, protocolos e acessos da equipe |
 
 ## 3. Objetivos
 
@@ -57,7 +57,7 @@ O recorte do MVP de novembro/2026 e o que vem depois estão em [escopo e roadmap
 
 ## 6. Premissas e dependências
 
-- A UPE responde às [questões em aberto](../requirements/open-questions.md) a tempo de orientar a fila e o controle de acesso; caso contrário, o MVP usa a opção mais simples, documentada como simulada.
+- A UPE respondeu às [questões em aberto](../requirements/open-questions.md) em 15/10/2026. Os critérios e pesos de cada fila continuam simulados até a instituição fornecer os oficiais.
 - A classificação de risco chega pronta da regulação; o sistema não faz triagem clínica.
 
 ## 7. Fora do escopo do produto
@@ -71,14 +71,18 @@ O recorte do MVP de novembro/2026 e o que vem depois estão em [escopo e roadmap
 | Termo | Significado |
 | --- | --- |
 | **Unidade** | CISAM, HUOC ou PROCAPE |
-| **Especialidade** | Área de atendimento. A mesma especialidade pode existir em mais de uma unidade, cada uma com seu prazo de resposta |
-| **Agenda** | Grade de horários de um profissional para uma especialidade numa unidade (`Schedule` no FHIR) |
+| **Especialidade** | Área de atendimento. A mesma especialidade pode ter várias filas, em uma ou mais unidades |
+| **Fila** | Onde as solicitações esperam vaga: uma especialidade numa unidade, com descrição para o paciente, elegibilidade (sexo, idade), prazo de confirmação, tolerância de atraso e protocolo próprio. Ex.: dermatologia clínica e dermatologia cirúrgica do HUOC |
+| **Protocolo da fila** | Lista de critérios com peso que pontuam a solicitação naquela fila |
+| **Nota** | Soma dos pontos das respostas aos critérios do protocolo. Ordena a fila depois do risco |
+| **Fim da fila** | Nova hora de chegada dada à solicitação quando a proposta expira ou o paciente falta |
+| **Agenda** | Grade de horários de um profissional para uma fila (`Schedule` no FHIR) |
 | **Vaga** | Um horário concreto gerado a partir de uma agenda (`Slot` no FHIR) |
 | **Solicitação** | O pedido de atendimento do paciente: a demanda que fica na fila |
 | **Agendamento** | O vínculo entre uma solicitação e uma vaga (`Appointment` no FHIR). Ocupa a vaga enquanto estiver `PROPOSTO` ou `CONFIRMADO` |
-| **Proposta** | Agendamento `PROPOSTO`, com prazo de resposta |
-| **Classificação de risco** | Prioridade clínica definida pela regulação (vermelho, amarelo, verde, azul) |
-| **Prioridade legal** | Prioridades previstas em lei: idosos, gestantes, pessoas com deficiência |
+| **Proposta** | Agendamento `PROPOSTO`, com prazo para confirmar (padrão de 2 dias) |
+| **Classificação de risco** | Prioridade clínica definida pela regulação, em três níveis: vermelho, amarelo e verde |
+| **Prioridade legal** | Prioridades previstas em lei: idosos, gestantes, pessoas com deficiência. Entra como critério com peso no protocolo da fila que a usa |
 | **Regulação** | Processo e sistemas públicos que autorizam e encaminham o acesso a consultas e procedimentos especializados |
 
 ## Referências

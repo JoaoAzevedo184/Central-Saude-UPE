@@ -1,12 +1,11 @@
 from collections.abc import Iterator
-from dataclasses import dataclass
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends
+from fastapi import Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.config import Settings, get_settings
+from app.infra.acesso import carregar_escopo
 from app.infra.db import SessionLocal
 
 
@@ -15,20 +14,21 @@ def get_session() -> Iterator[Session]:
         yield session
 
 
-@dataclass(frozen=True)
-class EscopoEquipe:
-    """Unidades que a equipe pode ver. `None` = todas as unidades."""
+def usuario_da_sessao() -> UUID:
+    """ID do usuário autenticado. A tarefa de autenticação (ADR-003) substitui este corpo.
 
-    unidade_ids: frozenset[UUID] | None
-
-
-def escopo_da_equipe(settings: Annotated[Settings, Depends(get_settings)]) -> EscopoEquipe:
-    """Escopo de unidades da equipe (ADR-023). Ponto único de troca do ABERTO-3.
-
-    Toda rota da equipe deve recebê-lo via `Depends(escopo_da_equipe)` e passá-lo às
-    consultas. Ainda não há usuário autenticado: a tarefa de autenticação vai injetar o
-    usuário aqui, para buscar a lotação quando `ESCOPO_POR_UNIDADE=true`.
+    Até lá, nenhuma rota que dependa de sessão autentica.
     """
-    if settings.escopo_por_unidade:
-        raise NotImplementedError("escopo por unidade ainda não implementado (ADR-023)")
-    return EscopoEquipe(unidade_ids=None)
+    raise HTTPException(status_code=401, detail="Não autenticado.")
+
+
+def escopo_da_equipe(
+    usuario_id: Annotated[UUID, Depends(usuario_da_sessao)],
+    session: Annotated[Session, Depends(get_session)],
+) -> frozenset[UUID]:
+    """Filas que o usuário da equipe pode ver e operar (ADR-025).
+
+    Toda rota da equipe deve recebê-lo via `Depends(escopo_da_equipe)` e filtrar as consultas
+    por `fila_id IN escopo` dentro da query. A regra está em `dominio.acesso.calcular_escopo`.
+    """
+    return carregar_escopo(session, usuario_id)

@@ -1,17 +1,18 @@
 import logging
+from collections.abc import Awaitable, Callable
 from http import HTTPStatus
 from typing import Any
 
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from starlette.exceptions import HTTPException
 
 from app.api.rotas import health
 from app.config import get_settings
 from app.dominio.erros import ErroDeDominio
-from app.logging import configurar_logging
+from app.logging import configurar_logging, resumo_do_erro
 
 settings = get_settings()
 configurar_logging(settings.log_level)
@@ -22,13 +23,6 @@ app = FastAPI(
     docs_url="/api/v1/docs",
     redoc_url=None,
     openapi_url="/api/v1/openapi.json",
-)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins_lista,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-    allow_headers=["Content-Type", settings.csrf_header_name],
 )
 
 api_v1 = APIRouter(prefix="/api/v1")
@@ -71,7 +65,27 @@ def _dominio(_: Request, exc: ErroDeDominio) -> JSONResponse:
     return problema(409, str(exc) or None, tipo=exc.tipo)
 
 
-@app.exception_handler(Exception)
-def _inesperado(request: Request, exc: Exception) -> JSONResponse:
-    logger.exception("erro inesperado em %s %s", request.method, request.url.path)
-    return problema(500)
+@app.middleware("http")
+async def _inesperado(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
+    # Middleware, não exception_handler(Exception): o handler roda no ServerErrorMiddleware,
+    # que relança a exceção e o servidor loga o traceback com a mensagem (pode ter dados).
+    try:
+        return await call_next(request)
+    except Exception as exc:
+        logger.error(
+            "erro inesperado em %s %s: %s", request.method, request.url.path, resumo_do_erro(exc)
+        )
+        return problema(500)
+
+
+# Registrado depois do middleware do 500 para ficar por fora dele: assim a resposta 500
+# também leva os cabeçalhos CORS e o navegador recebe o Problem Details.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins_lista,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+    allow_headers=["Content-Type", settings.csrf_header_name],
+)

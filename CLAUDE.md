@@ -7,7 +7,7 @@ Protótipo acadêmico (Extensão III, UNINASSAU Olinda) de teleagendamento para 
 - **Nunca faça commit, push, merge ou rebase**, nem crie branches, sem pedido explícito. Deixe as mudanças no working tree para a pessoa revisar.
 - Nunca use dados reais de pessoas (nem em testes, seeds, exemplos ou prints). CPFs válidos, porém fictícios.
 - Nunca versione segredos. Configuração nova vai para o `.env.example` com valor de exemplo.
-- ABERTO-1, 2 e 3 têm decisão provisória (ADR-021 a 023): implemente a decisão provisória, sempre pelo ponto único de troca (`propor_vaga`, `ordenar_fila`, `escopo_da_equipe`) e nunca espalhada pelo código. ABERTO-4 continua aberto: se a tarefa depender dele, pare e pergunte.
+- As questões ABERTO-1 a 4 foram respondidas pela UPE em 15/10/2026; veja os ADR-021 e 024 a 028. Cada regra tem um ponto único no domínio (`propor_vaga`, `calcular_expira_em`, `ordenar_fila`, `calcular_nota`, `calcular_escopo`/`escopo_da_equipe`, `reentrar_no_fim_da_fila`, `verificar_elegibilidade`, `pode_autenticar`): use-o e nunca espalhe a regra pelo código. ADR-029 e 030 são só propostas: não implemente sem pedido.
 
 ## Stack
 
@@ -67,7 +67,7 @@ Antes de dizer que terminou, rode os testes e o lint e informe o resultado real.
 ## Segurança
 
 - Rotas do paciente filtram por `paciente_id` da sessão **dentro da query**. Recurso de outro paciente responde `404`.
-- O papel do usuário vem da sessão, nunca do corpo da requisição. Schemas de entrada não aceitam `papel`, `status`, `classificacao_risco` nem `prioridade_legal` vindos do paciente.
+- O papel do usuário vem da sessão, nunca do corpo da requisição. Schemas de entrada não aceitam `papel`, `status`, `classificacao_risco`, `nota` nem `pontos` vindos do paciente.
 - **Respostas para o paciente nunca trazem posição na fila nem tamanho da fila** (ADR-007).
 - Escrita exige header `X-CSRF-Token`; refresh token só em cookie `httpOnly`.
 - Logs sem nome, CPF ou corpo de requisição; use IDs.
@@ -96,7 +96,7 @@ Se o código precisar contrariar um desses documentos, não contrarie em silênc
 
 ## Subagentes
 
-Definidos em `.claude/agents/` (rodam com Haiku). A sessão principal planeja e integra; os subagentes executam tarefas pequenas e bem delimitadas.
+Definidos em `.claude/agents/` (rodam com Sonnet, conforme o `model:` de cada arquivo). A sessão principal planeja e integra; os subagentes executam tarefas pequenas e bem delimitadas.
 
 | Subagente | Usar para |
 | --- | --- |
@@ -116,4 +116,4 @@ Fluxo sugerido para uma tarefa:
 6. `guardiao-docs`.
 7. A sessão principal consolida e apresenta o diff, **sem commit**.
 
-Mantenha na sessão principal (não delegue ao Haiku) o desenho de lógica concorrente nova, mudanças no modelo de dados que não estejam no `data-model.md` e qualquer decisão que vire ADR.
+Mantenha na sessão principal (não delegue aos subagentes) o desenho de lógica concorrente nova, mudanças no modelo de dados que não estejam no `data-model.md` e qualquer decisão que vire ADR.

@@ -52,8 +52,8 @@ class Settings(BaseSettings):
 
     # Regras de negócio configuráveis
     proposta_antecedencia_minima_horas: int = 24  # RN-008 / ADR-021
+    proposta_janela_minima_horas: int = 12  # ADR-021: menos que isso para responder, não propõe
     matching_automatico: bool = True  # ADR-021
-    escopo_por_unidade: bool = False  # ADR-023
 
     @property
     def cors_origins_lista(self) -> list[str]:

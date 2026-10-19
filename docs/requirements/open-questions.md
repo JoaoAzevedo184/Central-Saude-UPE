@@ -1,15 +1,23 @@
 # Decisões em aberto
 
-Pontos que dependem do grupo ou da UPE. ABERTO-1 a 3 têm decisão provisória para o MVP; ABERTO-4 não foi assumido no design. Cada tabela mostra onde a resposta muda o modelo, os containers ou a autorização. Quando um ponto for resolvido, registre a resposta aqui e crie ou atualize o ADR correspondente.
+Pontos que dependiam do grupo ou da UPE. Quando um ponto é resolvido, a resposta fica registrada aqui e o ADR correspondente é criado ou atualizado. As análises de cada ponto continuam abaixo como histórico.
 
-| ID | Pergunta | Depende de | Situação |
+**Em 15/10/2026, as quatro questões foram respondidas** em reunião com a diretora do Complexo Hospitalar da UPE que propôs o desafio. Não há questões abertas no momento.
+
+| ID | Pergunta | Situação | Resposta |
 | --- | --- | --- | --- |
-| ABERTO-1 | Quem propõe a vaga: matching automático ou atendente? | Grupo e UPE | Provisório — [ADR-021](../decisions/ADR-021-matching-automatico.md) |
-| ABERTO-2 | Existe regra oficial de prioridade? Cabe envelhecimento (aging)? | UPE | Provisório — [ADR-022](../decisions/ADR-022-ordem-da-fila-sem-aging.md) |
-| ABERTO-3 | Atendentes e gestores veem só a própria unidade ou todas? | UPE | Provisório — [ADR-023](../decisions/ADR-023-escopo-todas-as-unidades.md) |
-| ABERTO-4 | O que acontece com a solicitação quando o paciente falta? | Grupo e UPE | Aberto |
+| ABERTO-1 | Quem propõe a vaga: matching automático ou atendente? | **Respondida** em 15/10/2026 | Automática, na ordem da fila — [ADR-021](../decisions/ADR-021-matching-automatico.md) |
+| ABERTO-2 | Existe regra oficial de prioridade? Cabe envelhecimento (aging)? | **Respondida** em 15/10/2026 | Cada fila tem seu protocolo de critérios com peso; sem aging — [ADR-024](../decisions/ADR-024-protocolo-por-fila.md) |
+| ABERTO-3 | Atendentes e gestores veem só a própria unidade ou todas? | **Respondida** em 15/10/2026 | Escopo por fila: atendente nas suas filas, gestor por hospital ou central — [ADR-025](../decisions/ADR-025-escopo-por-fila.md) |
+| ABERTO-4 | O que acontece com a solicitação quando o paciente falta? | **Respondida** em 15/10/2026 | Depois de 1 hora de tolerância, `FALTOU` e a solicitação volta para o fim da fila — [ADR-026](../decisions/ADR-026-prazos-e-volta-ao-fim-da-fila.md) |
+
+A reunião também gerou o [ADR-027](../decisions/ADR-027-fila-como-entidade.md) (fila como entidade), o [ADR-028](../decisions/ADR-028-suspensao-de-acesso.md) (suspensão de acesso) e as propostas [ADR-029](../decisions/ADR-029-overbooking-por-vagas-extras.md) (overbooking) e [ADR-030](../decisions/ADR-030-historico-familiar-como-criterio.md) (histórico familiar), e manteve o [ADR-007](../decisions/ADR-007-paciente-ve-status.md) (o paciente vê o status, sem posição).
 
 ## ABERTO-1 — Quem propõe a vaga
+
+**Resposta (15/10/2026, reunião com a diretora que propôs o desafio):** a proposta é automática e segue a ordem da fila. O ADR-021 passa a Aceito ([ADR-021](../decisions/ADR-021-matching-automatico.md)).
+
+*Análise feita antes da resposta, mantida como histórico:*
 
 **Decisão provisória do MVP:** matching automático pelo Worker; proposta manual pelo atendente fica para depois. Ponto único de troca: `propor_vaga()` e a flag `MATCHING_AUTOMATICO` ([ADR-021](../decisions/ADR-021-matching-automatico.md)). A tabela abaixo mostra o que muda se a resposta for outra.
 
@@ -23,6 +31,10 @@ Pontos que dependem do grupo ou da UPE. ABERTO-1 a 3 têm decisão provisória p
 
 ## ABERTO-2 — Regra de prioridade e aging
 
+**Resposta (15/10/2026, reunião com a diretora que propôs o desafio):** não há uma ordem única. Cada fila tem um protocolo de critérios com peso; a nota é a soma dos pontos, o risco tem três níveis e o empate é resolvido pela hora de chegada. Sem aging. O ADR-022 foi substituído pelo [ADR-024](../decisions/ADR-024-protocolo-por-fila.md).
+
+*Análise feita antes da resposta, mantida como histórico:*
+
 **Decisão provisória do MVP:** ordem fixa (classificação de risco → prioridade legal → data do pedido), regras simuladas, sem aging. Ponto único de troca: `ordenar_fila()` e o CHECK de `regra_prioridade.criterio` ([ADR-022](../decisions/ADR-022-ordem-da-fila-sem-aging.md)). A tabela abaixo mostra o que muda se a resposta for outra.
 
 | Onde | Impacto |
@@ -35,6 +47,10 @@ Pontos que dependem do grupo ou da UPE. ABERTO-1 a 3 têm decisão provisória p
 
 ## ABERTO-3 — Escopo de acesso por unidade
 
+**Resposta (15/10/2026, reunião com a diretora que propôs o desafio):** escopo por fila. O atendente vê só as filas atribuídas; o gestor vê um hospital ou a central inteira; o admin vê tudo. O ADR-023 foi substituído pelo [ADR-025](../decisions/ADR-025-escopo-por-fila.md).
+
+*Análise feita antes da resposta, mantida como histórico:*
+
 **Decisão provisória do MVP:** a equipe vê todas as unidades, mas toda rota da equipe já passa por `escopo_da_equipe()`. Ponto único de troca: `escopo_da_equipe()` e a flag `ESCOPO_POR_UNIDADE` ([ADR-023](../decisions/ADR-023-escopo-todas-as-unidades.md)). A tabela abaixo mostra o que muda se a resposta for outra.
 
 | Onde | Se **por unidade** | Se **todas** |
@@ -45,6 +61,10 @@ Pontos que dependem do grupo ou da UPE. ABERTO-1 a 3 têm decisão provisória p
 | Protótipo | Seletor de unidade nas telas 06 e 07 só para admin ou gestor geral | Seletor de unidade para todos da equipe |
 
 ## ABERTO-4 — Falta do paciente
+
+**Resposta (15/10/2026, reunião com a diretora que propôs o desafio):** no dia da consulta há tolerância de 1 hora; depois disso, o agendamento vira `FALTOU` e a solicitação volta para o fim da fila, com o motivo informado ao paciente. Sem limite de faltas ([ADR-026](../decisions/ADR-026-prazos-e-volta-ao-fim-da-fila.md)).
+
+*Análise feita antes da resposta, mantida como histórico:*
 
 Quando um agendamento termina em `FALTOU`, a solicitação pode:
 

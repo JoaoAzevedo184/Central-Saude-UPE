@@ -10,6 +10,8 @@ classDiagram
     +id
     +nome
     +cpf
+    +sexo
+    +data_nascimento
     +tem_consentimento_vigente(finalidade) bool
   }
   class Consentimento {
@@ -22,11 +24,11 @@ classDiagram
   class Solicitacao {
     +status: StatusSolicitacao
     +classificacao_risco
-    +prioridade_legal
-    +data_pedido
+    +nota
+    +data_entrada_fila
     +validar()
     +marcar_em_proposta()
-    +voltar_para_fila()
+    +reentrar_no_fim_da_fila(agora, motivo)
     +marcar_agendada()
     +cancelar()
   }
@@ -54,18 +56,27 @@ classDiagram
     +duracao_min
     +gerar_vagas(periodo) Vaga[]
   }
-  class Oferta {
-    +prazo_resposta_horas
-    +ativa
-  }
-  class RegraPrioridade {
-    +ordem
-    +criterio
-    +parametros
-    +simulada
-  }
   class Fila {
-    +ordenar(solicitacoes, regras) Solicitacao[]
+    +descricao_paciente
+    +sexo_elegivel
+    +idade_minima
+    +idade_maxima
+    +prazo_confirmacao_horas
+    +tolerancia_atraso_min
+    +verificar_elegibilidade(paciente, hoje) bool
+    +ordenar(solicitacoes) Solicitacao[]
+  }
+  class CriterioFila {
+    +codigo
+    +tipo
+    +peso
+    +parametros
+    +simulado
+    +calcular_pontos(valor) int
+  }
+  class RespostaCriterio {
+    +valor
+    +pontos
   }
   class CanalNotificacao {
     <<interface>>
@@ -85,14 +96,17 @@ classDiagram
   Solicitacao "1" --> "*" Agendamento : propostas
   Agendamento "*" --> "1" Vaga
   Agenda "1" --> "*" Vaga
-  Oferta "1" --> "*" Agenda
-  Fila ..> RegraPrioridade : usa
-  Fila ..> Solicitacao : ordena
-  Agendamento ..> Relogio : prazos
+  Fila "1" --> "*" Agenda
+  Fila "1" --> "*" CriterioFila : protocolo
+  Fila "1" --> "*" Solicitacao : contem
+  Solicitacao "1" --> "*" RespostaCriterio
+  RespostaCriterio "*" --> "1" CriterioFila
+  Agendamento ..> Relogio : prazos e tolerancia
 ```
 
 Notas:
 
-- **Oferta** é a classe de domínio para a tabela `unidade_especialidade` (uma especialidade numa unidade, com prazo de resposta).
+- **Fila** é uma especialidade numa unidade, com descrição, elegibilidade, prazos e protocolo próprios ([ADR-027](../../decisions/ADR-027-fila-como-entidade.md)). Uma especialidade pode ter várias filas.
 - As transições de `Solicitacao` e `Agendamento` levantam erro de domínio quando o estado de origem não permite a operação; a API traduz esse erro em `409`.
-- `Fila` é um serviço sem estado: recebe as solicitações e as regras ativas e devolve a ordem. A ordenação fica em `ordenar_fila()`, sem aging no MVP ([ADR-022](../../decisions/ADR-022-ordem-da-fila-sem-aging.md)). Com aging, passa a precisar do `Relogio`.
+- A ordem da fila é risco → nota → hora de chegada, calculada por `ordenar_fila()` e nunca gravada ([ADR-024](../../decisions/ADR-024-protocolo-por-fila.md)). A nota é a soma dos pontos das respostas aos critérios da fila.
+- Voltar ao fim da fila (proposta expirada ou falta) é uma nova `data_entrada_fila` ([ADR-026](../../decisions/ADR-026-prazos-e-volta-ao-fim-da-fila.md)).

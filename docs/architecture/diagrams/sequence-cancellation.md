@@ -23,7 +23,7 @@ sequenceDiagram
 
   W->>D: SELECT outbox PENDENTE FOR UPDATE SKIP LOCKED
   W->>D: avisa P do cancelamento
-  W->>D: busca a próxima solicitação compatível (regras de prioridade)
+  W->>D: busca a primeira solicitação da fila da vaga (ordenar_fila)
   W->>D: INSERT agendamento PROPOSTO para P2 + outbox
   alt outra transação ocupou a vaga antes
     D-->>W: violação do índice único

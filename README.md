@@ -84,6 +84,8 @@ docker compose exec api sh -c "ruff check . && ruff format --check ."   # lint
 docker compose logs -f worker                           # laço de jobs
 ```
 
+O `.env` é obrigatório: o `docker-compose.yml` lê dele as credenciais do banco e os segredos, e sem ele os serviços não sobem. Ele nunca é versionado; variáveis novas aparecem primeiro no `.env.example`. Os testes usam um banco separado, `<POSTGRES_DB>_test`, apagado e recriado a cada execução. Para carregar dados sintéticos no banco de desenvolvimento, rode `docker compose exec api python -m app.infra.seed`.
+
 - Documentação da API: http://127.0.0.1:8000/api/v1/docs
 - E-mails enviados em desenvolvimento (mailpit): http://127.0.0.1:8025
 

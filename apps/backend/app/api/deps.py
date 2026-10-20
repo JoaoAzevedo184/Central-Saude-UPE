@@ -5,6 +5,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, Request
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -13,7 +14,7 @@ from app.dominio.relogio import Relogio
 from app.infra.acesso import carregar_escopo
 from app.infra.autenticacao import familia_ativa, ler_access_token
 from app.infra.db import SessionLocal
-from app.infra.modelos import Usuario
+from app.infra.modelos import Paciente, Usuario
 from app.infra.relogio import RelogioReal
 
 COOKIE_ACCESS = "access_token"
@@ -101,3 +102,15 @@ def escopo_da_equipe(
     por `fila_id IN escopo` dentro da query. A regra está em `dominio.acesso.calcular_escopo`.
     """
     return carregar_escopo(session, usuario.id)
+
+
+def paciente_da_sessao(
+    usuario: Annotated[Usuario, Depends(exige_papel("PACIENTE"))],
+    session: Annotated[Session, Depends(get_session)],
+) -> Paciente:
+    """Paciente do usuário da sessão. Toda consulta do paciente filtra por `paciente.id`
+    dentro da query; recurso de outro paciente responde 404 (AM-001)."""
+    paciente = session.scalar(select(Paciente).where(Paciente.usuario_id == usuario.id))
+    if paciente is None:
+        raise Problema(403, "/problemas/sem-permissao", "Sem permissão para esta ação.")
+    return paciente

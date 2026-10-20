@@ -1,6 +1,6 @@
 # Modelo de dados
 
-PostgreSQL. Identificadores `uuid` gerados pelo banco (`gen_random_uuid()`); datas e horas como `timestamptz` ([ADR-008](../decisions/ADR-008-datas-e-fuso.md)). A fonte de verdade é a migração `apps/backend/migrations/versions/0002_esquema_do_dominio.py`; os modelos SQLAlchemy em `app/infra/modelos.py` a espelham, e um teste (`alembic check`) falha se os dois divergirem.
+PostgreSQL. Identificadores `uuid` gerados pelo banco (`gen_random_uuid()`); datas e horas como `timestamptz` ([ADR-008](../decisions/ADR-008-datas-e-fuso.md)). A fonte de verdade são as migrações em `apps/backend/migrations/versions/` (`0002_esquema_do_dominio.py` e `0003_sessao_de_refresh_e_tentativas_de_login.py`); os modelos SQLAlchemy em `app/infra/modelos.py` a espelham, e um teste (`alembic check`) falha se os dois divergirem.
 
 Convenções:
 
@@ -12,6 +12,8 @@ Convenções:
 erDiagram
   USUARIO ||--o| PACIENTE : "conta de"
   USUARIO ||--o{ AUDITORIA : "ator"
+  USUARIO ||--o{ SESSAO_REFRESH : "ADR-003 sessoes"
+  SESSAO_REFRESH |o--o| SESSAO_REFRESH : "substituido por"
   USUARIO ||--o{ NOTIFICACAO : "destinatario"
   USUARIO ||--o{ USUARIO_FILA : "ADR-025 atendente"
   FILA ||--o{ USUARIO_FILA : "ADR-025"
@@ -36,13 +38,33 @@ erDiagram
 
   USUARIO {
     uuid id PK
-    text email UK
+    text email UK "anulavel; opcional para paciente, unico quando informado"
     text senha_hash
     text papel "CHECK PACIENTE ATENDENTE GESTOR ADMIN"
     text situacao "CHECK ATIVO SUSPENSO; ADR-028"
     timestamptz suspenso_em "obrigatorio se SUSPENSO"
     text motivo_suspensao
     timestamptz criado_em
+  }
+  SESSAO_REFRESH {
+    uuid id PK
+    uuid usuario_id FK "indice"
+    uuid familia_id "indice; uma por login"
+    text token_hash UK "SHA-256 do refresh token"
+    timestamptz criado_em
+    timestamptz expira_em
+    timestamptz revogado_em "nulo = ativo"
+    uuid substituido_por_id FK "rotacao"
+    timestamptz reapresentado_em "AM-003: uso unico da tolerancia"
+    inet ip
+  }
+  TENTATIVA_LOGIN {
+    uuid id PK
+    text tipo "CHECK LOGIN REGISTRO"
+    text identificador_hash "HMAC-SHA256; obrigatorio se LOGIN"
+    inet ip
+    bool sucesso
+    timestamptz ocorrido_em
   }
   PACIENTE {
     uuid id PK
@@ -260,6 +282,18 @@ ALTER TABLE solicitacao ADD CONSTRAINT ck_solicitacao_na_fila_com_entrada
 ALTER TABLE usuario ADD CONSTRAINT ck_usuario_suspensao_datada
   CHECK (situacao = 'ATIVO' OR suspenso_em IS NOT NULL);
 
+-- ADR-003: refresh token guardado só como hash, uma linha por token; a família liga a cadeia de rotação
+ALTER TABLE sessao_refresh ADD CONSTRAINT uq_sessao_refresh_token_hash UNIQUE (token_hash);
+CREATE INDEX ix_sessao_refresh_usuario_id ON sessao_refresh (usuario_id);
+CREATE INDEX ix_sessao_refresh_familia_id ON sessao_refresh (familia_id);
+
+-- AM-004: tentativa de login precisa de identificador (hash); registro conta só pelo IP
+ALTER TABLE tentativa_login ADD CONSTRAINT ck_tentativa_login_tipo CHECK (tipo IN ('LOGIN', 'REGISTRO'));
+ALTER TABLE tentativa_login ADD CONSTRAINT ck_tentativa_login_login_identificado
+  CHECK (tipo = 'REGISTRO' OR identificador_hash IS NOT NULL);
+CREATE INDEX ix_tentativa_login_identificador_hash_ocorrido_em ON tentativa_login (identificador_hash, ocorrido_em);
+CREATE INDEX ix_tentativa_login_ip_ocorrido_em ON tentativa_login (ip, ocorrido_em);
+
 -- Um consentimento vigente por paciente e finalidade
 CREATE UNIQUE INDEX ux_consentimento_vigente
   ON consentimento (paciente_id, finalidade)
@@ -294,6 +328,9 @@ Tipos de evento de `historico_solicitacao.tipo`: `CRIADA`, `CLASSIFICADA`, `ENTR
 - **Trocar a fila de uma solicitação que já tem respostas é bloqueado** pelas FKs compostas de `resposta_criterio` (`ON UPDATE RESTRICT`): as respostas pertencem ao protocolo da fila original. Para mudar de fila, a solicitação é cancelada e outra é criada na fila nova.
 - **Atribuições por papel** não são garantidas pelo banco: `usuario_fila` deveria ter só ATENDENTE e `usuario_unidade` só GESTOR. Por enquanto, o domínio ignora linhas de outros papéis (`calcular_escopo()`), e a futura tela de administração deve validar o papel ao gravar (RF-035). Gestor sem linha em `usuario_unidade` vê a central inteira ([ADR-025](../decisions/ADR-025-escopo-por-fila.md)).
 - **O gatilho não protege contra o dono das tabelas**, que pode removê-lo. Em produção, o papel do banco usado pela aplicação não deve ser o dono das tabelas nem ter `UPDATE`, `DELETE` ou `TRUNCATE` em `auditoria` e `historico_solicitacao` *(proposta para a implantação)*.
+- **E-mail do usuário é anulável** (migração 0003): o e-mail do paciente é opcional. A `UNIQUE` em `usuario.email` continua e, no Postgres, vários `NULL` não conflitam; só e-mails informados são únicos. A equipe entra por e-mail, então a conta de equipe sempre tem um.
+- **`sessao_refresh`:** cada login abre uma família (`familia_id`); cada renovação cria uma linha nova, revoga a anterior e aponta `substituido_por_id` para a nova. Reapresentar o token substituído dentro de `REFRESH_TOLERANCIA_S` vale uma vez só (`reapresentado_em`); a segunda reapresentação revoga a família. O access token carrega a família (`sid`) e só vale enquanto a família tem uma sessão ativa. Linhas vencidas são apagadas pelo Worker ([proteção de dados](../security/data-protection.md)).
+- **`tentativa_login`:** guarda o CPF ou e-mail só como HMAC-SHA256 com `LOGIN_HASH_KEY`, para o limite de tentativas sem o identificador em claro. Não tem FK para `usuario`.
 - **Usuários não são apagados**, só suspensos ([ADR-028](../decisions/ADR-028-suspensao-de-acesso.md)); a auditoria continua apontando para eles.
 - **Histórico familiar** é só a resposta do paciente a um critério; não há dados de parentes ([ADR-030](../decisions/ADR-030-historico-familiar-como-criterio.md)).
 - **Notificação** pode se referir a uma solicitação, a um agendamento ou a nenhum dos dois (avisos de conta).

@@ -13,9 +13,15 @@ Formato de `parametros` por tipo (o valor respondido vai em `resposta_criterio.v
 `fator` é sempre inteiro >= 0; parâmetro malformado levanta `ValueError`.
 """
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Hashable, Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
+
+from app.dominio.erros import EntradaInvalida
+
+# Quem responde cada origem de critério (ADR-024). O paciente nunca responde pela regulação.
+ORIGENS_DO_PACIENTE = frozenset({"PACIENTE"})
+ORIGENS_DA_EQUIPE = frozenset({"REGULACAO", "EQUIPE"})
 
 
 @dataclass(frozen=True)
@@ -24,6 +30,7 @@ class Criterio:
     tipo: str
     peso: int
     parametros: Mapping[str, Any] = field(default_factory=dict)
+    origem: str = "PACIENTE"
 
 
 def _fator(criterio: Criterio, fator: Any) -> int:
@@ -59,3 +66,26 @@ def calcular_pontos(criterio: Criterio, valor: Any) -> int:
 def calcular_nota(respostas: Iterable[tuple[Criterio, Any]]) -> int:
     """Nota da solicitação: soma dos pontos das respostas `(criterio, valor)`."""
     return sum(calcular_pontos(criterio, valor) for criterio, valor in respostas)
+
+
+def pontuar_respostas[K: Hashable](
+    criterios: Mapping[K, Criterio], respostas: Iterable[tuple[K, Any]], origens: frozenset[str]
+) -> dict[K, int]:
+    """Pontos de cada resposta `(criterio_id, valor)`, validando quem responde.
+
+    `criterios` são os critérios ativos da fila da solicitação; `origens`, as que este ator
+    pode responder. Critério de outra fila ou de outra origem, resposta repetida ou valor
+    inválido levantam `EntradaInvalida` (422).
+    """
+    pontos: dict[K, int] = {}
+    for criterio_id, valor in respostas:
+        criterio = criterios.get(criterio_id)
+        if criterio is None or criterio.origem not in origens:
+            raise EntradaInvalida("Critério inexistente nesta fila ou que você não responde.")
+        if criterio_id in pontos:
+            raise EntradaInvalida("Critério respondido mais de uma vez.")
+        try:
+            pontos[criterio_id] = calcular_pontos(criterio, valor)
+        except ValueError:
+            raise EntradaInvalida("Resposta inválida para o critério.") from None
+    return pontos

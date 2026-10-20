@@ -13,15 +13,15 @@ from collections.abc import Iterable
 
 from app.dominio.solicitacao import Solicitacao
 
-_PESO_RISCO = {"VERMELHO": 0, "AMARELO": 1, "VERDE": 2}
+PESO_RISCO = {"VERMELHO": 0, "AMARELO": 1, "VERDE": 2}
 
 
 def _chave(s: Solicitacao) -> tuple:
-    if s.classificacao_risco not in _PESO_RISCO:
+    if s.classificacao_risco not in PESO_RISCO:
         raise ValueError(f"classificação de risco desconhecida: {s.classificacao_risco!r}")
     if s.data_entrada_fila is None:
         raise ValueError(f"solicitação {s.id} sem data de entrada na fila")
-    return (_PESO_RISCO[s.classificacao_risco], -s.nota, s.data_entrada_fila, s.id)
+    return (PESO_RISCO[s.classificacao_risco], -s.nota, s.data_entrada_fila, s.id)
 
 
 def ordenar_fila(solicitacoes: Iterable[Solicitacao]) -> list[Solicitacao]:

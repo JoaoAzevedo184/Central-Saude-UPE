@@ -19,7 +19,7 @@ Profissionais entram de férias, mudam de setor ou são desligados. Apagar a con
 
 ## Ponto único de troca
 
-`pode_autenticar()` em `app/dominio/acesso.py`. O login e o refresh, ainda não implementados, devem chamá-lo.
+`pode_autenticar()` em `app/dominio/acesso.py`. O login, o refresh e `usuario_da_sessao` o chamam.
 
 ## Alternativas consideradas
 
@@ -31,4 +31,4 @@ Profissionais entram de férias, mudam de setor ou são desligados. Apagar a con
 
 - A auditoria continua apontando para quem agiu, mesmo depois do desligamento.
 - A tela de administração ganha "suspender" e "reativar". Reativar volta a situação para `ATIVO`; `suspenso_em` e `motivo_suspensao` ficam como registro da última suspensão.
-- Uma sessão já aberta precisa ser encerrada quando o usuário é suspenso; a tarefa de autenticação define como.
+- Uma sessão já aberta precisa ser encerrada quando o usuário é suspenso. Como ficou: suspender revoga todas as sessões de refresh do usuário, e `usuario_da_sessao` relê a situação e a família da sessão a cada requisição, recusando o access token que ainda não venceu (`401`). Regras da rota em [controle de acesso](../security/access-control.md).

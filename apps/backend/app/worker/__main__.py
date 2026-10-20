@@ -21,6 +21,7 @@ def montar_agenda(settings: Settings) -> list[tuple[Job, float]]:
     agenda: list[tuple[Job, float]] = [
         (jobs.expirar_propostas, settings.worker_intervalo_expiracao_s),
         (jobs.processar_outbox, settings.worker_intervalo_outbox_s),
+        (jobs.limpar_dados_de_autenticacao, settings.worker_intervalo_retencao_s),
     ]
     if settings.matching_automatico:
         # ADR-021: o matching anda junto com a outbox (eventos de vaga livre).

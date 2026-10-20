@@ -5,6 +5,10 @@ Por enquanto são esqueletos: registram log e devolvem 0.
 
 import logging
 
+from app.infra.autenticacao import apagar_dados_vencidos
+from app.infra.db import SessionLocal
+from app.infra.relogio import RelogioReal
+
 logger = logging.getLogger(__name__)
 
 
@@ -24,3 +28,12 @@ def propor_vagas_livres() -> int:
     """Matching automático: chama `propor_vaga()` para vagas livres (ADR-021)."""
     logger.info("propor_vagas_livres: nada a fazer (esqueleto)")
     return 0
+
+
+def limpar_dados_de_autenticacao() -> int:
+    """Retenção: apaga `tentativa_login` com mais de 24 h e `sessao_refresh` vencidas."""
+    with SessionLocal() as session:
+        apagados = apagar_dados_vencidos(session, RelogioReal().agora())
+        session.commit()
+    logger.info("limpar_dados_de_autenticacao: %d linhas apagadas", apagados)
+    return apagados

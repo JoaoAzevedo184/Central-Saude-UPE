@@ -18,6 +18,18 @@ class TransicaoInvalida(ErroDeDominio):
     tipo = "/problemas/transicao-invalida"
 
 
+class PropostaExpirada(TransicaoInvalida):
+    """Confirmar ou recusar depois de `expira_em`, mesmo antes do Worker expirar (UC-004). 409."""
+
+    tipo = "/problemas/proposta-expirada"
+
+
+class ToleranciaNaoEncerrada(TransicaoInvalida):
+    """Falta registrada antes de `início da vaga + tolerância` (RN-013). 409."""
+
+    tipo = "/problemas/tolerancia-nao-encerrada"
+
+
 class OperacaoNaoPermitida(ErroDeDominio):
     """A operação é válida em geral, mas não neste alvo (ex.: suspender a si mesmo). 409."""
 

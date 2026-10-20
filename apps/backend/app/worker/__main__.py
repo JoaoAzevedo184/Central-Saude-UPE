@@ -19,13 +19,14 @@ PASSO_S = 0.5
 
 def montar_agenda(settings: Settings) -> list[tuple[Job, float]]:
     agenda: list[tuple[Job, float]] = [
+        (jobs.gerar_vagas, settings.worker_intervalo_vagas_s),
         (jobs.expirar_propostas, settings.worker_intervalo_expiracao_s),
         (jobs.processar_outbox, settings.worker_intervalo_outbox_s),
         (jobs.limpar_dados_de_autenticacao, settings.worker_intervalo_retencao_s),
     ]
     if settings.matching_automatico:
-        # ADR-021: o matching anda junto com a outbox (eventos de vaga livre).
-        agenda.append((jobs.propor_vagas_livres, settings.worker_intervalo_outbox_s))
+        # ADR-021: varre as vagas livres no próprio intervalo.
+        agenda.append((jobs.propor_vagas, settings.worker_intervalo_matching_s))
     return agenda
 
 

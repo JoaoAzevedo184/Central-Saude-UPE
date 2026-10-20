@@ -11,12 +11,12 @@ sequenceDiagram
   participant W as Worker
   actor P2 as Próximo paciente
 
-  P->>A: POST /agendamentos/{id}/pedir-outra-data
+  P->>A: POST /agendamentos/{id}/recusar
   A->>D: BEGIN · SELECT ... FOR UPDATE
-  A->>D: UPDATE agendamento → CANCELADO (motivo: outra data)
+  A->>D: UPDATE agendamento → CANCELADO (RECUSADO_PELO_PACIENTE)
   A->>D: UPDATE solicitação → NA_FILA
   A->>D: INSERT auditoria
-  A->>D: INSERT outbox (AGENDAMENTO_CANCELADO)
+  A->>D: INSERT outbox (PROPOSTA_RECUSADA)
   A->>D: COMMIT
   A-->>P: 200 · "você continua na fila"
   Note over D: a vaga fica livre sem atualizar a tabela vaga<br/>(nenhum agendamento ativo aponta para ela)

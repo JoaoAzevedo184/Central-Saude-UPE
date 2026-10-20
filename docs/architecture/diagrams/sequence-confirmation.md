@@ -21,7 +21,7 @@ sequenceDiagram
   A->>D: SELECT agendamento + solicitação FOR UPDATE
   alt não é do paciente
     A-->>F: 404
-  else status ≠ PROPOSTO ou expira_em < agora
+  else status ≠ PROPOSTO ou expira_em <= agora
     A->>D: ROLLBACK
     A-->>F: 409 (expirada ou já respondida)
   else proposta válida

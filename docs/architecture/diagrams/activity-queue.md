@@ -34,7 +34,7 @@ flowchart TD
   dia -- não chegou --> tol{Passou a tolerância?<br/>RN-013}
   tol -- não --> dia
   tol -- sim --> faltou[FALTOU] --> fimfila
-  confirmado -- cancela antes --> libera1
+  confirmado -- cancela antes --> libera2
 ```
 
 Toda vaga liberada (cancelamento ou expiração) volta ao losango "Há vaga livre compatível?" para o próximo paciente (RN-005).

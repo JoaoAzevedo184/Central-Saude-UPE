@@ -40,6 +40,8 @@ stateDiagram-v2
   AGENDADA --> CANCELADA
 ```
 
+**Divergência temporária:** `EM_PROPOSTA` → `CANCELADA` e `AGENDADA` → `CANCELADA` estão no diagrama, mas a API responde `409` por ora; a regra será resolvida em [UC-004](use-cases/UC-004-confirmar-proposta.md) e [UC-005](use-cases/UC-005-pedir-outra-data-ou-cancelar.md). Hoje o paciente cancela só em `EM_ANALISE` e `NA_FILA`, e a equipe só grava respostas de critérios nesses dois estados. Reclassificar um pedido que já está `NA_FILA` exige motivo. O motivo do cancelamento pelo paciente é um código de lista fechada.
+
 Quando o agendamento termina em `FALTOU`, a solicitação volta para `NA_FILA`, no fim da fila ([ADR-026](../decisions/ADR-026-prazos-e-volta-ao-fim-da-fila.md)). Toda mudança de situação da solicitação gera uma linha em `historico_solicitacao`, que alimenta a linha do tempo do paciente (só as linhas com `visivel_paciente = true`) e o motivo da última mudança de posição que a equipe vê.
 
 ## Regras
@@ -63,3 +65,4 @@ Quando o agendamento termina em `FALTOU`, a solicitação volta para `NA_FILA`, 
 | RN-015 | A fila é ordenada por: (1) classificação de risco, `VERMELHO`, `AMARELO`, `VERDE`; (2) nota, da maior para a menor; (3) hora de chegada na fila (`data_entrada_fila`), da mais antiga para a mais nova. Solicitação sem classificação de risco não entra na fila | [ADR-024](../decisions/ADR-024-protocolo-por-fila.md) |
 | RN-016 | Se o prazo calculado deixar menos que a janela mínima (`PROPOSTA_JANELA_MINIMA_HORAS`, padrão 12 horas) para o paciente responder, a vaga não é proposta. Ela fica livre e aparece no painel como "vaga sem proposta". Exatamente 12 horas ainda permitem propor | [ADR-021](../decisions/ADR-021-matching-automatico.md) |
 | RN-017 | O paciente só entra numa fila se cumprir a elegibilidade dela: sexo (`sexo_elegivel`) e idade em anos completos entre `idade_minima` e `idade_maxima`, limites inclusivos, contada na data de hoje em `America/Recife`. Fila sem restrição aceita qualquer paciente. Paciente sem sexo ou sem data de nascimento é inelegível para filas que restringem esses dados | [ADR-027](../decisions/ADR-027-fila-como-entidade.md) |
+| RN-018 | Cada paciente tem no máximo uma solicitação ativa (status fora de `ATENDIDA` e `CANCELADA`) por fila, garantida pelo índice único parcial `ux_solicitacao_ativa_por_fila`. A segunda tentativa responde `409` com o ID da solicitação existente. Depois de encerrada, uma nova é permitida | [data-model](../architecture/data-model.md) |

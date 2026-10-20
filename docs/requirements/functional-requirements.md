@@ -11,8 +11,8 @@
 | RF-005 | Admin cadastra unidades, especialidades e filas (descrição para o paciente, elegibilidade, prazo de confirmação e tolerância de atraso) | Admin | M | UC-010 | RN-012, RN-013, RN-017 |
 | RF-006 | Admin cadastra agendas (profissional, dias, horário, duração, vigência) e o sistema gera as vagas | Admin | M | UC-010 | — |
 | RF-007 | Admin bloqueia e desbloqueia vagas | Admin | M | UC-010 | RN-001 |
-| RF-008 | Paciente registra uma solicitação numa fila para a qual é elegível, com preferência de turno e canal de aviso, e responde os critérios do protocolo que cabem a ele | Paciente | M | UC-002 | RN-006, RN-009, RN-017 |
-| RF-009 | Atendente valida a solicitação, que passa a aguardar vaga | Atendente | M | UC-007 | — |
+| RF-008 | Paciente registra uma solicitação numa fila para a qual é elegível, com preferência de turno e canal de aviso, e responde os critérios do protocolo que cabem a ele | Paciente | M | UC-002 | RN-006, RN-009, RN-017, RN-018 |
+| RF-009 | Atendente valida a solicitação, que passa a aguardar vaga | Atendente | M | UC-007 | RN-015 |
 | RF-010 | Atendente e gestor veem as filas do seu escopo, ordenadas por risco, nota e hora de chegada | Atendente, Gestor | M | UC-003 | RN-006, RN-015 |
 | RF-011 | O sistema ou o atendente propõe uma vaga ao paciente, com prazo de resposta | Sistema ([ADR-021](../decisions/ADR-021-matching-automatico.md)); proposta manual pelo atendente em fase futura | M | UC-003 | RN-001, RN-002, RN-003, RN-008 |
 | RF-012 | Paciente confirma uma proposta | Paciente | M | UC-004 | RN-001, RN-003 |
@@ -33,9 +33,9 @@
 | RF-027 | App mobile com notificações push | Paciente | F | — | — |
 | RF-028 | Paciente vê a descrição de cada fila (para que serve e quem pode entrar) antes de pedir | Paciente | M | UC-002 | RN-017 |
 | RF-029 | Paciente acompanha a linha do tempo da solicitação, com o motivo de cada mudança e sem posição na fila | Paciente | M | UC-002, UC-006, UC-008 | RN-007, RN-014 |
-| RF-030 | Paciente consulta o histórico de atendimentos (realizados, faltas, propostas expiradas e canceladas) | Paciente | M | — | RN-007 |
-| RF-031 | A equipe vê a posição de cada solicitação na fila e o motivo da última mudança de posição; o paciente não vê | Atendente, Gestor | M | UC-003 | RN-007, RN-015 |
-| RF-032 | O painel da equipe ordena as solicitações por criticidade (risco e nota) e, no empate, por hora de chegada | Atendente, Gestor | M | UC-003 | RN-015 |
+| RF-030 | Paciente consulta o histórico de atendimentos (realizados, faltas, propostas expiradas e canceladas). *Atendido em parte:* `GET /solicitacoes?situacao=encerradas` cobre `ATENDIDA` e `CANCELADA`; faltam as faltas e as propostas expiradas, que estão no agendamento (UC-004, UC-008) | Paciente | M | UC-002 | RN-007 |
+| RF-031 | A equipe vê a posição de cada solicitação na fila e o motivo da última mudança de posição; o paciente não vê | Atendente, Gestor | M | UC-003, UC-007 | RN-007, RN-015 |
+| RF-032 | O painel da equipe ordena as solicitações por criticidade (risco e nota) e, no empate, por hora de chegada | Atendente, Gestor | M | UC-003, UC-007 | RN-015 |
 | RF-033 | Admin suspende e reativa o acesso de um profissional, com data e motivo; o usuário suspenso não entra e a auditoria continua apontando para ele | Admin | M | UC-010 | — ([ADR-028](../decisions/ADR-028-suspensao-de-acesso.md)) |
 | RF-034 | O cadastro do paciente registra sexo e município, usados só para elegibilidade e direcionamento | Paciente | M | UC-001 | RN-017 |
 | RF-035 | Admin atribui filas a atendentes e unidades a gestores; o sistema valida que só ATENDENTE recebe fila e só GESTOR recebe unidade | Admin | M | UC-010 | — ([ADR-025](../decisions/ADR-025-escopo-por-fila.md)) |

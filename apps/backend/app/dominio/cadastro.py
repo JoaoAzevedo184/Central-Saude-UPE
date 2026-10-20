@@ -50,3 +50,16 @@ def erro_data_nascimento(data_nascimento: date, hoje: date) -> str | None:
     if idade_em_anos(data_nascimento, hoje) > IDADE_MAXIMA:
         return f"A idade não pode passar de {IDADE_MAXIMA} anos."
     return None
+
+
+def mascarar_cpf(cpf: str) -> str:
+    """CPF para telas da equipe: `***.482.***-10` (docs/security/data-protection.md)."""
+    return f"***.{cpf[3:6]}.***-{cpf[9:]}"
+
+
+def abreviar_nome(nome: str) -> str:
+    """Nome na fila da equipe: primeiro nome e inicial do último ("Maria S.")."""
+    partes = nome.split()
+    if len(partes) < 2:
+        return nome.strip()
+    return f"{partes[0]} {partes[-1][0]}."

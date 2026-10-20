@@ -4,7 +4,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from uuid import UUID
 
-from app.dominio.erros import TransicaoInvalida
+from app.dominio.erros import EntradaInvalida, TransicaoInvalida
 
 
 @dataclass(frozen=True)
@@ -65,4 +65,98 @@ def reentrar_no_fim_da_fila(
         visivel_paciente=True,
         ocorrido_em=agora,
     )
+    return nova, evento
+
+
+TEXTO_CRIADA = "Recebemos seu pedido. Ele está em análise."
+TEXTO_ENTROU_NA_FILA = "Seu pedido entrou na fila."
+TEXTO_NOTA_RECALCULADA = "nota recalculada"
+RISCOS = frozenset({"VERMELHO", "AMARELO", "VERDE"})
+# Estados em que a equipe ainda responde critérios (a nota só pesa antes da proposta).
+STATUS_COM_RESPOSTAS_DA_EQUIPE = frozenset({"EM_ANALISE", "NA_FILA"})
+# EM_PROPOSTA e AGENDADA → CANCELADA exigem cancelar o agendamento junto (UC-004/005):
+# por ora respondem 409 (divergência temporária com business-rules.md).
+STATUS_CANCELAVEIS = frozenset({"EM_ANALISE", "NA_FILA"})
+
+
+# Motivo do cancelamento pelo paciente: lista fechada, sem texto livre (minimização,
+# docs/security/data-protection.md). O rótulo vai para a linha do tempo.
+MOTIVOS_CANCELAMENTO = {
+    "NAO_PRECISO_MAIS": "Não preciso mais do atendimento.",
+    "CONSEGUI_EM_OUTRO_LUGAR": "Consegui atendimento em outro lugar.",
+    "DIFICULDADE_DE_DESLOCAMENTO": "Dificuldade de deslocamento.",
+    "CONFLITO_DE_HORARIO": "Conflito de horário.",
+    "OUTRO": "Outro motivo.",
+}
+
+
+def evento_criada(agora: datetime) -> EventoHistorico:
+    """Primeiro evento da linha do tempo (UC-002)."""
+    return EventoHistorico("CRIADA", None, "EM_ANALISE", TEXTO_CRIADA, True, agora)
+
+
+def classificar(
+    solicitacao: Solicitacao, risco: str, motivo: str | None, agora: datetime
+) -> tuple[Solicitacao, list[EventoHistorico]]:
+    """Classificação de risco pela equipe, simulando a regulação.
+
+    - EM_ANALISE: entra na fila (`data_entrada_fila = agora`), com os eventos CLASSIFICADA
+      (só equipe) e ENTROU_NA_FILA (texto neutro para o paciente).
+    - NA_FILA: só reclassifica, com motivo obrigatório; evento RECLASSIFICADA (só equipe).
+    - Outros estados: `TransicaoInvalida`.
+    """
+    if risco not in RISCOS:
+        raise ValueError(f"classificação de risco desconhecida: {risco!r}")
+    if solicitacao.status == "EM_ANALISE":
+        nova = replace(
+            solicitacao, status="NA_FILA", classificacao_risco=risco, data_entrada_fila=agora
+        )
+        return nova, [
+            EventoHistorico("CLASSIFICADA", "EM_ANALISE", "NA_FILA", motivo, False, agora),
+            EventoHistorico("ENTROU_NA_FILA", None, None, TEXTO_ENTROU_NA_FILA, True, agora),
+        ]
+    if solicitacao.status == "NA_FILA":
+        if not motivo:
+            raise EntradaInvalida("Informe o motivo da reclassificação.")
+        nova = replace(solicitacao, classificacao_risco=risco)
+        return nova, [EventoHistorico("RECLASSIFICADA", "NA_FILA", "NA_FILA", motivo, False, agora)]
+    raise TransicaoInvalida("A solicitação não está em um estado que permita classificar.")
+
+
+def exigir_aceita_respostas(solicitacao: Solicitacao) -> None:
+    """A equipe só responde critérios antes da proposta; depois, `TransicaoInvalida`."""
+    if solicitacao.status not in STATUS_COM_RESPOSTAS_DA_EQUIPE:
+        raise TransicaoInvalida("A solicitação não aceita mais respostas aos critérios.")
+
+
+def recalcular_nota(
+    solicitacao: Solicitacao, nota: int, agora: datetime
+) -> tuple[Solicitacao, EventoHistorico | None]:
+    """Nova nota depois de a equipe responder critérios (ADR-024).
+
+    Na fila, nota diferente muda a posição: evento RECLASSIFICADA (só equipe).
+    """
+    exigir_aceita_respostas(solicitacao)
+    nova = replace(solicitacao, nota=nota)
+    if solicitacao.status != "NA_FILA" or nota == solicitacao.nota:
+        return nova, None
+    return nova, EventoHistorico(
+        "RECLASSIFICADA", "NA_FILA", "NA_FILA", TEXTO_NOTA_RECALCULADA, False, agora
+    )
+
+
+def cancelar(
+    solicitacao: Solicitacao, motivo_codigo: str, agora: datetime
+) -> tuple[Solicitacao, EventoHistorico]:
+    """Cancelamento pelo paciente ("não vou precisar"). Só em EM_ANALISE e NA_FILA, por ora.
+
+    `motivo_codigo` é uma chave de `MOTIVOS_CANCELAMENTO`; o evento leva o rótulo.
+    """
+    if solicitacao.status not in STATUS_CANCELAVEIS:
+        raise TransicaoInvalida("A solicitação não pode ser cancelada neste estado.")
+    if motivo_codigo not in MOTIVOS_CANCELAMENTO:
+        raise EntradaInvalida("Motivo de cancelamento desconhecido.")
+    nova = replace(solicitacao, status="CANCELADA")
+    rotulo = MOTIVOS_CANCELAMENTO[motivo_codigo]
+    evento = EventoHistorico("CANCELADA", solicitacao.status, "CANCELADA", rotulo, True, agora)
     return nova, evento

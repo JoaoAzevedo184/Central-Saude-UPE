@@ -7,7 +7,7 @@
 3. **Verificar no servidor, sempre.** Esconder um botão no frontend não é controle de acesso.
 4. **Recurso alheio responde `404`**, para não confirmar que ele existe.
 5. **Um usuário, um papel.** Se alguém precisar de dois papéis, ganha duas contas *(proposta)*.
-6. **Suspenso não entra.** Usuário com `situacao = 'SUSPENSO'` não faz login (mesma mensagem genérica de credenciais inválidas), não renova o refresh token e não tem escopo. A conta nunca é apagada ([ADR-028](../decisions/ADR-028-suspensao-de-acesso.md)).
+6. **Suspenso não entra.** Usuário com `situacao = 'SUSPENSO'` não faz login (mesma mensagem genérica de credenciais inválidas), não renova o refresh token, não passa por `usuario_da_sessao` e não tem escopo. A conta nunca é apagada ([ADR-028](../decisions/ADR-028-suspensao-de-acesso.md)).
 
 ## Matriz de permissões
 
@@ -36,7 +36,7 @@ Legenda:
 | Consultar auditoria | — | — | — | ✅ |
 | Criar contas da equipe | — | — | — | ✅ |
 | Atribuir filas a atendentes e unidades a gestores | — | — | — | ✅ |
-| Suspender e reativar contas da equipe | — | — | — | ✅ |
+| Suspender e reativar contas da equipe (`POST /usuarios/{id}/suspender` e `/reativar`) | — | — | — | ✅ |
 
 ## Escopo da equipe
 
@@ -54,9 +54,28 @@ O banco não impede que um usuário de outro papel apareça em `usuario_fila` ou
 ## Implementação
 
 - O papel vem do usuário da sessão, carregado no servidor; nunca do corpo ou dos parâmetros da requisição.
-- Uma dependência do FastAPI por regra de acesso (`exige_papel(...)`, `paciente_da_sessao`, `escopo_da_equipe`), aplicada na rota; as rotas não repetem a verificação à mão.
+- Uma dependência do FastAPI por regra de acesso, aplicada na rota; as rotas não repetem a verificação à mão:
+  - `usuario_da_sessao`: lê o access token, carrega o usuário e confere, **a cada requisição**, a situação (`pode_autenticar()`) e se a família da sessão (`sid`) segue ativa. Falha → `401`;
+  - `exige_papel(...)`: constrói em cima de `usuario_da_sessao` e responde `403` para outro papel;
+  - `escopo_da_equipe`: conjunto de filas da equipe;
+  - `paciente_da_sessao`: *(proposta)*, ainda não implementada.
 - Consultas do paciente sempre incluem `paciente_id = <paciente da sessão>` na própria query, em vez de buscar pelo ID e comparar depois.
 - **Obrigatório:** toda rota da equipe recebe `escopo = Depends(escopo_da_equipe)`, um conjunto de `fila_id`, e filtra por `fila_id IN escopo` dentro da query. Recurso de fila fora do escopo responde `404`.
+
+## Suspender e reativar ([ADR-028](../decisions/ADR-028-suspensao-de-acesso.md))
+
+Rotas `POST /usuarios/{id}/suspender` (corpo `motivo`) e `POST /usuarios/{id}/reativar`: só `ADMIN` (`exige_papel("ADMIN")`), respondem `204` e gravam auditoria.
+
+| Situação | Resposta |
+| --- | --- |
+| Usuário inexistente | `404` |
+| Alvo é paciente (só contas da equipe são suspensas) | `409` (`operacao-nao-permitida`) |
+| Admin suspende a si mesmo | `409` (`operacao-nao-permitida`) |
+| Alvo é o último ADMIN ativo | `409` (`operacao-nao-permitida`) |
+| Conta já suspensa (ou já ativa, ao reativar) | `409` (`transicao-invalida`) |
+
+- A rota trava os ADMIN ativos com `FOR UPDATE` antes de contar, para dois admins suspendendo um ao outro ao mesmo tempo não deixarem a central sem nenhum.
+- Suspender **revoga todas as sessões** do usuário. O access token que ainda não venceu cai na próxima requisição, porque `usuario_da_sessao` relê a situação e a família.
 
 ## Testes obrigatórios
 

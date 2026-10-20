@@ -12,14 +12,16 @@
 | Data de nascimento | `paciente` | Elegibilidade por idade da fila e critérios de idade do protocolo | Não | Só para o próprio paciente e a equipe |
 | Sexo | `paciente` | **Só** a elegibilidade da fila (por exemplo, laqueadura e mamografia). Anulável; sem ele, o paciente fica inelegível só para filas que restringem sexo | Não | Só para o próprio paciente e a equipe |
 | Município | `paciente` | **Só** direcionar o paciente para a unidade e as filas adequadas. Anulável | Não | Só para o próprio paciente e a equipe |
-| Celular, e-mail | `paciente`, `usuario` | Avisos | Não | Só para o próprio paciente |
+| Celular, e-mail | `paciente`, `usuario` | Avisos. O e-mail do paciente é opcional; a equipe usa o e-mail para entrar | Não | Só para o próprio paciente |
+| CPF ou e-mail digitado no login, e IP | `tentativa_login` | Limite de tentativas (AM-004). O identificador é guardado só como HMAC-SHA256 com chave do servidor (`LOGIN_HASH_KEY`); nunca em claro | Não | Ninguém pela interface |
+| Hash do refresh token e IP | `sessao_refresh` | Sessão renovável e detecção de reuso (ADR-003); o token em si não é guardado | Não | Ninguém pela interface |
 | Especialidade solicitada | `solicitacao` | Fila e agendamento | **Sim** (revela condição de saúde) | Paciente e equipe |
 | Classificação de risco | `solicitacao` | Ordem da fila | **Sim** | Só a equipe |
 | Respostas aos critérios da fila (por exemplo, número de filhos, uso de anticoagulante, prioridade legal) e a nota | `resposta_criterio`, `solicitacao.nota` | Ordem da fila ([ADR-024](../decisions/ADR-024-protocolo-por-fila.md)) | **Sim** | Só a equipe das filas do escopo; o paciente vê as próprias respostas, não os pontos nem a nota |
 | Histórico familiar (por exemplo, "mãe ou irmã teve câncer de mama?") | `resposta_criterio` | Critério da fila ([ADR-030](../decisions/ADR-030-historico-familiar-como-criterio.md)) | **Sim** | Igual às demais respostas |
 | Linha do tempo da solicitação | `historico_solicitacao` | Transparência para o paciente e motivo das mudanças para a equipe | Não (sem posição) | O paciente vê só os eventos com `visivel_paciente = true` |
 | Situação da conta da equipe (suspensão, data, motivo) | `usuario` | Controle de acesso ([ADR-028](../decisions/ADR-028-suspensao-de-acesso.md)) | Não | Só o admin |
-| IP e ações | `auditoria` | Rastreabilidade e segurança | Não | Só o admin |
+| IP e ações (inclui login e registro) | `auditoria` | Rastreabilidade e segurança | Não | Só o admin |
 
 O sistema **não** guarda diagnóstico, prontuário, resultados de exames nem qualquer dado clínico além do necessário para agendar.
 
@@ -41,6 +43,10 @@ O sistema **não** guarda diagnóstico, prontuário, resultados de exames nem qu
 | Conta e solicitações ativas | Enquanto o paciente usar o serviço |
 | Solicitações encerradas | Prazo definido pela política da instituição |
 | Auditoria | Prazo definido pela política da instituição |
+| `tentativa_login` | 24 horas *(proposta)* |
+| `sessao_refresh` | Até vencer *(proposta)* |
+
+O job `limpar_dados_de_autenticacao` do Worker apaga as duas tabelas conforme a proposta acima e roda de hora em hora (`WORKER_INTERVALO_RETENCAO_S`).
 | Backups | Rotação com a última cópia diária de 7 dias *(exemplo)* |
 
 ## Direitos do titular

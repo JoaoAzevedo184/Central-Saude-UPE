@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import func, select
 
 from app.infra.acesso import carregar_escopo
-from app.infra.modelos import CriterioFila, Fila, Paciente, Unidade, Usuario
+from app.infra.modelos import Agenda, CriterioFila, Fila, Paciente, Unidade, Usuario
 from app.infra.relogio import RelogioFixo
 from app.infra.seed import cpf_sintetico, semear
 
@@ -30,6 +30,8 @@ def test_seed_cria_dados_e_e_idempotente(sessao):
     assert sessao.scalar(select(func.count()).select_from(Unidade)) == 3
     assert sessao.scalar(select(func.count()).select_from(Fila)) == 5
     assert sessao.scalar(select(func.count()).select_from(CriterioFila)) == 7
+    assert sessao.scalar(select(func.count(func.distinct(Agenda.fila_id)))) == 5  # 1 por fila
+    assert all(sessao.scalars(select(Unidade.endereco)))
     assert all(sessao.scalars(select(CriterioFila.simulado)))
     assert usuario(sessao, "atendente.suspenso@exemplo.com").situacao == "SUSPENSO"
     assert sessao.scalar(select(Paciente.cpf)) == "12345678909"

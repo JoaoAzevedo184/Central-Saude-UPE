@@ -298,11 +298,11 @@ def test_uc002_cancelar_grava_evento_auditoria_e_outbox(api, sessao, paciente, m
     assert auditoria.ator_usuario_id == paciente.usuario_id
 
 
-@pytest.mark.parametrize("estado", ["EM_PROPOSTA", "AGENDADA", "ATENDIDA", "CANCELADA"])
-def test_uc002_cancelar_fora_de_em_analise_ou_na_fila_retorna_409(
+@pytest.mark.parametrize("estado", ["ATENDIDA", "CANCELADA"])
+def test_uc002_cancelar_solicitacao_encerrada_retorna_409(
     api, sessao, paciente, mundo, relogio, estado
 ):
-    # EM_PROPOSTA e AGENDADA: divergência temporária com business-rules.md (UC-004/005).
+    # EM_PROPOSTA e AGENDADA cancelam junto o agendamento: test_agendamentos.py.
     sid = pedir(api, mundo.fila).json()["id"]
     s = sessao.get(Solicitacao, sid)
     s.status, s.classificacao_risco, s.data_entrada_fila = estado, "VERDE", relogio.agora()

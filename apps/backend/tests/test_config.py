@@ -5,7 +5,9 @@ from pydantic import ValidationError
 
 from app.config import Settings
 
-ENV_EXAMPLE = Path(__file__).resolve().parents[3] / ".env.example"
+# Na raiz do repositório. Na imagem (/app/tests) não há parents[3]: o teste é pulado.
+_PAIS = Path(__file__).resolve().parents
+ENV_EXAMPLE = _PAIS[3] / ".env.example" if len(_PAIS) > 3 else None
 
 
 def test_le_variaveis_do_ambiente(monkeypatch):
@@ -39,7 +41,9 @@ def test_adr025_variavel_antiga_de_escopo_e_ignorada(monkeypatch):
     assert not hasattr(Settings(), "escopo_por_unidade")
 
 
-@pytest.mark.skipif(not ENV_EXAMPLE.exists(), reason=".env.example fica fora da imagem")
+@pytest.mark.skipif(
+    ENV_EXAMPLE is None or not ENV_EXAMPLE.exists(), reason=".env.example fica fora da imagem"
+)
 def test_env_example_traz_toda_variavel_obrigatoria():
     # Sem isso, um .env copiado do exemplo derruba o migrate com "Field required".
     chaves = {

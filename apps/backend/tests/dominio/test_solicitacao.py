@@ -100,8 +100,15 @@ def test_uc007_reclassificar_na_fila_exige_motivo_e_mantem_a_chegada():
 def test_uc007_classificar_e_cancelar_fora_do_estado_levantam_transicao_invalida(status):
     with pytest.raises(TransicaoInvalida):
         classificar(sol(status), "VERDE", "Motivo sintético", AGORA)
-    with pytest.raises(TransicaoInvalida):
-        cancelar(sol(status), "OUTRO", AGORA)
+    if status in ("ATENDIDA", "CANCELADA"):  # EM_PROPOSTA e AGENDADA cancelam (UC-005 A1)
+        with pytest.raises(TransicaoInvalida):
+            cancelar(sol(status), "OUTRO", AGORA)
+    else:
+        with pytest.raises(TransicaoInvalida):  # sem agendamento ativo: inconsistente
+            cancelar(sol(status), "OUTRO", AGORA)
+        assert cancelar(sol(status), "OUTRO", AGORA, tem_agendamento_ativo=True)[0].status == (
+            "CANCELADA"
+        )
 
 
 def test_adr024_recalcular_nota_so_gera_evento_na_fila_e_com_nota_diferente():

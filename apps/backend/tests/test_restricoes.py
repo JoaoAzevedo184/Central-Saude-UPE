@@ -1,4 +1,4 @@
-"""Restrições do banco (migrações 0002 e 0004). Cada teste confere a restrição que disparou."""
+"""Restrições do banco (migrações 0002, 0004 e 0005). Cada teste confere a que disparou."""
 
 from datetime import UTC, date, datetime, time, timedelta
 
@@ -82,7 +82,7 @@ def vaga(c, grafo, horas=0):
     )
 
 
-def agendamento(c, solicitacao_id, vaga_id, status="PROPOSTO"):
+def agendamento(c, solicitacao_id, vaga_id, status="PROPOSTO", **extra):
     return inserir(
         c,
         "agendamento",
@@ -91,6 +91,7 @@ def agendamento(c, solicitacao_id, vaga_id, status="PROPOSTO"):
         status=status,
         proposto_em=T0,
         expira_em=T0 + timedelta(hours=48),
+        **extra,
     )
 
 
@@ -421,3 +422,29 @@ def test_minimizacao_motivo_de_cancelamento_e_codigo_fechado(conexao, grafo):
         lambda: solicitacao(conexao, grafo, motivo_cancelamento="OUTRO"),
     )
     solicitacao(conexao, grafo, status="CANCELADA", motivo_cancelamento="OUTRO")
+
+
+def test_uc005_motivo_do_agendamento_e_codigo_fechado(conexao, grafo):
+    s = solicitacao(conexao, grafo)
+    v = vaga(conexao, grafo)
+    viola(
+        conexao,
+        "ck_agendamento_motivo_cancelamento",
+        lambda: agendamento(conexao, s, v, status="CANCELADO", motivo_cancelamento="texto livre"),
+    )
+    viola(
+        conexao,
+        "ck_agendamento_motivo_so_se_cancelado",
+        lambda: agendamento(conexao, s, v, motivo_cancelamento="RECUSADO_PELO_PACIENTE"),
+    )
+    agendamento(conexao, s, v, status="CANCELADO", motivo_cancelamento="RECUSADO_PELO_PACIENTE")
+
+
+@pytest.mark.parametrize("dias", [[0, 1], [8], []])
+def test_agenda_dias_da_semana_em_iso(conexao, grafo, dias):
+    viola(
+        conexao,
+        "ck_agenda_dias_semana_iso",
+        "UPDATE agenda SET dias_semana = CAST(:d AS smallint[]) WHERE id = :id",
+        {"d": dias, "id": grafo["agenda"]},
+    )

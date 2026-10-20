@@ -24,8 +24,8 @@ def test_adr021_matching_so_entra_na_agenda_com_a_flag():
     com = worker.montar_agenda(Settings(matching_automatico=True))
     sem = worker.montar_agenda(Settings(matching_automatico=False))
 
-    assert jobs.propor_vagas_livres in [job for job, _ in com]
-    assert jobs.propor_vagas_livres not in [job for job, _ in sem]
+    assert jobs.propor_vagas in [job for job, _ in com]
+    assert jobs.propor_vagas not in [job for job, _ in sem]
 
 
 def test_retencao_entra_na_agenda():

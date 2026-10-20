@@ -10,6 +10,8 @@ def test_downgrade_e_upgrade_das_migracoes(banco):
     config = alembic_config()
     banco.dispose()
 
+    command.downgrade(config, "0004")
+    command.upgrade(config, "head")
     command.downgrade(config, "0003")
     command.upgrade(config, "head")
     command.downgrade(config, "0002")

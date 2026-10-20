@@ -25,8 +25,9 @@ Legenda:
 | Ver solicitações, agendamentos e linha do tempo | 🔒 (só eventos visíveis ao paciente; sem posição na fila) | 🏥 | 🏥 | ✅ |
 | Confirmar, pedir outra data, cancelar | 🔒 | — | — | — |
 | Cancelar agendamento em nome do paciente | — | 🏥 *(proposta)* | — | — |
-| Validar solicitação | — | 🏥 | — | — |
-| Ver fila ordenada, com posição e motivo da última mudança | — | 🏥 | 🏥 | ✅ |
+| Validar/classificar solicitação (simulação da regulação) | — | 🏥 | — | — |
+| Responder critérios de origem `REGULACAO`/`EQUIPE` | — | 🏥 *(proposta)* | — | — |
+| Ver painel da fila e detalhe da solicitação, com posição e histórico | — | 🏥 | 🏥 | ✅ |
 | Propor vaga | — | 🏥 fase futura ([ADR-021](../decisions/ADR-021-matching-automatico.md)) | — | — |
 | Registrar comparecimento ou falta | — | 🏥 | — | — |
 | Ver indicadores | — | — | 🏥 | ✅ |
@@ -58,13 +59,22 @@ O banco não impede que um usuário de outro papel apareça em `usuario_fila` ou
   - `usuario_da_sessao`: lê o access token, carrega o usuário e confere, **a cada requisição**, a situação (`pode_autenticar()`) e se a família da sessão (`sid`) segue ativa. Falha → `401`;
   - `exige_papel(...)`: constrói em cima de `usuario_da_sessao` e responde `403` para outro papel;
   - `escopo_da_equipe`: conjunto de filas da equipe;
-  - `paciente_da_sessao`: *(proposta)*, ainda não implementada.
+  - `paciente_da_sessao`: exige o papel `PACIENTE` e devolve o paciente da sessão; as rotas do paciente usam o `paciente_id` dele na query.
 - Consultas do paciente sempre incluem `paciente_id = <paciente da sessão>` na própria query, em vez de buscar pelo ID e comparar depois.
 - **Obrigatório:** toda rota da equipe recebe `escopo = Depends(escopo_da_equipe)`, um conjunto de `fila_id`, e filtra por `fila_id IN escopo` dentro da query. Recurso de fila fora do escopo responde `404`.
 
+## Auditoria das leituras da equipe
+
+Ler o painel e o detalhe também é auditado (AM-007), sem nome, CPF nem respostas:
+
+| Ação | Entidade | Dados registrados |
+| --- | --- | --- |
+| `CONSULTAR_PAINEL` | `fila` | filtros `status`, `ordenacao`, `limit` e `offset` |
+| `CONSULTAR_SOLICITACAO` | `solicitacao` | só o ID da entidade |
+
 ## Suspender e reativar ([ADR-028](../decisions/ADR-028-suspensao-de-acesso.md))
 
-Rotas `POST /usuarios/{id}/suspender` (corpo `motivo`) e `POST /usuarios/{id}/reativar`: só `ADMIN` (`exige_papel("ADMIN")`), respondem `204` e gravam auditoria.
+Rotas `POST /usuarios/{id}/suspender` (corpo `motivo`) e `POST /usuarios/{id}/reativar`: só `ADMIN` (`exige_papel("ADMIN")`), respondem `204` e gravam auditoria. Pela decisão de 2026-10-19, as rotas de administração ficam sob `/admin/*`; estas duas ainda estão no caminho antigo e mudam para `/admin/usuarios/...` numa tarefa própria ([API](../architecture/api-design.md#administração)).
 
 | Situação | Resposta |
 | --- | --- |

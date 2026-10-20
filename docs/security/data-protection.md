@@ -19,6 +19,7 @@
 | Classificação de risco | `solicitacao` | Ordem da fila | **Sim** | Só a equipe |
 | Respostas aos critérios da fila (por exemplo, número de filhos, uso de anticoagulante, prioridade legal) e a nota | `resposta_criterio`, `solicitacao.nota` | Ordem da fila ([ADR-024](../decisions/ADR-024-protocolo-por-fila.md)) | **Sim** | Só a equipe das filas do escopo; o paciente vê as próprias respostas, não os pontos nem a nota |
 | Histórico familiar (por exemplo, "mãe ou irmã teve câncer de mama?") | `resposta_criterio` | Critério da fila ([ADR-030](../decisions/ADR-030-historico-familiar-como-criterio.md)) | **Sim** | Igual às demais respostas |
+| Motivo do cancelamento | `solicitacao.motivo_cancelamento` | Entender por que o pedido foi encerrado. Código de lista fechada, sem texto livre | Não | Paciente (como rótulo) e equipe |
 | Linha do tempo da solicitação | `historico_solicitacao` | Transparência para o paciente e motivo das mudanças para a equipe | Não (sem posição) | O paciente vê só os eventos com `visivel_paciente = true` |
 | Situação da conta da equipe (suspensão, data, motivo) | `usuario` | Controle de acesso ([ADR-028](../decisions/ADR-028-suspensao-de-acesso.md)) | Não | Só o admin |
 | IP e ações (inclui login e registro) | `auditoria` | Rastreabilidade e segurança | Não | Só o admin |
@@ -28,6 +29,11 @@ O sistema **não** guarda diagnóstico, prontuário, resultados de exames nem qu
 ## Princípios aplicados
 
 - **Minimização:** cada campo só existe se um fluxo usa. Campos novos com dado pessoal precisam aparecer nesta tabela no mesmo pull request. `sexo` e `municipio` servem só à elegibilidade e ao direcionamento; não entram em indicadores nem em e-mails.
+- **Minimização nas solicitações:**
+  - o motivo do cancelamento pelo paciente é um **código fechado**, sem texto livre, que poderia trazer dado de saúde ou de terceiros;
+  - a linha do tempo do paciente mostra **só o dia** (fuso `America/Recife`), sem hora: a hora de `ENTROU_NA_FILA` revelaria a `data_entrada_fila` e a ordem de chegada;
+  - o motivo da reclassificação (texto livre da equipe) **não aparece no painel**, só no detalhe, que é auditado.
+- **Auditoria das leituras da equipe** (`CONSULTAR_PAINEL`, `CONSULTAR_SOLICITACAO`) guarda ator, entidade e filtros, sem nome, CPF nem respostas dos critérios.
 - **Sem dados de terceiros:** o histórico familiar é guardado só como a resposta do paciente ao critério. O sistema nunca cadastra parentes, nunca liga o cadastro de um paciente ao de outro e nunca guarda nome, CPF ou qualquer dado pessoal dos parentes ([ADR-030](../decisions/ADR-030-historico-familiar-como-criterio.md)).
 - **Consentimento por finalidade:** `AGENDAMENTO` (obrigatório para usar o serviço) e `LEMBRETE_EMAIL` (opcional), com versão do termo e data; revogável a qualquer momento (RN-009).
 - **Mascaramento:** CPF e cartão do SUS mascarados nas interfaces e nas respostas da API, exceto para o próprio titular quando necessário.

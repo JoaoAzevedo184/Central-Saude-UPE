@@ -16,7 +16,7 @@
 | RF-010 | Atendente e gestor veem as filas do seu escopo, ordenadas por risco, nota e hora de chegada | Atendente, Gestor | M | UC-003 | RN-006, RN-015 |
 | RF-011 | O sistema ou o atendente propõe uma vaga ao paciente, com prazo de resposta | Sistema ([ADR-021](../decisions/ADR-021-matching-automatico.md)); proposta manual pelo atendente em fase futura | M | UC-003 | RN-001, RN-002, RN-003, RN-008 |
 | RF-012 | Paciente confirma uma proposta | Paciente | M | UC-004 | RN-001, RN-003 |
-| RF-013 | Paciente pede outra data e continua na fila | Paciente | M | UC-005 | RN-004 |
+| RF-013 | Paciente pede outra data e continua na fila | Paciente | M | UC-005 | RN-004, RN-020 |
 | RF-014 | Paciente cancela ("não vou precisar") | Paciente | M | UC-005 | RN-004 |
 | RF-015 | O sistema expira propostas não respondidas no prazo e devolve a solicitação ao fim da fila | Sistema | M | UC-006 | RN-003, RN-014 |
 | RF-016 | Vaga liberada por cancelamento ou expiração volta a ser oferecida ao próximo da fila | Sistema ou Atendente | M | UC-003 | RN-005 |

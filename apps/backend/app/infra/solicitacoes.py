@@ -65,19 +65,21 @@ def gravar_transicao(
     nova: SolicitacaoDominio,
     eventos: Iterable[EventoHistorico],
     *,
-    ator_id: UUID,
+    ator_id: UUID | None,
     acao: str,
     ip: str | None,
     evento_outbox: str | None = None,
     criacao: bool = False,
     auditoria_antes: dict[str, Any] | None = None,
     auditoria_depois: dict[str, Any] | None = None,
+    agendamento_id: UUID | None = None,
 ) -> None:
     """Aplica o resultado do domínio e grava linha do tempo, auditoria e outbox (etapas 4 a 7).
 
     Quem chama já travou a solicitação (`FOR UPDATE`) e conferiu dono ou escopo, ou acabou de
     inseri-la (`criacao`, já com flush); o commit também é de quem chama. A auditoria guarda
     só os campos de estado que mudaram, mais `auditoria_antes`/`auditoria_depois`.
+    `ator_id=None` é o Worker. `agendamento_id` vai no payload da outbox.
     """
     campos = ("status", "classificacao_risco", "nota", "data_entrada_fila")
     antes = dict.fromkeys(campos) if criacao else {c: getattr(modelo, c) for c in campos}
@@ -105,8 +107,10 @@ def gravar_transicao(
             entidade_id=modelo.id,
             dados_antes=None
             if criacao
-            else _json({c: antes[c] for c in mudou} | (auditoria_antes or {})),
-            dados_depois=_json({c: getattr(modelo, c) for c in mudou} | (auditoria_depois or {})),
+            else para_json({c: antes[c] for c in mudou} | (auditoria_antes or {})),
+            dados_depois=para_json(
+                {c: getattr(modelo, c) for c in mudou} | (auditoria_depois or {})
+            ),
             ip=ip,
         )
     )
@@ -116,10 +120,11 @@ def gravar_transicao(
                 tipo_evento=evento_outbox,
                 agregado_tipo="solicitacao",
                 agregado_id=modelo.id,
-                payload={"solicitacao_id": str(modelo.id)},
+                payload={"solicitacao_id": str(modelo.id)}
+                | ({"agendamento_id": str(agendamento_id)} if agendamento_id else {}),
             )
         )
 
 
-def _json(dados: dict[str, Any]) -> dict[str, Any]:
+def para_json(dados: dict[str, Any]) -> dict[str, Any]:
     return {k: v.isoformat() if hasattr(v, "isoformat") else v for k, v in dados.items()}

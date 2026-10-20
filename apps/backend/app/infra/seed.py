@@ -10,8 +10,9 @@ import logging
 import os
 import secrets
 import sys
-from datetime import date
+from datetime import date, time
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import insert, select
 from sqlalchemy.orm import Session
@@ -22,6 +23,7 @@ from app.dominio.relogio import Relogio
 from app.infra.autenticacao import hash_senha
 from app.infra.db import SessionLocal
 from app.infra.modelos import (
+    Agenda,
     CriterioFila,
     Especialidade,
     Fila,
@@ -151,10 +153,33 @@ FILAS = [
     ),
 ]
 
+# Endereços institucionais públicos das unidades (não são dados pessoais).
 UNIDADES = [
-    ("CISAM", "Centro Integrado de Saúde Amaury de Medeiros"),
-    ("HUOC", "Hospital Universitário Oswaldo Cruz"),
-    ("PROCAPE", "Pronto-Socorro Cardiológico de Pernambuco"),
+    (
+        "CISAM",
+        "Centro Integrado de Saúde Amaury de Medeiros",
+        "Rua Visconde de Mamanguape, s/n, Encruzilhada, Recife - PE",
+    ),
+    (
+        "HUOC",
+        "Hospital Universitário Oswaldo Cruz",
+        "Rua Arnóbio Marques, 310, Santo Amaro, Recife - PE",
+    ),
+    (
+        "PROCAPE",
+        "Pronto-Socorro Cardiológico de Pernambuco",
+        "Rua dos Palmares, s/n, Santo Amaro, Recife - PE",
+    ),
+]
+
+# Uma agenda por fila: (fila, profissional fictício, dias ISO, início, fim, duração em min).
+# As vagas saem do job `gerar_vagas` do Worker.
+AGENDAS = [
+    ("Laqueadura tubária", "Dra. Ana Exemplo", [2, 4], time(8), time(12), 60),
+    ("Mamografia", "Dra. Beatriz Exemplo", [1, 3, 5], time(13), time(17), 30),
+    ("Cardiologia — anticoagulação", "Dr. Carlos Exemplo", [1, 2, 3, 4, 5], time(8), time(11), 20),
+    ("Dermatologia clínica", "Dra. Daniela Exemplo", [2, 3], time(8), time(12), 30),
+    ("Dermatologia cirúrgica", "Dr. Eduardo Exemplo", [4], time(13), time(17), 60),
 ]
 
 
@@ -163,7 +188,10 @@ def semear(session: Session, relogio: Relogio, senha_hash: str) -> bool:
     if session.scalar(select(Unidade).where(Unidade.sigla == "CISAM")) is not None:
         return False
 
-    unidades = {sigla: Unidade(sigla=sigla, nome=nome) for sigla, nome in UNIDADES}
+    unidades = {
+        sigla: Unidade(sigla=sigla, nome=nome, endereco=endereco)
+        for sigla, nome, endereco in UNIDADES
+    }
     especialidades = {nome: Especialidade(nome=nome) for nome in {f[1] for f in FILAS}}
     session.add_all([*unidades.values(), *especialidades.values()])
     session.flush()
@@ -193,6 +221,20 @@ def semear(session: Session, relogio: Relogio, senha_hash: str) -> bool:
             )
             for codigo, desc, tipo, peso, parametros, origem in criterios
         )
+
+    hoje = relogio.agora().astimezone(ZoneInfo(get_settings().timezone_exibicao)).date()
+    session.add_all(
+        Agenda(
+            fila_id=filas[fila].id,
+            profissional=profissional,
+            dias_semana=dias,
+            hora_inicio=inicio,
+            hora_fim=fim,
+            duracao_min=duracao,
+            vigencia_inicio=hoje,
+        )
+        for fila, profissional, dias, inicio, fim, duracao in AGENDAS
+    )
 
     def usuario(email: str, papel: str, **extra: Any) -> Usuario:
         u = Usuario(email=email, senha_hash=senha_hash, papel=papel, **extra)

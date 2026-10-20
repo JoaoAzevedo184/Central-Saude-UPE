@@ -11,12 +11,14 @@ from uuid import UUID
 
 from sqlalchemy import (
     ARRAY,
+    BigInteger,
     Boolean,
     CheckConstraint,
     Column,
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
+    Identity,
     Index,
     PrimaryKeyConstraint,
     SmallInteger,
@@ -49,6 +51,12 @@ MOTIVOS_CANCELAMENTO = (
     "OUTRO",
 )
 STATUS_AGENDAMENTO = ("PROPOSTO", "CONFIRMADO", "CANCELADO", "EXPIRADO", "REALIZADO", "FALTOU")
+MOTIVOS_CANCELAMENTO_AGENDAMENTO = (
+    "RECUSADO_PELO_PACIENTE",
+    "CANCELADO_PELO_PACIENTE",
+    "CANCELADO_PELA_EQUIPE",  # reservado
+    "VAGA_BLOQUEADA",  # reservado
+)
 TIPOS_HISTORICO = (
     "CRIADA",
     "CLASSIFICADA",
@@ -262,12 +270,16 @@ class Agenda(Base):
         CheckConstraint("hora_inicio < hora_fim", name="horario"),
         CheckConstraint("duracao_min > 0", name="duracao_positiva"),
         CheckConstraint("vigencia_fim IS NULL OR vigencia_inicio <= vigencia_fim", name="vigencia"),
+        CheckConstraint(
+            "cardinality(dias_semana) > 0 AND dias_semana <@ ARRAY[1,2,3,4,5,6,7]::smallint[]",
+            name="dias_semana_iso",
+        ),
     )
 
     id: Mapped[UUID] = pk_uuid()
     fila_id: Mapped[UUID] = fk("fila.id")
     profissional: Mapped[str] = mapped_column(Text)
-    dias_semana: Mapped[list[int]] = mapped_column(ARRAY(SmallInteger))
+    dias_semana: Mapped[list[int]] = mapped_column(ARRAY(SmallInteger))  # ISO: 1 = segunda
     hora_inicio: Mapped[time]
     hora_fim: Mapped[time]
     duracao_min: Mapped[int]
@@ -394,6 +406,8 @@ class HistoricoSolicitacao(Base):
     visivel_paciente: Mapped[bool]
     ator_usuario_id: Mapped[UUID | None] = fk("usuario.id")  # nulo = Worker
     ocorrido_em: Mapped[datetime] = agora()
+    # Ordem de gravação: desempata eventos do mesmo instante. Ordene por (ocorrido_em, seq).
+    seq: Mapped[int] = mapped_column(BigInteger, Identity(always=True))
 
 
 class Agendamento(Base):
@@ -420,6 +434,10 @@ class Agendamento(Base):
             postgresql_where=text("status = 'PROPOSTO'"),
         ),
         CheckConstraint("expira_em > proposto_em", name="expira_depois_de_propor"),
+        em("motivo_cancelamento", MOTIVOS_CANCELAMENTO_AGENDAMENTO),
+        CheckConstraint(
+            "motivo_cancelamento IS NULL OR status = 'CANCELADO'", name="motivo_so_se_cancelado"
+        ),
     )
 
     id: Mapped[UUID] = pk_uuid()

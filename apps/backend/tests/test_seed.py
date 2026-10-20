@@ -2,7 +2,6 @@ from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
 
 from app.infra.acesso import carregar_escopo
 from app.infra.modelos import CriterioFila, Fila, Paciente, Unidade, Usuario
@@ -11,11 +10,7 @@ from app.infra.seed import cpf_sintetico, semear
 
 pytestmark = pytest.mark.integracao
 
-
-@pytest.fixture
-def sessao(conexao):
-    with Session(bind=conexao, join_transaction_mode="create_savepoint") as s:
-        yield s
+SENHA_HASH = "hash-de-teste"
 
 
 def usuario(sessao, email):
@@ -29,8 +24,8 @@ def filas_de(sessao, *siglas):
 def test_seed_cria_dados_e_e_idempotente(sessao):
     relogio = RelogioFixo(datetime(2026, 10, 19, 12, tzinfo=UTC))
 
-    assert semear(sessao, relogio) is True
-    assert semear(sessao, relogio) is False
+    assert semear(sessao, relogio, SENHA_HASH) is True
+    assert semear(sessao, relogio, SENHA_HASH) is False
 
     assert sessao.scalar(select(func.count()).select_from(Unidade)) == 3
     assert sessao.scalar(select(func.count()).select_from(Fila)) == 5
@@ -41,7 +36,7 @@ def test_seed_cria_dados_e_e_idempotente(sessao):
 
 
 def test_adr025_escopo_a_partir_do_seed(sessao):
-    semear(sessao, RelogioFixo(datetime(2026, 10, 19, 12, tzinfo=UTC)))
+    semear(sessao, RelogioFixo(datetime(2026, 10, 19, 12, tzinfo=UTC)), SENHA_HASH)
 
     def escopo(email):
         return carregar_escopo(sessao, usuario(sessao, email).id)
@@ -64,6 +59,9 @@ def test_seed_so_roda_em_desenvolvimento(monkeypatch, ambiente):
     from app.infra import seed
 
     monkeypatch.setenv("APP_ENV", ambiente)
+    monkeypatch.setenv("JWT_SECRET_KEY", "x" * 64)  # produção exige segredo forte (AM-009)
+    monkeypatch.setenv("LOGIN_HASH_KEY", "y" * 64)
+    monkeypatch.setenv("COOKIE_SECURE", "true")
     config.get_settings.cache_clear()
     try:
         with pytest.raises(SystemExit, match="development"):

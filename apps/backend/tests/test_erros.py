@@ -59,7 +59,9 @@ def _cpf_duplicado() -> None:
 
 
 app.include_router(router)
-client = TestClient(app, raise_server_exceptions=False)
+# As rotas de escrita exigem o token CSRF (ADR-003); aqui ele é só um valor qualquer.
+CSRF = {"cookies": {"csrf_token": "t"}, "headers": {"X-CSRF-Token": "t"}}
+client = TestClient(app, raise_server_exceptions=False, **CSRF)
 
 
 def test_validacao_responde_422_sem_ecoar_a_entrada():
@@ -109,7 +111,7 @@ def test_erro_de_banco_loga_so_tipo_e_sqlstate(banco, caplog):
 )
 def test_middleware_do_500_nao_captura_http_nem_dominio(caplog, rota, metodo, status):
     # raise_server_exceptions=True: se o erro escapasse até o middleware, viraria 500.
-    with TestClient(app) as c, caplog.at_level(logging.ERROR):
+    with TestClient(app, **CSRF) as c, caplog.at_level(logging.ERROR):
         resposta = getattr(c, metodo)(rota)
 
     assert resposta.status_code == status

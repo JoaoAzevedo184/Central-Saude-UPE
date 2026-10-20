@@ -8,7 +8,9 @@ os.environ.setdefault(
     "DATABASE_URL",
     "postgresql+psycopg://teleagendamento:teleagendamento@localhost:5432/teleagendamento",
 )
+os.environ["APP_ENV"] = "test"  # vale também dentro do container, cujo .env diz development
 os.environ.setdefault("JWT_SECRET_KEY", "segredo-somente-para-testes")
+os.environ.setdefault("LOGIN_HASH_KEY", "chave-de-hash-somente-para-testes")
 
 # Os testes nunca tocam o banco de desenvolvimento: usam <POSTGRES_DB>_test, recriado a cada
 # execução. Isto roda antes de qualquer import de `app`, que lê DATABASE_URL uma vez só.
@@ -16,13 +18,18 @@ URL_ORIGINAL = make_url(os.environ["DATABASE_URL"])
 URL_TESTE = URL_ORIGINAL.set(database=f"{URL_ORIGINAL.database}_test")
 os.environ["DATABASE_URL"] = URL_TESTE.render_as_string(hide_password=False)
 
+from datetime import UTC, datetime  # noqa: E402
+
 import pytest  # noqa: E402
 from alembic import command  # noqa: E402
 from alembic.config import Config  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
+from sqlalchemy.orm import Session  # noqa: E402
 
+from app.api.deps import get_relogio, get_session  # noqa: E402
 from app.api.main import app  # noqa: E402
 from app.infra.db import engine  # noqa: E402
+from app.infra.relogio import RelogioFixo  # noqa: E402
 
 BACKEND = Path(__file__).resolve().parent.parent
 
@@ -69,5 +76,30 @@ def conexao(banco):
 @pytest.fixture
 def client():
     with TestClient(app) as c:
+        yield c
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def sessao(conexao):
+    """Sessão do ORM dentro da transação do teste; o commit das rotas vira um SAVEPOINT."""
+    with Session(bind=conexao, join_transaction_mode="create_savepoint") as s:
+        yield s
+
+
+@pytest.fixture
+def relogio():
+    return RelogioFixo(datetime(2026, 10, 19, 12, tzinfo=UTC))
+
+
+IP_DO_CLIENTE = "203.0.113.5"  # faixa de documentação (RFC 5737)
+
+
+@pytest.fixture
+def api(sessao, relogio):
+    """Cliente com a sessão de teste, o relógio fixo e um IP válido (o padrão é "testclient")."""
+    app.dependency_overrides[get_session] = lambda: sessao
+    app.dependency_overrides[get_relogio] = lambda: relogio
+    with TestClient(app, client=(IP_DO_CLIENTE, 50000)) as c:
         yield c
     app.dependency_overrides.clear()

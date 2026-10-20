@@ -26,3 +26,7 @@ def test_adr021_matching_so_entra_na_agenda_com_a_flag():
 
     assert jobs.propor_vagas_livres in [job for job, _ in com]
     assert jobs.propor_vagas_livres not in [job for job, _ in sem]
+
+
+def test_retencao_entra_na_agenda():
+    assert jobs.limpar_dados_de_autenticacao in [job for job, _ in worker.montar_agenda(Settings())]

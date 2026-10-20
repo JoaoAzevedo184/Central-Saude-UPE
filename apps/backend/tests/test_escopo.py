@@ -1,13 +1,7 @@
-import pytest
-from fastapi import HTTPException
+def test_adr025_sem_autenticacao_o_escopo_falha_fechado(client):
+    # A regra do escopo está em dominio/acesso.py (tests/dominio/test_acesso.py). Sem sessão,
+    # `usuario_da_sessao` responde 401 antes de qualquer escopo ser calculado.
+    resposta = client.get("/api/v1/me")
 
-from app.api.deps import usuario_da_sessao
-
-
-def test_adr025_sem_autenticacao_o_escopo_falha_fechado():
-    # A regra do escopo está em dominio/acesso.py (tests/dominio/test_acesso.py). Até existir
-    # autenticação, a dependência não identifica usuário e nenhuma rota da equipe responde.
-    with pytest.raises(HTTPException) as erro:
-        usuario_da_sessao()
-
-    assert erro.value.status_code == 401
+    assert resposta.status_code == 401
+    assert resposta.json()["type"] == "/problemas/nao-autenticado"

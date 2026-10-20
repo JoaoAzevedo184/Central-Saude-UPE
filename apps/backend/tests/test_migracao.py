@@ -6,10 +6,12 @@ from tests.conftest import alembic_config
 pytestmark = pytest.mark.integracao
 
 
-def test_downgrade_e_upgrade_da_0002(banco):
+def test_downgrade_e_upgrade_das_migracoes(banco):
     config = alembic_config()
     banco.dispose()
 
+    command.downgrade(config, "0002")
+    command.upgrade(config, "head")
     command.downgrade(config, "0001")
     command.upgrade(config, "head")
 

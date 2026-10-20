@@ -159,6 +159,7 @@ erDiagram
     int nota "soma dos pontos; ADR-024"
     timestamptz data_entrada_fila "hora de chegada; ADR-026"
     timestamptz criada_em
+    text motivo_cancelamento "CHECK lista fechada; so se CANCELADA; migracao 0004"
   }
   RESPOSTA_CRITERIO {
     uuid solicitacao_id PK, FK
@@ -299,6 +300,22 @@ CREATE UNIQUE INDEX ux_consentimento_vigente
   ON consentimento (paciente_id, finalidade)
   WHERE revogado_em IS NULL;
 
+-- RN-018 (migração 0004): uma solicitação ativa por paciente e fila
+CREATE UNIQUE INDEX ux_solicitacao_ativa_por_fila
+  ON solicitacao (paciente_id, fila_id)
+  WHERE status NOT IN ('ATENDIDA', 'CANCELADA');
+
+-- Migração 0004: "Minhas solicitações" (inclui as encerradas, que o índice acima não cobre) e o painel da equipe
+CREATE INDEX ix_solicitacao_paciente_id ON solicitacao (paciente_id);
+CREATE INDEX ix_solicitacao_fila_id_status ON solicitacao (fila_id, status);
+
+-- Migração 0004: motivo do cancelamento pelo paciente é código fechado, sem texto livre
+ALTER TABLE solicitacao ADD CONSTRAINT ck_solicitacao_motivo_cancelamento
+  CHECK (motivo_cancelamento IN ('NAO_PRECISO_MAIS', 'CONSEGUI_EM_OUTRO_LUGAR',
+         'DIFICULDADE_DE_DESLOCAMENTO', 'CONFLITO_DE_HORARIO', 'OUTRO'));
+ALTER TABLE solicitacao ADD CONSTRAINT ck_solicitacao_motivo_so_se_cancelada
+  CHECK (motivo_cancelamento IS NULL OR status = 'CANCELADA');
+
 -- Ordenação da fila e Worker
 CREATE INDEX ix_solicitacao_fila_ordem ON solicitacao (fila_id, data_entrada_fila) WHERE status = 'NA_FILA';
 CREATE INDEX ix_outbox_pendente ON outbox (proximo_retry_em) WHERE status = 'PENDENTE';
@@ -323,6 +340,8 @@ Tipos de evento de `historico_solicitacao.tipo`: `CRIADA`, `CLASSIFICADA`, `ENTR
 
 - **Vaga livre** = `status_admin = 'ATIVA'` e nenhum agendamento ativo apontando para ela. A tabela `vaga` não guarda "ocupada", para não existir estado duplicado que possa divergir.
 - **A posição na fila não é gravada.** Ela é calculada na consulta por `ordenar_fila()` (risco → nota → `data_entrada_fila`). A posição de todas as solicitações muda a cada entrada, reclassificação ou volta ao fim da fila; gravá-la exigiria reescrever a fila inteira a cada mudança, com risco de divergência e de corrida entre transações. Também não fica em `historico_solicitacao`, para a posição nunca vazar pela linha do tempo do paciente ([ADR-007](../decisions/ADR-007-paciente-ve-status.md)). A equipe vê a posição calculada e o motivo da última mudança, que vem do histórico.
+- **`ix_solicitacao_fila_ordem` não cobre risco nem nota.** A ordenação do painel (risco, nota, chegada, id) é feita em memória pelo Postgres, depois de filtrar por `fila_id` e `status` (`ix_solicitacao_fila_id_status`). Aceito no volume do protótipo; revisar se uma fila ficar grande.
+- **Motivo do cancelamento** (`solicitacao.motivo_cancelamento`) é nulo ou um código da lista fechada, e só existe em solicitação `CANCELADA`. Texto livre ficou de fora de propósito ([proteção de dados](../security/data-protection.md)).
 - **Fim da fila** = nova `data_entrada_fila` ([ADR-026](../decisions/ADR-026-prazos-e-volta-ao-fim-da-fila.md)).
 - **Nota** é a soma de `resposta_criterio.pontos`, recalculada pelo domínio sempre que uma resposta é gravada ([ADR-024](../decisions/ADR-024-protocolo-por-fila.md)). Prioridade legal é um critério da fila, não uma coluna da solicitação.
 - **Trocar a fila de uma solicitação que já tem respostas é bloqueado** pelas FKs compostas de `resposta_criterio` (`ON UPDATE RESTRICT`): as respostas pertencem ao protocolo da fila original. Para mudar de fila, a solicitação é cancelada e outra é criada na fila nova.

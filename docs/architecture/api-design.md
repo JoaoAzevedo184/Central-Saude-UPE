@@ -1,6 +1,6 @@
 # API
 
-> **Rascunho.** Os endpoints abaixo são a proposta inicial e vão mudar durante a implementação. A referência definitiva será a documentação OpenAPI gerada pelo FastAPI em `/api/v1/docs`.
+> **Rascunho.** Sessão e conta, solicitações do paciente e painel da equipe estão implementados; os demais endpoints são a proposta inicial e vão mudar durante a implementação. A referência definitiva será a documentação OpenAPI gerada pelo FastAPI em `/api/v1/docs`.
 
 ## Convenções (propostas)
 
@@ -11,10 +11,13 @@
 
   | `type` | Status | Quando aparece |
   | --- | --- | --- |
-  | `about:blank` | conforme o erro (`404`, `405`, `422`, `500`, `503`…) | Erros HTTP genéricos: rota inexistente, método não permitido, validação da entrada (com a lista `errors`), erro inesperado, banco indisponível no `/health` |
+  | `about:blank` | conforme o erro (`404`, `405`, `422`, `500`, `503`…) | Erros HTTP genéricos: rota inexistente, método não permitido, validação da entrada (com a lista `errors`), erro de entrada do domínio (`422`, como critério de outra fila ou valor inválido), erro inesperado, banco indisponível no `/health` |
   | `/problemas/transicao-invalida` | `409` | O estado de origem não permite a transição pedida (ex.: proposta já respondida) |
   | `/problemas/erro-de-dominio` | `409` | Outra regra de negócio violada, sem `type` mais específico |
   | `/problemas/operacao-nao-permitida` | `409` | A operação é válida em geral, mas não neste alvo (ex.: suspender a si mesmo, um paciente ou o último ADMIN ativo) |
+  | `/problemas/nao-elegivel` | `409` | O paciente não cumpre a elegibilidade da fila (RN-017); o `detail` traz o motivo |
+  | `/problemas/solicitacao-duplicada` | `409` | Já existe solicitação ativa do paciente na fila (RN-018); traz o campo extra `solicitacao_id` da existente |
+  | `/problemas/sem-consentimento` | `403` | Sem consentimento vigente `AGENDAMENTO` para criar a solicitação (RN-009) |
   | `/problemas/cadastro-nao-concluido` | `409` | Registro com CPF, cartão do SUS ou e-mail já cadastrado; mensagem única, sem dizer qual campo (AM-005) |
   | `/problemas/nao-autenticado` | `401` | Sem sessão, access token inválido ou vencido, usuário suspenso ou sessão revogada; refresh inválido, vencido ou reutilizado |
   | `/problemas/credenciais-invalidas` | `401` | Login com identificador inexistente, senha errada ou conta suspensa; o corpo é idêntico nos três casos |
@@ -29,13 +32,14 @@
   - `422`: validação
   - `429`: muitas tentativas de login ou de registro (`Retry-After`)
 - **Ações de estado** são sub-recursos com `POST` (`/agendamentos/{id}/confirmar`), não `PATCH` no campo `status`. Assim cada transição tem validação, autorização e auditoria próprias.
-- **Paginação** de listas: `?limite=&cursor=`.
+- **Paginação** de listas: `?limit=&offset=`. `limit` de 1 a 100 (padrão 50); `offset` a partir de 0.
 - **Escopo da equipe por fila** ([ADR-025](../decisions/ADR-025-escopo-por-fila.md)): toda rota da equipe recebe `escopo = Depends(escopo_da_equipe)`, um conjunto de `fila_id`, e filtra por `fila_id IN escopo` **dentro da query**. Recurso de fila fora do escopo responde `404`, como recurso de outro paciente. Usuário suspenso não tem sessão ([ADR-028](../decisions/ADR-028-suspensao-de-acesso.md)).
 - **O que o paciente vê** ([ADR-007](../decisions/ADR-007-paciente-ve-status.md)):
   - status da solicitação, a fila (nome e descrição) e a linha do tempo, com só os eventos de `historico_solicitacao` em que `visivel_paciente = true` (tipo, data e motivo);
   - **nunca** posição na fila, tamanho da fila, nota, pontos dos critérios, classificação de risco ou estimativa derivada deles;
   - os schemas de entrada do paciente aceitam só as respostas dos critérios com origem `PACIENTE`; os pontos e a nota são calculados no servidor.
-- **O que a equipe vê:** além do que o paciente vê, a posição calculada na consulta (`ordenar_fila()`), o risco, a nota, as respostas e o motivo da última mudança de posição.
+- **O que a equipe vê:** além do que o paciente vê, a posição calculada na consulta, o risco, a nota, as respostas com os pontos e o histórico completo, com motivo. O CPF vai mascarado e o nome, abreviado na lista (ver [proteção de dados](../security/data-protection.md)).
+- **Cache:** as respostas de `/api/v1/filas`, `/api/v1/solicitacoes` e `/api/v1/equipe/` levam `Cache-Control: no-store`, como `/auth/*` e `/me`.
 
 ## Endpoints
 
@@ -63,18 +67,39 @@ Caminhos sob `/api/v1`. Respostas de `/auth/*` e `/me` levam `Cache-Control: no-
 - **A cada requisição**, a dependência `usuario_da_sessao` relê o usuário e a família da sessão. Suspensão, logout e reuso do refresh cortam o acesso na hora ([ADR-028](../decisions/ADR-028-suspensao-de-acesso.md)).
 - O serviço de tokens está pronto para `Authorization: Bearer`, mas a API ainda **não lê** esse header ([ADR-003](../decisions/ADR-003-autenticacao-web.md)).
 
-### Paciente
+### Paciente: filas e solicitações
+Implementadas. Papel `PACIENTE` (dependência `paciente_da_sessao`); toda consulta filtra por `paciente_id` da sessão **dentro da query** e recurso alheio responde `404`. Os schemas de entrada usam `extra="forbid"` (AM-013).
+
+| Método | Rota | Descrição |
+| --- | --- | --- |
+| GET | `/filas` | Filas ativas com unidade, especialidade, `descricao_paciente`, `elegivel` e `motivo_inelegivel` (texto fixo de `motivo_inelegivel()`). Sem contagem de pessoas |
+| GET | `/filas/{id}` | Detalhe da fila com os critérios de origem `PACIENTE` (`id`, `codigo`, `descricao`, `tipo`, `opcoes`). Sem peso, fator nem pontos |
+| POST | `/solicitacoes` | Cria a solicitação `EM_ANALISE` ([UC-002](../requirements/use-cases/UC-002-solicitar-atendimento.md)). Corpo: `fila_id`, `turno_preferido` (`MANHA`, `TARDE`, `QUALQUER`), `origem_encaminhamento` (texto de 2 a 200), `respostas` (`[{criterio_id, valor}]`, até 50; `valor` texto até 200). `201` com o detalhe |
+| GET | `/solicitacoes?situacao=abertas\|encerradas&limit&offset` | Minhas solicitações. `encerradas` = `ATENDIDA` e `CANCELADA` |
+| GET | `/solicitacoes/{id}` | `status`, fila, unidade, `data_pedido`, turno, `origem_encaminhamento`, as respostas próprias (`descricao`, `valor`; só origem `PACIENTE`) e `linha_do_tempo` `[{tipo, data, motivo}]` só com `visivel_paciente = true` |
+| POST | `/solicitacoes/{id}/cancelar` | Corpo obrigatório `{motivo_codigo}`: `NAO_PRECISO_MAIS`, `CONSEGUI_EM_OUTRO_LUGAR`, `DIFICULDADE_DE_DESLOCAMENTO`, `CONFLITO_DE_HORARIO` ou `OUTRO`. Sem texto livre; a linha do tempo mostra o rótulo amigável. Só em `EM_ANALISE` e `NA_FILA`; outro estado → `409` (`transicao-invalida`). Outbox `SOLICITACAO_CANCELADA` |
+
+Erros de `POST /solicitacoes`:
+
+| Situação | Resposta |
+| --- | --- |
+| Sem consentimento `AGENDAMENTO` vigente | `403` `/problemas/sem-consentimento` |
+| Paciente inelegível (RN-017) | `409` `/problemas/nao-elegivel` (`detail` = motivo) |
+| Já existe solicitação ativa na fila (RN-018) | `409` `/problemas/solicitacao-duplicada`, com `solicitacao_id` da existente |
+| Critério de outra fila ou de outra origem, repetido, ou valor inválido | `422` |
+| Fila inexistente ou inativa | `422` |
+
+- **`data` da linha do tempo é só o dia**, em `America/Recife`, sem hora: a hora de `ENTROU_NA_FILA` revelaria a `data_entrada_fila` e, com ela, a ordem de chegada (AM-014).
+- **O paciente nunca recebe:** posição, tamanho da fila, total, nota, pontos, pesos, parâmetros ou fatores, `classificacao_risco`, `data_entrada_fila` nem a hora dos eventos.
+- No cancelamento, só `EM_ANALISE` e `NA_FILA` são aceitos por ora. `EM_PROPOSTA` → `CANCELADA` e `AGENDADA` → `CANCELADA` estão no diagrama de estados, mas respondem `409` até o [UC-004](../requirements/use-cases/UC-004-confirmar-proposta.md) e o [UC-005](../requirements/use-cases/UC-005-pedir-outra-data-ou-cancelar.md).
+
+### Paciente: demais rotas *(proposta)*
 | Método | Rota | Descrição |
 | --- | --- | --- |
 | GET | `/pacientes/me/consentimentos` | Consentimentos vigentes e histórico |
 | POST | `/pacientes/me/consentimentos` | Concede um consentimento (finalidade, versão do termo) |
 | POST | `/pacientes/me/consentimentos/{id}/revogar` | Revoga um consentimento |
-| GET | `/filas/disponiveis?especialidade_id=` | Filas para as quais o paciente é elegível, com a descrição para o paciente (RN-017) |
-| GET | `/pacientes/me/solicitacoes` | Solicitações com status, **sem posição na fila** (RN-007) |
-| GET | `/solicitacoes/{id}/linha-do-tempo` | Eventos visíveis ao paciente, com motivo; sem posição |
 | GET | `/pacientes/me/historico` | Histórico de atendimentos: realizados, faltas, propostas expiradas e canceladas |
-| POST | `/solicitacoes` | Nova solicitação numa fila, com as respostas dos critérios de origem `PACIENTE` |
-| POST | `/solicitacoes/{id}/cancelar` | "Não vou precisar" |
 | GET | `/pacientes/me/agendamentos` | Propostas, próximos e anteriores |
 | GET | `/agendamentos/{id}` | Detalhe da proposta ou do agendamento |
 | POST | `/agendamentos/{id}/confirmar` | Confirma presença |
@@ -84,29 +109,49 @@ Caminhos sob `/api/v1`. Respostas de `/auth/*` e `/me` levam `Cache-Control: no-
 | POST | `/notificacoes/{id}/marcar-lida` | Marca como lido |
 
 ### Equipe (atendente e gestor)
+Implementadas as rotas `/equipe`. Prefixo `/equipe`; `escopo_da_equipe` é aplicado dentro da query e recurso fora do escopo responde `404`. Leitura: ATENDENTE, GESTOR e ADMIN. Escrita: só ATENDENTE. Toda leitura é auditada ([controle de acesso](../security/access-control.md)).
+
 | Método | Rota | Descrição |
 | --- | --- | --- |
-| GET | `/filas` | Filas do escopo do usuário |
-| GET | `/filas/{id}/solicitacoes` | Fila ordenada por risco, nota e hora de chegada, com posição e motivo da última mudança (só filas do escopo) |
-| POST | `/solicitacoes/{id}/validar` | `EM_ANALISE` → `NA_FILA`, com a classificação de risco |
+| GET | `/equipe/filas` | Filas do escopo (inclui inativas) com `contagem_por_status` |
+| GET | `/equipe/filas/{fila_id}/solicitacoes?status&ordenacao=prioridade\|chegada&limit&offset` | `{total, itens}`. Item: `id`, `status`, `posicao`, `classificacao_risco`, `nota`, `data_entrada_fila`, `paciente_nome` abreviado ("Maria S."), `paciente_cpf` mascarado (`***.482.***-10`) e `ultima_mudanca` `{tipo, ocorrido_em}`, **sem motivo** (o motivo fica no detalhe). `ocorrido_em` mantém a hora para a equipe (decidido em 2026-10-19); só o paciente vê a data sem hora |
+| GET | `/equipe/solicitacoes/{id}` | Nome completo, CPF mascarado, respostas (critério, origem, valor, pontos), nota e histórico completo com motivo |
+| POST | `/equipe/solicitacoes/{id}/classificar` | Corpo `{classificacao_risco, motivo?}`. Ver abaixo |
+| PUT | `/equipe/solicitacoes/{id}/respostas` | Grava respostas dos critérios de origem `REGULACAO` e `EQUIPE`. Ver abaixo |
+
+- **Posição:** só para `NA_FILA`. É `ROW_NUMBER` sobre a fila inteira, calculado antes da paginação, e nunca gravado. A ordenação `prioridade` segue a mesma ordem de `ordenar_fila()` (risco, nota decrescente, chegada, id); `chegada` ordena só pela hora de chegada.
+- **`classificar`:**
+  - `EM_ANALISE` → `NA_FILA`: `data_entrada_fila` = agora; eventos `CLASSIFICADA` (invisível) e `ENTROU_NA_FILA` (visível, "Seu pedido entrou na fila."); outbox `SOLICITACAO_NA_FILA`.
+  - `NA_FILA`: reclassifica. O `motivo` é obrigatório (3 a 500 caracteres); evento `RECLASSIFICADA` invisível ao paciente; sem outbox.
+  - Outro estado → `409`.
+  - É uma **simulação da regulação**: pelo [PRD](../product/PRD.md), o risco vem da regulação.
+- **`respostas`:** a nota é recalculada por `calcular_nota`. Em `NA_FILA`, se a nota mudar, grava `RECLASSIFICADA` ("nota recalculada"), invisível ao paciente. Critério de origem `PACIENTE` ou de outra fila → `422`. Só em `EM_ANALISE` e `NA_FILA`; outro estado → `409` (o estado é conferido antes da validação da entrada). A auditoria guarda as respostas antes e depois.
+
+### Equipe: demais rotas *(proposta)*
+| Método | Rota | Descrição |
+| --- | --- | --- |
 | POST | `/agendamentos` | Propõe uma vaga para uma solicitação — fase futura (proposta manual, [ADR-021](../decisions/ADR-021-matching-automatico.md)) |
 | POST | `/agendamentos/{id}/registrar-comparecimento` | `CONFIRMADO` → `REALIZADO` |
 | POST | `/agendamentos/{id}/registrar-falta` | `CONFIRMADO` → `FALTOU`, só depois da tolerância; a solicitação volta ao fim da fila (RN-013, RN-014) |
 | GET | `/indicadores?de=&ate=&unidade_id=` | Confirmação, faltas, tempo até confirmação, vagas reaproveitadas, tamanho de cada fila (gestor: unidades do escopo) |
 
 ### Administração
+> **Decidido (2026-10-19):** toda rota de administração fica sob `/admin/*`, porque `GET /filas` e `GET /filas/{id}` pertencem ao paciente. Os caminhos abaixo são relativos a `/api/v1`, como no resto do documento.
+>
+> **Divergência temporária:** `POST /usuarios/{id}/suspender` e `/reativar` já estão implementados em `/api/v1/usuarios/...`, fora do prefixo. A mudança para `/admin/usuarios/...` exige alterar o código e os testes e fica para uma tarefa própria.
+
 | Método | Rota | Descrição |
 | --- | --- | --- |
-| GET, POST, PATCH | `/unidades` | Unidades |
-| GET, POST, PATCH | `/especialidades` | Especialidades |
-| GET, POST, PATCH | `/filas` | Filas: descrição para o paciente, elegibilidade, prazo de confirmação e tolerância |
-| GET, POST, PATCH | `/filas/{id}/criterios` | Protocolo da fila: critérios, tipos, pesos e parâmetros |
-| GET, POST, PATCH | `/agendas` | Agendas; criar uma agenda gera as vagas da vigência |
-| POST | `/vagas/{id}/bloquear` e `/vagas/{id}/desbloquear` | Estado administrativo da vaga |
-| GET, POST | `/usuarios` | Contas da equipe |
-| POST | `/usuarios/{id}/suspender` e `/usuarios/{id}/reativar` | Suspensão de acesso ([ADR-028](../decisions/ADR-028-suspensao-de-acesso.md)). Suspender recebe `{motivo}` (3 a 500 caracteres). Só ADMIN; ambas respondem `204`. Regras em [controle de acesso](../security/access-control.md) |
-| PUT | `/usuarios/{id}/filas` e `/usuarios/{id}/unidades` | Atribuições de escopo; filas só para ATENDENTE e unidades só para GESTOR |
-| GET | `/auditoria?entidade=&entidade_id=` | Trilha de auditoria |
+| GET, POST, PATCH | `/admin/unidades` | Unidades |
+| GET, POST, PATCH | `/admin/especialidades` | Especialidades |
+| GET, POST, PATCH | `/admin/filas` | Filas: descrição para o paciente, elegibilidade, prazo de confirmação e tolerância |
+| GET, POST, PATCH | `/admin/filas/{id}/criterios` | Protocolo da fila: critérios, tipos, pesos e parâmetros |
+| GET, POST, PATCH | `/admin/agendas` | Agendas; criar uma agenda gera as vagas da vigência |
+| POST | `/admin/vagas/{id}/bloquear` e `/admin/vagas/{id}/desbloquear` | Estado administrativo da vaga |
+| GET, POST | `/admin/usuarios` | Contas da equipe |
+| POST | `/admin/usuarios/{id}/suspender` e `/admin/usuarios/{id}/reativar` (hoje em `/usuarios/...`, ver divergência acima) | Suspensão de acesso ([ADR-028](../decisions/ADR-028-suspensao-de-acesso.md)). Suspender recebe `{motivo}` (3 a 500 caracteres). Só ADMIN; ambas respondem `204`. Regras em [controle de acesso](../security/access-control.md) |
+| PUT | `/admin/usuarios/{id}/filas` e `/admin/usuarios/{id}/unidades` | Atribuições de escopo; filas só para ATENDENTE e unidades só para GESTOR |
+| GET | `/admin/auditoria?entidade=&entidade_id=` | Trilha de auditoria |
 
 ### Operação
 | Método | Rota | Descrição |

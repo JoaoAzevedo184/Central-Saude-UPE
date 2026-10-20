@@ -33,10 +33,15 @@
 
 - Agendamentos vencidos em `EXPIRADO`, solicitações em `NA_FILA` com nova `data_entrada_fila`, vagas livres.
 
+## Implementação
+
+Job `expirar_propostas`, a cada `WORKER_INTERVALO_EXPIRACAO_S`. Expira quando `expira_em <= agora`. Trava solicitação e agendamento com `SKIP LOCKED`; item travado fica para a próxima execução. Outbox `PROPOSTA_EXPIRADA`.
+
 ## Critérios de aceite
 
-- **Dado** uma proposta vencida, **quando** o job roda, **então** ela fica `EXPIRADO`, a solicitação volta para `NA_FILA` com `data_entrada_fila` igual ao horário do job e fica atrás das solicitações de mesmo risco e mesma nota.
+- **Dado** uma proposta vencida, **quando** o job roda, **então** ela fica `EXPIRADO`, a solicitação volta para `NA_FILA` com `data_entrada_fila` igual ao horário do job e fica atrás das solicitações de mesmo risco e mesma nota (`test_uc006_expira_e_volta_para_o_fim_da_fila`).
 - **Dado** uma proposta expirada, **quando** o paciente consulta a linha do tempo, **então** vê o motivo "você não confirmou a vaga no prazo" e não vê posição nem tamanho da fila.
-- **Dado** o job executado duas vezes seguidas, **quando** se compara o banco, **então** o resultado é o mesmo e nenhum aviso é duplicado (idempotência).
-- **Dado** dois Workers rodando ao mesmo tempo, **quando** processam o mesmo lote, **então** nenhuma proposta é processada duas vezes.
-- **Dado** o relógio fixado nos testes, **quando** o prazo ainda não venceu por um segundo, **então** a proposta não é expirada.
+- **Dado** o job executado duas vezes seguidas, **quando** se compara o banco, **então** o resultado é o mesmo e nenhum aviso é duplicado (`test_uc006_rodar_duas_vezes_nao_muda_nada`).
+- **Dado** dois Workers rodando ao mesmo tempo, **quando** processam o mesmo lote, **então** nenhuma proposta é processada duas vezes (garantido por `FOR UPDATE SKIP LOCKED`; o teste de concorrência cobre a proposta, `test_adr004_rn002_propor_vagas_concorrente_nao_duplica`).
+- **Dado** o relógio fixado nos testes, **quando** o prazo ainda não venceu por um segundo, **então** a proposta não é expirada (`test_uc006_um_segundo_antes_do_prazo_nao_expira`).
+- **Dado** uma proposta expirada, **quando** o Worker propõe de novo, **então** a vaga vai para a próxima da fila, e o ciclo propor → expirar → propor ao próximo → confirmar funciona de ponta a ponta (`test_uc003_uc006_uc004_ciclo_completo`, `test_uc003_nunca_reoferece_a_mesma_vaga_depois_de_expirar`).

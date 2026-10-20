@@ -36,7 +36,7 @@
 
 ## Fluxo alternativo — A1: cancelar a solicitação
 
-Antes da proposta de vaga, o paciente pode desistir. `POST /solicitacoes/{id}/cancelar` exige `motivo_codigo` de lista fechada (sem texto livre) e só vale em `EM_ANALISE` e `NA_FILA`; em outro estado, `409`. Numa única transação, o sistema muda a solicitação para `CANCELADA`, grava o evento `CANCELADA` (com o rótulo amigável do motivo, visível ao paciente), a auditoria e a outbox `SOLICITACAO_CANCELADA`. O cancelamento com proposta ou agendamento ativo fica no [UC-005](UC-005-pedir-outra-data-ou-cancelar.md).
+Antes da proposta de vaga, o paciente pode desistir. `POST /solicitacoes/{id}/cancelar` exige `motivo_codigo` de lista fechada (sem texto livre) e, sem proposta, vale em `EM_ANALISE` e `NA_FILA`; em `ATENDIDA` ou `CANCELADA`, `409`. Numa única transação, o sistema muda a solicitação para `CANCELADA`, grava o evento `CANCELADA` (com o rótulo amigável do motivo, visível ao paciente), a auditoria e a outbox `SOLICITACAO_CANCELADA`. O cancelamento com proposta ou agendamento ativo fica no [UC-005](UC-005-pedir-outra-data-ou-cancelar.md).
 
 ## Divergências aceitas em relação ao fluxo
 
@@ -61,7 +61,7 @@ Antes da proposta de vaga, o paciente pode desistir. `POST /solicitacoes/{id}/ca
 - **Dado** uma solicitação criada, **quando** o paciente consulta suas respostas, **então** a resposta não traz pontos, nota, risco nem posição (`test_adr007_respostas_do_paciente_sem_chaves_proibidas`).
 - **Dado** uma solicitação com eventos internos, **quando** o paciente vê a linha do tempo, **então** vê só os eventos visíveis (`test_adr007_linha_do_tempo_sem_eventos_internos`), e cada `data` é só o dia no fuso de Recife, sem hora (`test_adr007_linha_do_tempo_so_com_a_data_no_fuso_de_recife`).
 - **Dado** uma solicitação `EM_ANALISE` ou `NA_FILA`, **quando** o paciente cancela com `motivo_codigo`, **então** ficam gravados o evento, a auditoria e a outbox (`test_uc002_cancelar_grava_evento_auditoria_e_outbox`).
-- **Dado** uma solicitação em outro estado, **quando** o paciente tenta cancelar, **então** a resposta é `409` (`test_uc002_cancelar_fora_de_em_analise_ou_na_fila_retorna_409`).
+- **Dado** uma solicitação encerrada (`ATENDIDA` ou `CANCELADA`), **quando** o paciente tenta cancelar, **então** a resposta é `409` (`test_uc002_cancelar_solicitacao_encerrada_retorna_409`).
 
 ## Segurança
 

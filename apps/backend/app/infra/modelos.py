@@ -41,6 +41,13 @@ STATUS_VAGA = ("ATIVA", "BLOQUEADA")
 RISCOS = ("VERMELHO", "AMARELO", "VERDE")
 TURNOS = ("MANHA", "TARDE", "QUALQUER")
 STATUS_SOLICITACAO = ("EM_ANALISE", "NA_FILA", "EM_PROPOSTA", "AGENDADA", "ATENDIDA", "CANCELADA")
+MOTIVOS_CANCELAMENTO = (
+    "NAO_PRECISO_MAIS",
+    "CONSEGUI_EM_OUTRO_LUGAR",
+    "DIFICULDADE_DE_DESLOCAMENTO",
+    "CONFLITO_DE_HORARIO",
+    "OUTRO",
+)
 STATUS_AGENDAMENTO = ("PROPOSTO", "CONFIRMADO", "CANCELADO", "EXPIRADO", "REALIZADO", "FALTOU")
 TIPOS_HISTORICO = (
     "CRIADA",
@@ -302,12 +309,26 @@ class Solicitacao(Base):
         CheckConstraint(
             "status <> 'NA_FILA' OR data_entrada_fila IS NOT NULL", name="na_fila_com_entrada"
         ),
+        em("motivo_cancelamento", MOTIVOS_CANCELAMENTO),
+        CheckConstraint(
+            "motivo_cancelamento IS NULL OR status = 'CANCELADA'", name="motivo_so_se_cancelada"
+        ),
         Index(
             "ix_solicitacao_fila_ordem",
             "fila_id",
             "data_entrada_fila",
             postgresql_where=text("status = 'NA_FILA'"),
         ),
+        # RN-018: no máximo uma solicitação ativa por paciente e fila.
+        Index(
+            "ux_solicitacao_ativa_por_fila",
+            "paciente_id",
+            "fila_id",
+            unique=True,
+            postgresql_where=text("status NOT IN ('ATENDIDA', 'CANCELADA')"),
+        ),
+        Index("ix_solicitacao_paciente_id", "paciente_id"),
+        Index("ix_solicitacao_fila_id_status", "fila_id", "status"),
     )
 
     id: Mapped[UUID] = pk_uuid()
@@ -321,6 +342,8 @@ class Solicitacao(Base):
     nota: Mapped[int] = mapped_column(server_default="0")  # ADR-024
     # Hora de chegada na fila (desempate). Ao reentrar, recebe o horário atual (ADR-026).
     data_entrada_fila: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Código fechado, sem texto livre (minimização). Nulo se não foi cancelada pelo paciente.
+    motivo_cancelamento: Mapped[str | None] = mapped_column(Text)
     criada_em: Mapped[datetime] = agora()
 
 

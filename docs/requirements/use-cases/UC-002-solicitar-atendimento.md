@@ -5,7 +5,7 @@
 | **Ator principal** | Paciente |
 | **Objetivo** | Registrar o pedido de atendimento numa fila para a qual o paciente é elegível |
 | **Requisitos** | RF-008, RF-018, RF-020, RF-028, RF-029 |
-| **Regras** | RN-006, RN-007, RN-009, RN-010, RN-011, RN-017 |
+| **Regras** | RN-006, RN-007, RN-009, RN-010, RN-011, RN-017, RN-018 |
 
 ## Pré-condições
 
@@ -30,8 +30,20 @@
 ## Exceções
 
 - **E1 — Sem consentimento vigente:** o sistema bloqueia a solicitação e oferece conceder o consentimento.
-- **E2 — Já existe solicitação ativa na mesma fila:** o sistema informa e mostra a solicitação existente *(regra proposta; validar com o grupo)*.
-- **E3 — Paciente inelegível para a fila escolhida** (por exemplo, sexo ou idade fora da regra, ou cadastro sem esses dados): a resposta é `409` com o motivo, e nada é criado.
+- **E2 — Já existe solicitação ativa na mesma fila (RN-018):** a resposta é `409` (`/problemas/solicitacao-duplicada`) com o `solicitacao_id` da existente, e nada é criado.
+- **E3 — Paciente inelegível para a fila escolhida** (por exemplo, sexo ou idade fora da regra, ou cadastro sem esses dados): a resposta é `409` (`/problemas/nao-elegivel`) com o motivo, e nada é criado.
+- **E4 — Resposta inválida** (critério de outra fila ou de outra origem, repetido, valor inválido, ou fila inexistente ou inativa): `422`, e nada é criado.
+
+## Fluxo alternativo — A1: cancelar a solicitação
+
+Antes da proposta de vaga, o paciente pode desistir. `POST /solicitacoes/{id}/cancelar` exige `motivo_codigo` de lista fechada (sem texto livre) e só vale em `EM_ANALISE` e `NA_FILA`; em outro estado, `409`. Numa única transação, o sistema muda a solicitação para `CANCELADA`, grava o evento `CANCELADA` (com o rótulo amigável do motivo, visível ao paciente), a auditoria e a outbox `SOLICITACAO_CANCELADA`. O cancelamento com proposta ou agendamento ativo fica no [UC-005](UC-005-pedir-outra-data-ou-cancelar.md).
+
+## Divergências aceitas em relação ao fluxo
+
+- Os "canais de aviso" (passo 3) não estão implementados.
+- `origem_encaminhamento` é um texto informado pelo paciente (2 a 200 caracteres), em vez do `ReguladorGateway` simulado.
+- O paciente não precisa responder todos os critérios: critério sem resposta vale 0 ponto.
+- Sem data de nascimento o domínio responde inelegível, mas isso só é testado no domínio, porque `data_nascimento` é `NOT NULL` desde a migração 0002.
 
 ## Pós-condições
 
@@ -40,12 +52,16 @@
 
 ## Critérios de aceite
 
-- **Dado** um paciente elegível com consentimento vigente, **quando** confirma a solicitação, **então** ela é criada como `EM_ANALISE` na fila escolhida, com a nota igual à soma dos pontos das respostas.
-- **Dado** um paciente sem consentimento `AGENDAMENTO` vigente, **quando** tenta solicitar, **então** a resposta é `403` e nada é criado.
-- **Dado** um paciente do sexo masculino, **quando** tenta entrar na fila de laqueadura, **então** a resposta é `409` e nada é criado.
-- **Dado** um paciente sem data de nascimento, **quando** tenta entrar numa fila com idade mínima, **então** a resposta é `409` (falha fechada).
-- **Dado** uma resposta a critério de outra fila, **quando** o sistema tenta gravá-la, **então** o banco recusa.
-- **Dado** uma solicitação criada, **quando** o paciente consulta suas solicitações, **então** a resposta traz o status e a linha do tempo, e não traz posição nem tamanho da fila.
+- **Dado** um paciente elegível com consentimento vigente, **quando** confirma a solicitação, **então** ela é criada como `EM_ANALISE` na fila escolhida, com a nota igual à soma dos pontos das respostas (`test_uc002_cria_solicitacao_em_analise_com_nota`).
+- **Dado** um paciente sem consentimento `AGENDAMENTO` vigente, **quando** tenta solicitar, **então** a resposta é `403` e nada é criado (`test_rn009_sem_consentimento_retorna_403_e_nada_e_criado`).
+- **Dado** um paciente inelegível por sexo, por idade ou por falta do sexo no cadastro, **quando** tenta entrar na fila, **então** a resposta é `409` e nada é criado (`test_rn017_inelegivel_retorna_409_e_nada_e_criado`).
+- **Dado** uma resposta a critério de outra fila ou de outra origem, repetida ou com valor inválido, **quando** o paciente envia, **então** a resposta é `422` e nada é criado (`test_uc002_resposta_invalida_retorna_422_e_nada_e_criado`).
+- **Dado** uma solicitação ativa na fila, **quando** o paciente cria outra na mesma fila, **então** a resposta é `409` com o `solicitacao_id` da existente; depois de cancelar a primeira, a nova é permitida (`test_rn018_solicitacao_duplicada_retorna_409_e_apos_cancelar_e_permitida`).
+- **Dado** a solicitação do paciente A, **quando** o paciente B tenta ler ou cancelar, **então** a resposta é `404` (`test_am001_paciente_b_nao_le_nem_cancela_solicitacao_de_a`).
+- **Dado** uma solicitação criada, **quando** o paciente consulta suas respostas, **então** a resposta não traz pontos, nota, risco nem posição (`test_adr007_respostas_do_paciente_sem_chaves_proibidas`).
+- **Dado** uma solicitação com eventos internos, **quando** o paciente vê a linha do tempo, **então** vê só os eventos visíveis (`test_adr007_linha_do_tempo_sem_eventos_internos`), e cada `data` é só o dia no fuso de Recife, sem hora (`test_adr007_linha_do_tempo_so_com_a_data_no_fuso_de_recife`).
+- **Dado** uma solicitação `EM_ANALISE` ou `NA_FILA`, **quando** o paciente cancela com `motivo_codigo`, **então** ficam gravados o evento, a auditoria e a outbox (`test_uc002_cancelar_grava_evento_auditoria_e_outbox`).
+- **Dado** uma solicitação em outro estado, **quando** o paciente tenta cancelar, **então** a resposta é `409` (`test_uc002_cancelar_fora_de_em_analise_ou_na_fila_retorna_409`).
 
 ## Segurança
 

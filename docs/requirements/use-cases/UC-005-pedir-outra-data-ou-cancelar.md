@@ -27,6 +27,8 @@
 4. Numa única transação, o sistema muda o agendamento para `CANCELADO` (motivo: desistência), muda a solicitação para `CANCELADA`, registra a auditoria e grava o evento na outbox.
 5. A vaga fica livre e volta a ser oferecida.
 
+> O cancelamento da solicitação antes de existir proposta (`EM_ANALISE` e `NA_FILA`, com `motivo_codigo`) já está em [UC-002](UC-002-solicitar-atendimento.md). Este caso de uso cobre o cancelamento com proposta ou agendamento ativo, ainda não implementado (hoje a API responde `409`).
+
 ## Exceções
 
 - **E1 — Agendamento já em estado final** (expirado, cancelado, realizado): `409`, mostrando o estado atual.

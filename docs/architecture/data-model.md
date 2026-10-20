@@ -132,7 +132,7 @@ erDiagram
     uuid id PK
     uuid fila_id FK
     text profissional
-    smallint_array dias_semana
+    smallint_array dias_semana "ISO 1=segunda a 7=domingo; CHECK; migracao 0005"
     time hora_inicio
     time hora_fim
     int duracao_min
@@ -180,6 +180,7 @@ erDiagram
     bool visivel_paciente
     uuid ator_usuario_id FK "nulo = Worker"
     timestamptz ocorrido_em
+    bigint seq "IDENTITY; desempate de ordem; migracao 0005"
   }
   AGENDAMENTO {
     uuid id PK
@@ -190,7 +191,7 @@ erDiagram
     timestamptz proposto_em
     timestamptz expira_em "RN-008, RN-012"
     timestamptz respondido_em
-    text motivo_cancelamento
+    text motivo_cancelamento "CHECK lista fechada; so se CANCELADO; migracao 0005"
   }
   NOTIFICACAO {
     uuid id PK
@@ -316,6 +317,19 @@ ALTER TABLE solicitacao ADD CONSTRAINT ck_solicitacao_motivo_cancelamento
 ALTER TABLE solicitacao ADD CONSTRAINT ck_solicitacao_motivo_so_se_cancelada
   CHECK (motivo_cancelamento IS NULL OR status = 'CANCELADA');
 
+-- Migração 0005: motivo do cancelamento do agendamento é código fechado
+-- (CANCELADO_PELA_EQUIPE e VAGA_BLOQUEADA ficam reservados)
+ALTER TABLE agendamento ADD CONSTRAINT ck_agendamento_motivo_cancelamento
+  CHECK (motivo_cancelamento IN ('RECUSADO_PELO_PACIENTE', 'CANCELADO_PELO_PACIENTE',
+         'CANCELADO_PELA_EQUIPE', 'VAGA_BLOQUEADA'));
+ALTER TABLE agendamento ADD CONSTRAINT ck_agendamento_motivo_so_se_cancelado
+  CHECK (motivo_cancelamento IS NULL OR status = 'CANCELADO');
+-- Migração 0005: dias da semana da agenda em ISO 8601, sem lista vazia
+ALTER TABLE agenda ADD CONSTRAINT ck_agenda_dias_semana_iso
+  CHECK (cardinality(dias_semana) > 0 AND dias_semana <@ ARRAY[1,2,3,4,5,6,7]::smallint[]);
+-- Migração 0005: ordem de gravação da linha do tempo
+ALTER TABLE historico_solicitacao ADD COLUMN seq bigint GENERATED ALWAYS AS IDENTITY;
+
 -- Ordenação da fila e Worker
 CREATE INDEX ix_solicitacao_fila_ordem ON solicitacao (fila_id, data_entrada_fila) WHERE status = 'NA_FILA';
 CREATE INDEX ix_outbox_pendente ON outbox (proximo_retry_em) WHERE status = 'PENDENTE';
@@ -341,6 +355,10 @@ Tipos de evento de `historico_solicitacao.tipo`: `CRIADA`, `CLASSIFICADA`, `ENTR
 - **Vaga livre** = `status_admin = 'ATIVA'` e nenhum agendamento ativo apontando para ela. A tabela `vaga` não guarda "ocupada", para não existir estado duplicado que possa divergir.
 - **A posição na fila não é gravada.** Ela é calculada na consulta por `ordenar_fila()` (risco → nota → `data_entrada_fila`). A posição de todas as solicitações muda a cada entrada, reclassificação ou volta ao fim da fila; gravá-la exigiria reescrever a fila inteira a cada mudança, com risco de divergência e de corrida entre transações. Também não fica em `historico_solicitacao`, para a posição nunca vazar pela linha do tempo do paciente ([ADR-007](../decisions/ADR-007-paciente-ve-status.md)). A equipe vê a posição calculada e o motivo da última mudança, que vem do histórico.
 - **`ix_solicitacao_fila_ordem` não cobre risco nem nota.** A ordenação do painel (risco, nota, chegada, id) é feita em memória pelo Postgres, depois de filtrar por `fila_id` e `status` (`ix_solicitacao_fila_id_status`). Aceito no volume do protótipo; revisar se uma fila ficar grande.
+- **Ordem da linha do tempo:** sempre `ORDER BY ocorrido_em, seq`. Eventos gravados na mesma transação têm o mesmo `ocorrido_em` (ex.: `RECUSADA` e `REENTROU_NA_FILA`); o `seq` segue a ordem de inserção e desempata. O `seq` nunca sai na API: é um contador global e, exposto, revelaria volume.
+- **Motivo do cancelamento do agendamento** (`agendamento.motivo_cancelamento`): `RECUSADO_PELO_PACIENTE` ("esta data não serve"; conta para RN-020), `CANCELADO_PELO_PACIENTE` ("não vou precisar"); `CANCELADO_PELA_EQUIPE` e `VAGA_BLOQUEADA` estão reservados. Só em agendamento `CANCELADO`.
+- **Situação da vaga** (livre, livre sem proposta, proposta, confirmada, bloqueada, encerrada) é calculada na consulta por `situacao_da_vaga()`, nunca gravada ([ADR-004](../decisions/ADR-004-ocupacao-da-vaga.md)). As vagas são geradas pelo Worker a partir da agenda, com `ON CONFLICT (agenda_id, inicio) DO NOTHING`.
+- **Índices:** a 0005 não cria índice. `ix_agendamento_expiracao` atende o job de expiração e `uq_vaga_agenda_inicio` já indexa `(agenda_id, inicio)` para as vagas livres.
 - **Motivo do cancelamento** (`solicitacao.motivo_cancelamento`) é nulo ou um código da lista fechada, e só existe em solicitação `CANCELADA`. Texto livre ficou de fora de propósito ([proteção de dados](../security/data-protection.md)).
 - **Fim da fila** = nova `data_entrada_fila` ([ADR-026](../decisions/ADR-026-prazos-e-volta-ao-fim-da-fila.md)).
 - **Nota** é a soma de `resposta_criterio.pontos`, recalculada pelo domínio sempre que uma resposta é gravada ([ADR-024](../decisions/ADR-024-protocolo-por-fila.md)). Prioridade legal é um critério da fila, não uma coluna da solicitação.

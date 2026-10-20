@@ -1,6 +1,6 @@
 # API
 
-> **Rascunho.** Sessão e conta, solicitações do paciente e painel da equipe estão implementados; os demais endpoints são a proposta inicial e vão mudar durante a implementação. A referência definitiva será a documentação OpenAPI gerada pelo FastAPI em `/api/v1/docs`.
+> **Rascunho.** Sessão e conta, solicitações do paciente, resposta à proposta, painel da equipe, agenda do dia, presença e painel de vagas estão implementados; os demais endpoints são a proposta inicial e vão mudar durante a implementação. A referência definitiva será a documentação OpenAPI gerada pelo FastAPI em `/api/v1/docs`.
 
 ## Convenções (propostas)
 
@@ -12,7 +12,9 @@
   | `type` | Status | Quando aparece |
   | --- | --- | --- |
   | `about:blank` | conforme o erro (`404`, `405`, `422`, `500`, `503`…) | Erros HTTP genéricos: rota inexistente, método não permitido, validação da entrada (com a lista `errors`), erro de entrada do domínio (`422`, como critério de outra fila ou valor inválido), erro inesperado, banco indisponível no `/health` |
-  | `/problemas/transicao-invalida` | `409` | O estado de origem não permite a transição pedida (ex.: proposta já respondida) |
+  | `/problemas/transicao-invalida` | `409` | O estado de origem não permite a transição pedida (ex.: proposta já respondida, cancelar depois do início da vaga, comparecimento antes do início) |
+  | `/problemas/proposta-expirada` | `409` | Confirmar ou recusar depois de `expira_em`, mesmo antes de o Worker expirar a proposta ([UC-004](../requirements/use-cases/UC-004-confirmar-proposta.md)) |
+  | `/problemas/tolerancia-nao-encerrada` | `409` | Falta registrada antes de `início da vaga + tolerância`, inclusive no limite exato (RN-013) |
   | `/problemas/erro-de-dominio` | `409` | Outra regra de negócio violada, sem `type` mais específico |
   | `/problemas/operacao-nao-permitida` | `409` | A operação é válida em geral, mas não neste alvo (ex.: suspender a si mesmo, um paciente ou o último ADMIN ativo) |
   | `/problemas/nao-elegivel` | `409` | O paciente não cumpre a elegibilidade da fila (RN-017); o `detail` traz o motivo |
@@ -76,8 +78,10 @@ Implementadas. Papel `PACIENTE` (dependência `paciente_da_sessao`); toda consul
 | GET | `/filas/{id}` | Detalhe da fila com os critérios de origem `PACIENTE` (`id`, `codigo`, `descricao`, `tipo`, `opcoes`). Sem peso, fator nem pontos |
 | POST | `/solicitacoes` | Cria a solicitação `EM_ANALISE` ([UC-002](../requirements/use-cases/UC-002-solicitar-atendimento.md)). Corpo: `fila_id`, `turno_preferido` (`MANHA`, `TARDE`, `QUALQUER`), `origem_encaminhamento` (texto de 2 a 200), `respostas` (`[{criterio_id, valor}]`, até 50; `valor` texto até 200). `201` com o detalhe |
 | GET | `/solicitacoes?situacao=abertas\|encerradas&limit&offset` | Minhas solicitações. `encerradas` = `ATENDIDA` e `CANCELADA` |
-| GET | `/solicitacoes/{id}` | `status`, fila, unidade, `data_pedido`, turno, `origem_encaminhamento`, as respostas próprias (`descricao`, `valor`; só origem `PACIENTE`) e `linha_do_tempo` `[{tipo, data, motivo}]` só com `visivel_paciente = true` |
-| POST | `/solicitacoes/{id}/cancelar` | Corpo obrigatório `{motivo_codigo}`: `NAO_PRECISO_MAIS`, `CONSEGUI_EM_OUTRO_LUGAR`, `DIFICULDADE_DE_DESLOCAMENTO`, `CONFLITO_DE_HORARIO` ou `OUTRO`. Sem texto livre; a linha do tempo mostra o rótulo amigável. Só em `EM_ANALISE` e `NA_FILA`; outro estado → `409` (`transicao-invalida`). Outbox `SOLICITACAO_CANCELADA` |
+| GET | `/solicitacoes/{id}` | `status`, fila, unidade, `data_pedido`, turno, `origem_encaminhamento`, as respostas próprias (`descricao`, `valor`; só origem `PACIENTE`), `linha_do_tempo` `[{tipo, data, motivo}]` só com `visivel_paciente = true`, na ordem `(ocorrido_em, seq)`, e `agendamento_ativo` (ver abaixo) |
+| POST | `/solicitacoes/{id}/cancelar` | Corpo obrigatório `{motivo_codigo}`: `NAO_PRECISO_MAIS`, `CONSEGUI_EM_OUTRO_LUGAR`, `DIFICULDADE_DE_DESLOCAMENTO`, `CONFLITO_DE_HORARIO` ou `OUTRO`. Sem texto livre; a linha do tempo mostra o rótulo amigável. Vale em `EM_ANALISE`, `NA_FILA` (outbox `SOLICITACAO_CANCELADA`), `EM_PROPOSTA` e `AGENDADA` (outbox `AGENDAMENTO_CANCELADO`; o agendamento ativo vai para `CANCELADO` com `CANCELADO_PELO_PACIENTE`, só antes do início da vaga). `ATENDIDA`, `CANCELADA` ou vaga já iniciada → `409` (`transicao-invalida`) ([UC-005](../requirements/use-cases/UC-005-pedir-outra-data-ou-cancelar.md)) |
+| POST | `/agendamentos/{id}/confirmar` | Só `PROPOSTO` e antes de `expira_em`. Agendamento `CONFIRMADO`, solicitação `AGENDADA`, evento `CONFIRMADA`, outbox `AGENDAMENTO_CONFIRMADO`. Depois do prazo → `409` `proposta-expirada`. Responde o detalhe da solicitação ([UC-004](../requirements/use-cases/UC-004-confirmar-proposta.md)) |
+| POST | `/agendamentos/{id}/recusar` | "Esta data não serve". Só `PROPOSTO` e antes de `expira_em`. Agendamento `CANCELADO` com `RECUSADO_PELO_PACIENTE`, solicitação `NA_FILA` (mantém a posição ou vai para o fim, RN-020), evento `RECUSADA`, outbox `PROPOSTA_RECUSADA` ([UC-005](../requirements/use-cases/UC-005-pedir-outra-data-ou-cancelar.md)) |
 
 Erros de `POST /solicitacoes`:
 
@@ -91,7 +95,9 @@ Erros de `POST /solicitacoes`:
 
 - **`data` da linha do tempo é só o dia**, em `America/Recife`, sem hora: a hora de `ENTROU_NA_FILA` revelaria a `data_entrada_fila` e, com ela, a ordem de chegada (AM-014).
 - **O paciente nunca recebe:** posição, tamanho da fila, total, nota, pontos, pesos, parâmetros ou fatores, `classificacao_risco`, `data_entrada_fila` nem a hora dos eventos.
-- No cancelamento, só `EM_ANALISE` e `NA_FILA` são aceitos por ora. `EM_PROPOSTA` → `CANCELADA` e `AGENDADA` → `CANCELADA` estão no diagrama de estados, mas respondem `409` até o [UC-004](../requirements/use-cases/UC-004-confirmar-proposta.md) e o [UC-005](../requirements/use-cases/UC-005-pedir-outra-data-ou-cancelar.md).
+- **`agendamento_ativo`** (proposta ou consulta confirmada, ou `null`): `id`, `status` (`PROPOSTO` ou `CONFIRMADO`), `inicio` e `fim` da vaga no fuso de Recife, `profissional`, `unidade` `{id, sigla, nome}`, `endereco` da unidade e `expira_em` (só na proposta). O nome do profissional é visível ao paciente ([proteção de dados](../security/data-protection.md)).
+- Agendamento de outro paciente responde `404` em `confirmar` e `recusar`; o dono é conferido dentro da query.
+- **Pendência:** "pedir outra data" com o agendamento já `CONFIRMADO` não existe; por ora o paciente cancela e abre nova solicitação ([UC-005](../requirements/use-cases/UC-005-pedir-outra-data-ou-cancelar.md)).
 
 ### Paciente: demais rotas *(proposta)*
 | Método | Rota | Descrição |
@@ -101,10 +107,7 @@ Erros de `POST /solicitacoes`:
 | POST | `/pacientes/me/consentimentos/{id}/revogar` | Revoga um consentimento |
 | GET | `/pacientes/me/historico` | Histórico de atendimentos: realizados, faltas, propostas expiradas e canceladas |
 | GET | `/pacientes/me/agendamentos` | Propostas, próximos e anteriores |
-| GET | `/agendamentos/{id}` | Detalhe da proposta ou do agendamento |
-| POST | `/agendamentos/{id}/confirmar` | Confirma presença |
-| POST | `/agendamentos/{id}/pedir-outra-data` | Cancela este agendamento e mantém a solicitação na fila |
-| POST | `/agendamentos/{id}/cancelar` | Cancela o agendamento |
+| GET | `/agendamentos/{id}` | Detalhe da proposta ou do agendamento (hoje vem em `agendamento_ativo` do detalhe da solicitação) |
 | GET | `/notificacoes` | Avisos do usuário |
 | POST | `/notificacoes/{id}/marcar-lida` | Marca como lido |
 
@@ -118,6 +121,9 @@ Implementadas as rotas `/equipe`. Prefixo `/equipe`; `escopo_da_equipe` é aplic
 | GET | `/equipe/solicitacoes/{id}` | Nome completo, CPF mascarado, respostas (critério, origem, valor, pontos), nota e histórico completo com motivo |
 | POST | `/equipe/solicitacoes/{id}/classificar` | Corpo `{classificacao_risco, motivo?}`. Ver abaixo |
 | PUT | `/equipe/solicitacoes/{id}/respostas` | Grava respostas dos critérios de origem `REGULACAO` e `EQUIPE`. Ver abaixo |
+| GET | `/equipe/filas/{fila_id}/agendamentos?data=AAAA-MM-DD` | Agenda do dia (dia em Recife): `[{id, solicitacao_id, inicio, fim, profissional, paciente_nome, status, presenca_registrada}]`, nome abreviado, sem CPF. Entram `PROPOSTO`, `CONFIRMADO`, `REALIZADO` e `FALTOU`. Leitura auditada (`CONSULTAR_AGENDAMENTOS`) ([UC-008](../requirements/use-cases/UC-008-registrar-comparecimento-ou-falta.md)) |
+| POST | `/equipe/agendamentos/{id}/presenca` | Só ATENDENTE. Corpo `{compareceu: bool}`. Ver abaixo |
+| GET | `/equipe/filas/{fila_id}/vagas?de=AAAA-MM-DD&ate=AAAA-MM-DD` | Painel de vagas: `{total, sem_proposta, itens: [{id, inicio, fim, profissional, situacao}]}`. Período de 1 a 31 dias, inclusivo; fora disso → `422`. Leitura auditada (`CONSULTAR_VAGAS`). Ver abaixo |
 
 - **Posição:** só para `NA_FILA`. É `ROW_NUMBER` sobre a fila inteira, calculado antes da paginação, e nunca gravado. A ordenação `prioridade` segue a mesma ordem de `ordenar_fila()` (risco, nota decrescente, chegada, id); `chegada` ordena só pela hora de chegada.
 - **`classificar`:**
@@ -127,12 +133,14 @@ Implementadas as rotas `/equipe`. Prefixo `/equipe`; `escopo_da_equipe` é aplic
   - É uma **simulação da regulação**: pelo [PRD](../product/PRD.md), o risco vem da regulação.
 - **`respostas`:** a nota é recalculada por `calcular_nota`. Em `NA_FILA`, se a nota mudar, grava `RECLASSIFICADA` ("nota recalculada"), invisível ao paciente. Critério de origem `PACIENTE` ou de outra fila → `422`. Só em `EM_ANALISE` e `NA_FILA`; outro estado → `409` (o estado é conferido antes da validação da entrada). A auditoria guarda as respostas antes e depois.
 
+- **Datas** (`data`, `de`, `ate`) aceitam de 2000-01-01 a 2100-12-31; fora disso → `422`.
+- **`presenca`:** só de `CONFIRMADO` (outro estado → `409`). `true`: a partir do início da vaga (antes → `409` `transicao-invalida`); agendamento `REALIZADO`, solicitação `ATENDIDA`, evento `ATENDIDA`, outbox `ATENDIMENTO_REGISTRADO`. `false`: só depois de `início + tolerancia_atraso_min` da fila (antes ou no limite → `409` `tolerancia-nao-encerrada`); agendamento `FALTOU`, solicitação no fim da fila (RN-014), eventos `FALTOU` e `REENTROU_NA_FILA`, outbox `FALTA_REGISTRADA`. Agendamento fora do escopo → `404`. Responde o detalhe da solicitação da equipe.
+- **`situacao` da vaga**, calculada na consulta por `situacao_da_vaga()` e nunca gravada: `PROPOSTA` e `CONFIRMADA` (agendamento ativo), `BLOQUEADA`, `ENCERRADA` (já começou, sem agendamento ativo), `LIVRE_SEM_PROPOSTA` (livre, mas `calcular_expira_em()` não deixa a janela mínima, RN-016; candidata a encaixe manual, [ADR-021](../decisions/ADR-021-matching-automatico.md)) e `LIVRE`. `sem_proposta` conta as `LIVRE_SEM_PROPOSTA`.
+
 ### Equipe: demais rotas *(proposta)*
 | Método | Rota | Descrição |
 | --- | --- | --- |
 | POST | `/agendamentos` | Propõe uma vaga para uma solicitação — fase futura (proposta manual, [ADR-021](../decisions/ADR-021-matching-automatico.md)) |
-| POST | `/agendamentos/{id}/registrar-comparecimento` | `CONFIRMADO` → `REALIZADO` |
-| POST | `/agendamentos/{id}/registrar-falta` | `CONFIRMADO` → `FALTOU`, só depois da tolerância; a solicitação volta ao fim da fila (RN-013, RN-014) |
 | GET | `/indicadores?de=&ate=&unidade_id=` | Confirmação, faltas, tempo até confirmação, vagas reaproveitadas, tamanho de cada fila (gestor: unidades do escopo) |
 
 ### Administração

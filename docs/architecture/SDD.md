@@ -158,16 +158,23 @@ Ver [UC-004](../requirements/use-cases/UC-004-confirmar-proposta.md) e o [diagra
 
 ### 5.4 Cancelamento e liberação da vaga
 
-Ver [UC-005](../requirements/use-cases/UC-005-pedir-outra-data-ou-cancelar.md) e o [diagrama de sequência](diagrams/sequence-cancellation.md).
+Ver [UC-005](../requirements/use-cases/UC-005-pedir-outra-data-ou-cancelar.md) e o [diagrama de sequência](diagrams/sequence-cancellation.md). Cancelar ou recusar só muda o status do agendamento; a vaga fica livre porque deixa de ter agendamento ativo ([ADR-004](../decisions/ADR-004-ocupacao-da-vaga.md)), e o job `propor_vagas` a oferece ao próximo da fila na rodada seguinte, se ainda couber a janela mínima (RN-016).
+
+### 5.4a Presença
+
+Ver [UC-008](../requirements/use-cases/UC-008-registrar-comparecimento-ou-falta.md). A equipe consulta a agenda do dia e registra comparecimento (a partir do início da vaga) ou falta (depois da tolerância, `pode_marcar_falta()`); a regra fica em `registrar_presenca()` no domínio.
 
 ### 5.5 Jobs do Worker
 
 | Job | Frequência *(proposta)* | Seleção | Garantia |
 | --- | --- | --- | --- |
-| Expirar propostas | a cada 1 min | `PROPOSTO` com `expira_em < agora`; a solicitação volta ao fim da fila ([ADR-026](../decisions/ADR-026-prazos-e-volta-ao-fim-da-fila.md)) | Idempotente; `SKIP LOCKED` |
-| Processar outbox | a cada 10 s | `PENDENTE` com `proximo_retry_em <= agora` | Pelo menos uma vez; o consumo tolera evento repetido |
-| Retentar avisos | junto com a outbox | `FALHOU` com tentativas abaixo do limite | Recuo progressivo entre tentativas |
-| Matching automático | junto com o processamento da outbox (mesmo intervalo, `WORKER_INTERVALO_OUTBOX_S`) | Disparado por eventos de vaga livre; só com `MATCHING_AUTOMATICO=true` ([ADR-021](../decisions/ADR-021-matching-automatico.md)) | Índice único decide a corrida |
+| Gerar vagas (`gerar_vagas`) | `WORKER_INTERVALO_VAGAS_S` (padrão 3600 s) | Agendas ativas de filas ativas; vagas dos próximos `VAGAS_HORIZONTE_DIAS` dias (padrão 30), em hora local de Recife, gravadas em `timestamptz` | Idempotente: `ON CONFLICT (agenda_id, inicio) DO NOTHING`; agenda travada com `SKIP LOCKED` |
+| Matching automático (`propor_vagas`) | `WORKER_INTERVALO_MATCHING_S` (padrão 60 s); só com `MATCHING_AUTOMATICO=true` ([ADR-021](../decisions/ADR-021-matching-automatico.md)) | Vagas `ATIVA`, futuras, sem agendamento ativo, de filas com alguém `NA_FILA`, em ordem de início. Escolha por `propor_vaga()` entre as primeiras 50 compatíveis | Vaga e solicitação escolhida com `SKIP LOCKED`; índices únicos decidem a corrida; conflito descarta só aquela vaga |
+| Expirar propostas (`expirar_propostas`) | `WORKER_INTERVALO_EXPIRACAO_S` | `PROPOSTO` com `expira_em <= agora`; a solicitação volta ao fim da fila ([ADR-026](../decisions/ADR-026-prazos-e-volta-ao-fim-da-fila.md)) | Idempotente; `SKIP LOCKED` |
+| Processar outbox *(esqueleto; consumo na próxima tarefa)* | `WORKER_INTERVALO_OUTBOX_S` (padrão 10 s) | `PENDENTE` com `proximo_retry_em <= agora` | Pelo menos uma vez; o consumo tolera evento repetido |
+| Retentar avisos *(a implementar)* | junto com a outbox | `FALHOU` com tentativas abaixo do limite | Recuo progressivo entre tentativas |
+
+Cada item (agenda, vaga ou proposta) roda na própria transação: um item com erro não derruba o lote, e o log leva só IDs e o tipo do erro. A ordem das travas é a mesma em todos os caminhos: vaga (só o matching), solicitação, agendamento.
 
 ### 5.6 Pontos únicos de troca
 
@@ -175,11 +182,13 @@ Cada regra de negócio que a UPE pode ajustar fica num único lugar do código, 
 
 | Ponto | Flag | Decisão |
 | --- | --- | --- |
-| `propor_vaga(solicitacao, vaga, proposto_por)` | `MATCHING_AUTOMATICO` | [ADR-021](../decisions/ADR-021-matching-automatico.md) |
+| `propor_vaga(candidatas, vaga, agora, ...)` em `dominio/agendamento/proposta.py`: escolhe a primeira apta na ordem da fila (turno RN-019, nunca a mesma vaga duas vezes) e devolve proposta, evento e `expira_em` | `MATCHING_AUTOMATICO` | [ADR-021](../decisions/ADR-021-matching-automatico.md) |
 | `calcular_expira_em()` em `dominio/agendamento/prazos.py` | `PROPOSTA_ANTECEDENCIA_MINIMA_HORAS`, `PROPOSTA_JANELA_MINIMA_HORAS` | [ADR-021](../decisions/ADR-021-matching-automatico.md), [ADR-026](../decisions/ADR-026-prazos-e-volta-ao-fim-da-fila.md) |
 | `ordenar_fila(solicitacoes)` em `dominio/fila/ordenacao.py`; `calcular_pontos()` e `calcular_nota()` em `dominio/fila/criterios.py` | — (protocolo em `criterio_fila`) | [ADR-024](../decisions/ADR-024-protocolo-por-fila.md) |
 | `calcular_escopo()` em `dominio/acesso.py`, exposto pela dependência `escopo_da_equipe()` | — (atribuições em `usuario_fila` e `usuario_unidade`) | [ADR-025](../decisions/ADR-025-escopo-por-fila.md) |
-| `pode_marcar_falta()` e `reentrar_no_fim_da_fila()` | — (prazo e tolerância na `fila`) | [ADR-026](../decisions/ADR-026-prazos-e-volta-ao-fim-da-fila.md) |
+| `pode_marcar_falta()` e `reentrar_no_fim_da_fila()`; `registrar_presenca()` em `dominio/agendamento/estados.py` | — (prazo e tolerância na `fila`) | [ADR-026](../decisions/ADR-026-prazos-e-volta-ao-fim-da-fila.md) |
+| `recusar_proposta()` em `dominio/solicitacao.py` (contagem em `contar_recusas()`, desde a última entrada na fila) | `RECUSAS_MANTENDO_POSICAO` | RN-020 *(proposta)* |
+| `situacao_da_vaga()` em `dominio/agendamento/vagas.py` | — | RN-016, [ADR-021](../decisions/ADR-021-matching-automatico.md) |
 | `verificar_elegibilidade()` em `dominio/fila/elegibilidade.py` | — (elegibilidade na `fila`) | [ADR-027](../decisions/ADR-027-fila-como-entidade.md) |
 | `pode_autenticar()` em `dominio/acesso.py` | — (`usuario.situacao`) | [ADR-028](../decisions/ADR-028-suspensao-de-acesso.md) |
 
@@ -190,6 +199,8 @@ Cada regra de negócio que a UPE pode ajustar fica num único lugar do código, 
 | Duas propostas para a mesma vaga | Índice único parcial; o perdedor recebe violação de unicidade → `409` ou descarte |
 | Paciente confirma enquanto o Worker expira | `FOR UPDATE` no agendamento; quem pega o lock depois encontra outro estado e não altera |
 | Dois Workers no mesmo lote | `FOR UPDATE SKIP LOCKED` |
+| Paciente cancela enquanto o Worker expira | Os dois travam solicitação e depois agendamento; o Worker usa `SKIP LOCKED` e pula |
+| Dois Workers no matching | Vaga e solicitação escolhida com `SKIP LOCKED`; se a escolhida estiver travada, passa para a próxima da ordem |
 | Clique duplo em "Confirmar" | A segunda chamada encontra `CONFIRMADO` → `409`, sem novo evento |
 
 ## 7. Erros

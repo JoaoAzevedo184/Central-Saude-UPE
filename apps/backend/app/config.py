@@ -58,11 +58,16 @@ class Settings(BaseSettings):
     worker_intervalo_outbox_s: float = 10
     outbox_max_tentativas: int = 5
     worker_intervalo_retencao_s: float = 3600
+    worker_intervalo_matching_s: float = 60  # ADR-021: varredura das vagas livres
+    worker_intervalo_vagas_s: float = 3600  # geração das vagas a partir das agendas
+    vagas_horizonte_dias: int = 30  # quantos dias à frente as vagas são geradas
 
     # Regras de negócio configuráveis
     proposta_antecedencia_minima_horas: int = 24  # RN-008 / ADR-021
     proposta_janela_minima_horas: int = 12  # ADR-021: menos que isso para responder, não propõe
     matching_automatico: bool = True  # ADR-021
+    # UC-005 (proposta): recusas que mantêm a posição; a seguinte volta para o fim da fila.
+    recusas_mantendo_posicao: int = 1
 
     @model_validator(mode="after")
     def _producao_segura(self) -> "Settings":

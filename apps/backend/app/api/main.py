@@ -9,7 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from starlette.exceptions import HTTPException
 
-from app.api.rotas import health
+from app.api.deps import csrf_valido
+from app.api.rotas import auth, health, usuarios
 from app.config import get_settings
 from app.dominio.erros import ErroDeDominio
 from app.logging import configurar_logging, resumo_do_erro
@@ -27,6 +28,8 @@ app = FastAPI(
 
 api_v1 = APIRouter(prefix="/api/v1")
 api_v1.include_router(health.router)
+api_v1.include_router(auth.router)
+api_v1.include_router(usuarios.router)
 app.include_router(api_v1)
 
 
@@ -50,7 +53,8 @@ def problema(
 @app.exception_handler(HTTPException)
 def _http(_: Request, exc: HTTPException) -> JSONResponse:
     detail = exc.detail if isinstance(exc.detail, str) else None
-    return problema(exc.status_code, detail, headers=exc.headers)
+    tipo = getattr(exc, "tipo", "about:blank")
+    return problema(exc.status_code, detail, tipo=tipo, headers=exc.headers)
 
 
 @app.exception_handler(RequestValidationError)
@@ -63,6 +67,33 @@ def _validacao(_: Request, exc: RequestValidationError) -> JSONResponse:
 @app.exception_handler(ErroDeDominio)
 def _dominio(_: Request, exc: ErroDeDominio) -> JSONResponse:
     return problema(409, str(exc) or None, tipo=exc.tipo)
+
+
+METODOS_DE_ESCRITA = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+# Só registro e login dispensam CSRF: ainda não há sessão (ADR-003). Negar por padrão.
+ROTAS_SEM_CSRF = frozenset({"/api/v1/auth/registro", "/api/v1/auth/login"})
+# Respostas com sessão ou dados da conta não ficam em cache.
+PREFIXOS_SEM_CACHE = ("/api/v1/auth/", "/api/v1/me")
+
+
+@app.middleware("http")
+async def _csrf_e_cache(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
+    path = request.url.path
+    if (
+        request.method in METODOS_DE_ESCRITA
+        and path not in ROTAS_SEM_CSRF
+        and not csrf_valido(request)
+    ):
+        resposta: Response = problema(
+            403, "Token CSRF ausente ou inválido.", tipo="/problemas/csrf-invalido"
+        )
+    else:
+        resposta = await call_next(request)
+    if path.startswith(PREFIXOS_SEM_CACHE):
+        resposta.headers["Cache-Control"] = "no-store"
+    return resposta
 
 
 @app.middleware("http")

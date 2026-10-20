@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import SecretStr
+from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,7 +11,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(extra="ignore")
 
     # Ambiente
-    app_env: Literal["development", "test", "production"] = "development"
+    # Obrigatório: sem padrão, um ambiente esquecido não sobe como development.
+    app_env: Literal["development", "test", "production"]
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
     # Banco. A aplicação usa só DATABASE_URL; POSTGRES_* servem ao container do Postgres.
@@ -33,6 +34,13 @@ class Settings(BaseSettings):
     cookie_samesite: Literal["lax", "strict"] = "lax"
     cookie_domain: str = ""
     csrf_header_name: str = "X-CSRF-Token"
+    login_max_tentativas: int = 5  # AM-004: falhas por IP ou identificador dentro da janela
+    login_janela_min: int = 15
+    registro_max_tentativas: int = 20  # AM-004: registros por IP na mesma janela (recepção)
+    # HMAC do CPF/e-mail em tentativa_login: sem a chave, o hash não é revertido por força bruta.
+    login_hash_key: SecretStr
+    refresh_tolerancia_s: int = 10  # ADR-003: duas abas renovando juntas não contam como roubo
+    termo_versao_atual: str = "1.0"  # UC-001: só aceita o aceite da versão vigente
 
     # Tempo (ADR-008)
     timezone_exibicao: str = "America/Recife"
@@ -49,11 +57,29 @@ class Settings(BaseSettings):
     worker_intervalo_expiracao_s: float = 60
     worker_intervalo_outbox_s: float = 10
     outbox_max_tentativas: int = 5
+    worker_intervalo_retencao_s: float = 3600
 
     # Regras de negócio configuráveis
     proposta_antecedencia_minima_horas: int = 24  # RN-008 / ADR-021
     proposta_janela_minima_horas: int = 12  # ADR-021: menos que isso para responder, não propõe
     matching_automatico: bool = True  # ADR-021
+
+    @model_validator(mode="after")
+    def _producao_segura(self) -> "Settings":
+        """AM-009: em produção, sem o segredo de exemplo, sem segredo curto e sem cookie em HTTP."""
+        if self.app_env == "production":
+            for nome in ("jwt_secret_key", "login_hash_key"):
+                segredo = getattr(self, nome).get_secret_value()
+                # "troque-" é o prefixo dos valores de exemplo do .env.example.
+                if len(segredo) < 32 or segredo.startswith("troque-"):
+                    raise ValueError(
+                        f"{nome.upper()} de produção precisa de 32+ caracteres aleatórios"
+                    )
+            if self.jwt_secret_key == self.login_hash_key:
+                raise ValueError("LOGIN_HASH_KEY precisa ser diferente de JWT_SECRET_KEY")
+            if not self.cookie_secure:
+                raise ValueError("COOKIE_SECURE precisa ser true em produção")
+        return self
 
     @property
     def cors_origins_lista(self) -> list[str]:

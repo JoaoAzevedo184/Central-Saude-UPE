@@ -20,7 +20,8 @@ flowchart LR
 | `POST /auth/registro`, `POST /auth/login` | Qualquer pessoa na internet; sem CSRF, limitados por IP e por identificador (AM-004) |
 | `POST /auth/refresh`, `POST /auth/logout` | Quem tem o cookie `refresh_token`; exigem CSRF |
 | Rotas do paciente com ID (`/agendamentos/{id}`, `/solicitacoes/{id}`) | Pacientes autenticados |
-| Rotas da equipe (fila, validação, indicadores, auditoria) | Atendentes, gestores e admins |
+| Rotas da equipe (fila, validação, agenda do dia, presença, painel de vagas, indicadores, auditoria) | Atendentes, gestores e admins |
+| Worker (geração de vagas, matching, expiração) | Ninguém de fora; roda sozinho contra o banco |
 | E-mails enviados | Quem tiver acesso à caixa de entrada do paciente |
 | SSH na VM, repositório no GitHub | Integrantes da equipe |
 
@@ -45,6 +46,8 @@ flowchart LR
 | AM-015 | Falsificação | E-mail falso imitando a central leva o paciente a uma página de login falsa | Médio | Média | Avisos sempre direcionam para o domínio oficial; o site nunca pede senha por e-mail | Proposto |
 | AM-016 | Adulteração / Elevação de privilégio | Operador "fura a fila" de um conhecido: reclassifica o risco, altera respostas de critérios, marca falta indevida em outro paciente ou mexe em filas que não são suas | Alto | Média | Escopo por fila: o atendente só opera as filas atribuídas ([ADR-025](../decisions/ADR-025-escopo-por-fila.md)); ordem calculada só pelo domínio (`ordenar_fila()`), sem campo de posição editável; nota e pontos calculados no servidor; falta só depois da tolerância (RN-013); reclassificação e falta registradas em `historico_solicitacao` e na auditoria append-only, com o ator | Decidido |
 | AM-017 | Elevação de privilégio | Profissional desligado ou de férias continua acessando o sistema | Médio | Média | Suspensão em vez de exclusão: usuário `SUSPENSO` não faz login, não renova o refresh token e não tem escopo ([ADR-028](../decisions/ADR-028-suspensao-de-acesso.md)) | Implementado: suspender revoga todas as sessões e `usuario_da_sessao` recusa o access token na próxima requisição |
+| AM-018 | Adulteração | Corrida na proposta (detalha AM-006 para o matching automático): dois Workers (ou um Worker e um cancelamento) entregam a mesma vaga a dois pacientes ou duas vagas à mesma solicitação | Alto | Média | Índices únicos parciais de RN-001 e RN-002 são a garantia final; vaga e solicitação escolhida travadas com `FOR UPDATE SKIP LOCKED`; conflito descarta só aquela vaga; a mesma ordem de travas em todos os caminhos (vaga, solicitação, agendamento). Teste: `test_adr004_rn002_propor_vagas_concorrente_nao_duplica` | Implementado |
+| AM-019 | Adulteração | Paciente confirma ou recusa depois do prazo, aproveitando que o Worker ainda não expirou a proposta, e "segura" a vaga | Médio | Média | O prazo é conferido na própria rota com o `Relogio` (`409` `proposta-expirada`); confirmação e expiração travam o mesmo agendamento e só uma vence. Testes: `test_uc004_um_segundo_depois_do_prazo_responde_409_sem_o_job`, `test_uc004_uc006_confirmacao_e_expiracao_simultaneas_so_uma_vence` | Implementado |
 
 ## Riscos aceitos e premissas da autenticação
 

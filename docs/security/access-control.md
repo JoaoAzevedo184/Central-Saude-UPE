@@ -23,12 +23,14 @@ Legenda:
 | Ver e revogar consentimentos | 🔒 | — | — | — |
 | Criar solicitação | 🔒 | — | — | — |
 | Ver solicitações, agendamentos e linha do tempo | 🔒 (só eventos visíveis ao paciente; sem posição na fila) | 🏥 | 🏥 | ✅ |
-| Confirmar, pedir outra data, cancelar | 🔒 | — | — | — |
+| Confirmar, pedir outra data (só proposta), cancelar (até o início da vaga) | 🔒 | — | — | — |
+| Ver data, hora, unidade, endereço e **nome do profissional** da própria proposta ou consulta | 🔒 | 🏥 | 🏥 | ✅ |
 | Cancelar agendamento em nome do paciente | — | 🏥 *(proposta)* | — | — |
 | Validar/classificar solicitação (simulação da regulação) | — | 🏥 | — | — |
 | Responder critérios de origem `REGULACAO`/`EQUIPE` | — | 🏥 *(proposta)* | — | — |
 | Ver painel da fila e detalhe da solicitação, com posição e histórico | — | 🏥 | 🏥 | ✅ |
 | Propor vaga | — | 🏥 fase futura ([ADR-021](../decisions/ADR-021-matching-automatico.md)) | — | — |
+| Ver agenda do dia (nome abreviado) e painel de vagas | — | 🏥 | 🏥 | ✅ |
 | Registrar comparecimento ou falta | — | 🏥 | — | — |
 | Ver indicadores | — | — | 🏥 | ✅ |
 | Cadastrar unidades, especialidades e filas (elegibilidade, prazos) | — | — | — | ✅ |
@@ -65,12 +67,14 @@ O banco não impede que um usuário de outro papel apareça em `usuario_fila` ou
 
 ## Auditoria das leituras da equipe
 
-Ler o painel e o detalhe também é auditado (AM-007), sem nome, CPF nem respostas:
+Ler o painel, o detalhe, a agenda do dia e o painel de vagas também é auditado (AM-007), sem nome, CPF nem respostas:
 
 | Ação | Entidade | Dados registrados |
 | --- | --- | --- |
 | `CONSULTAR_PAINEL` | `fila` | filtros `status`, `ordenacao`, `limit` e `offset` |
 | `CONSULTAR_SOLICITACAO` | `solicitacao` | só o ID da entidade |
+| `CONSULTAR_AGENDAMENTOS` | `fila` | a `data` consultada |
+| `CONSULTAR_VAGAS` | `fila` | o período `de` e `ate` |
 
 ## Suspender e reativar ([ADR-028](../decisions/ADR-028-suspensao-de-acesso.md))
 

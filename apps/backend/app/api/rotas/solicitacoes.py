@@ -1,4 +1,4 @@
-"""Área do paciente: filas e solicitações (UC-002).
+"""Área do paciente: filas, solicitações (UC-002) e resposta à proposta (UC-004, UC-005).
 
 ADR-007: nenhuma resposta daqui traz posição, tamanho da fila, nota, pontos, pesos,
 classificação de risco nem `data_entrada_fila`. Toda consulta filtra pelo paciente da sessão
@@ -19,13 +19,25 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_relogio, get_session, ip_do_cliente, paciente_da_sessao
 from app.config import get_settings
+from app.dominio.agendamento.estados import cancelar_pelo_paciente as cancelar_agendamento
+from app.dominio.agendamento.estados import confirmar as confirmar_agendamento
+from app.dominio.agendamento.estados import recusar as recusar_agendamento
 from app.dominio.erros import EntradaInvalida, NaoElegivel, SemConsentimento, SolicitacaoDuplicada
 from app.dominio.fila.criterios import ORIGENS_DO_PACIENTE, calcular_nota, pontuar_respostas
 from app.dominio.fila.elegibilidade import DadosPaciente, RestricoesFila, motivo_inelegivel
 from app.dominio.relogio import Relogio
 from app.dominio.solicitacao import cancelar as cancelar_solicitacao
-from app.dominio.solicitacao import evento_criada
+from app.dominio.solicitacao import confirmar_proposta, evento_criada, recusar_proposta
+from app.infra.agendamentos import (
+    ATIVOS,
+    aplicar_agendamento,
+    contar_recusas,
+    para_dominio_agendamento,
+    travar_agendamento,
+)
 from app.infra.modelos import (
+    Agenda,
+    Agendamento,
     Consentimento,
     CriterioFila,
     Especialidade,
@@ -35,6 +47,7 @@ from app.infra.modelos import (
     RespostaCriterio,
     Solicitacao,
     Unidade,
+    Vaga,
 )
 from app.infra.solicitacoes import criterios_da_fila, gravar_transicao, para_dominio
 
@@ -143,11 +156,25 @@ class RespostaPaciente(BaseModel):
     valor: bool | int | float | str
 
 
+class AgendamentoPaciente(BaseModel):
+    """Proposta (com `expira_em`) ou consulta confirmada. Horários no fuso de Recife."""
+
+    id: UUID
+    status: Literal["PROPOSTO", "CONFIRMADO"]
+    inicio: datetime
+    fim: datetime
+    profissional: str  # UC-004: o paciente vê o profissional
+    unidade: UnidadeSaida
+    endereco: str | None
+    expira_em: datetime | None  # só na proposta
+
+
 class SolicitacaoDetalhe(SolicitacaoResumo):
     turno_preferido: str
     origem_encaminhamento: str | None
     respostas: list[RespostaPaciente]
     linha_do_tempo: list[EventoPaciente]
+    agendamento_ativo: AgendamentoPaciente | None
 
 
 # --- apoio --------------------------------------------------------------------------------
@@ -222,8 +249,14 @@ def _detalhe(session: Session, paciente_id: UUID, solicitacao_id: UUID) -> Solic
             HistoricoSolicitacao.tipo, HistoricoSolicitacao.ocorrido_em, HistoricoSolicitacao.motivo
         )
         .where(HistoricoSolicitacao.solicitacao_id == s.id, HistoricoSolicitacao.visivel_paciente)
-        .order_by(HistoricoSolicitacao.ocorrido_em, HistoricoSolicitacao.id)
+        .order_by(HistoricoSolicitacao.ocorrido_em, HistoricoSolicitacao.seq)
     )
+    ativo = session.execute(
+        select(Agendamento, Vaga, Agenda.profissional)
+        .join(Vaga, Vaga.id == Agendamento.vaga_id)
+        .join(Agenda, Agenda.id == Vaga.agenda_id)
+        .where(Agendamento.solicitacao_id == s.id, Agendamento.status.in_(ATIVOS))
+    ).one_or_none()
     return SolicitacaoDetalhe(
         **_resumo(s, fila, unidade),
         turno_preferido=s.turno_preferido,
@@ -232,6 +265,22 @@ def _detalhe(session: Session, paciente_id: UUID, solicitacao_id: UUID) -> Solic
         linha_do_tempo=[
             EventoPaciente(tipo=t, data=o.astimezone(fuso).date(), motivo=m) for t, o, m in eventos
         ],
+        agendamento_ativo=_agendamento_paciente(*ativo, unidade, fuso) if ativo else None,
+    )
+
+
+def _agendamento_paciente(
+    a: Agendamento, vaga: Vaga, profissional: str, unidade: Unidade, fuso: ZoneInfo
+) -> AgendamentoPaciente:
+    return AgendamentoPaciente(
+        id=a.id,
+        status=a.status,
+        inicio=vaga.inicio.astimezone(fuso),
+        fim=vaga.fim.astimezone(fuso),
+        profissional=profissional,
+        unidade=UnidadeSaida(id=unidade.id, sigla=unidade.sigla, nome=unidade.nome),
+        endereco=unidade.endereco,
+        expira_em=a.expira_em.astimezone(fuso) if a.status == "PROPOSTO" else None,
     )
 
 
@@ -418,7 +467,12 @@ def cancelar(
     relogio: RelogioDep,
     dados: CancelamentoEntrada,
 ) -> SolicitacaoDetalhe:
-    """Cancelamento ("não vou precisar"): EM_ANALISE ou NA_FILA. Outros estados → 409."""
+    """Cancelamento ("não vou precisar"): EM_ANALISE, NA_FILA, EM_PROPOSTA ou AGENDADA.
+
+    Com proposta ou consulta ativa, o agendamento é cancelado junto, só antes do início da
+    vaga; a vaga fica livre e o Worker a oferece ao próximo (RN-005). Outros estados → 409.
+    Travas: solicitação, depois agendamento (a vaga só é lida).
+    """
     s = session.scalar(
         select(Solicitacao)
         .where(Solicitacao.id == solicitacao_id, Solicitacao.paciente_id == paciente.id)
@@ -427,7 +481,27 @@ def cancelar(
     )
     if s is None:
         raise HTTPException(404, "Solicitação não encontrada.")
-    nova, evento = cancelar_solicitacao(para_dominio(s), dados.motivo_codigo, relogio.agora())
+    agora = relogio.agora()
+    ativo = session.execute(
+        select(Agendamento, Vaga.inicio)
+        .join(Vaga, Vaga.id == Agendamento.vaga_id)
+        .where(Agendamento.solicitacao_id == s.id, Agendamento.status.in_(ATIVOS))
+        .with_for_update(of=Agendamento)
+        .execution_options(populate_existing=True)
+    ).one_or_none()
+    nova, evento = cancelar_solicitacao(
+        para_dominio(s), dados.motivo_codigo, agora, tem_agendamento_ativo=ativo is not None
+    )
+    if ativo:
+        a, inicio = ativo
+        aplicar_agendamento(
+            session,
+            a,
+            cancelar_agendamento(para_dominio_agendamento(a), inicio, agora),
+            ator_id=paciente.usuario_id,
+            acao="CANCELAR_AGENDAMENTO",
+            ip=ip_do_cliente(request),
+        )
     s.motivo_cancelamento = dados.motivo_codigo
     gravar_transicao(
         session,
@@ -437,9 +511,102 @@ def cancelar(
         ator_id=paciente.usuario_id,
         acao="CANCELAR_SOLICITACAO",
         ip=ip_do_cliente(request),
-        evento_outbox="SOLICITACAO_CANCELADA",
+        evento_outbox="AGENDAMENTO_CANCELADO" if ativo else "SOLICITACAO_CANCELADA",
         auditoria_depois={"motivo_cancelamento": dados.motivo_codigo},
+        agendamento_id=ativo[0].id if ativo else None,
     )
     session.commit()
     logger.info("solicitacao cancelada: id=%s", s.id)
+    return _detalhe(session, paciente.id, s.id)
+
+
+# --- resposta à proposta ------------------------------------------------------------------
+
+
+def _travar_do_paciente(
+    session: Session, agendamento_id: UUID, paciente: Paciente
+) -> tuple[Solicitacao, Agendamento]:
+    """Trava solicitação e agendamento do próprio paciente; de outro paciente, 404 (AM-001)."""
+    par = travar_agendamento(session, agendamento_id, Solicitacao.paciente_id == paciente.id)
+    if par is None:
+        raise HTTPException(404, "Agendamento não encontrado.")
+    return par
+
+
+@router.post("/agendamentos/{agendamento_id}/confirmar")
+def confirmar(
+    agendamento_id: UUID,
+    request: Request,
+    paciente: PacienteDep,
+    session: SessionDep,
+    relogio: RelogioDep,
+) -> SolicitacaoDetalhe:
+    """UC-004: PROPOSTO → CONFIRMADO e solicitação AGENDADA, só antes de `expira_em`."""
+    s, a = _travar_do_paciente(session, agendamento_id, paciente)
+    agora = relogio.agora()
+    novo = confirmar_agendamento(para_dominio_agendamento(a), agora)
+    nova, evento = confirmar_proposta(para_dominio(s), agora)
+    aplicar_agendamento(
+        session,
+        a,
+        novo,
+        ator_id=paciente.usuario_id,
+        acao="CONFIRMAR_AGENDAMENTO",
+        ip=ip_do_cliente(request),
+    )
+    gravar_transicao(
+        session,
+        s,
+        nova,
+        [evento],
+        ator_id=paciente.usuario_id,
+        acao="CONFIRMAR_AGENDAMENTO",
+        ip=ip_do_cliente(request),
+        evento_outbox="AGENDAMENTO_CONFIRMADO",
+        agendamento_id=a.id,
+    )
+    session.commit()
+    logger.info("agendamento confirmado: id=%s", a.id)
+    return _detalhe(session, paciente.id, s.id)
+
+
+@router.post("/agendamentos/{agendamento_id}/recusar")
+def recusar(
+    agendamento_id: UUID,
+    request: Request,
+    paciente: PacienteDep,
+    session: SessionDep,
+    relogio: RelogioDep,
+) -> SolicitacaoDetalhe:
+    """UC-005 ("esta data não serve"): só PROPOSTO. A vaga fica livre para o próximo."""
+    s, a = _travar_do_paciente(session, agendamento_id, paciente)
+    agora = relogio.agora()
+    novo = recusar_agendamento(para_dominio_agendamento(a), agora)
+    nova, eventos = recusar_proposta(
+        para_dominio(s),
+        contar_recusas(session, s),
+        get_settings().recusas_mantendo_posicao,
+        agora,
+    )
+    aplicar_agendamento(
+        session,
+        a,
+        novo,
+        ator_id=paciente.usuario_id,
+        acao="RECUSAR_PROPOSTA",
+        ip=ip_do_cliente(request),
+    )
+    gravar_transicao(
+        session,
+        s,
+        nova,
+        eventos,
+        ator_id=paciente.usuario_id,
+        acao="RECUSAR_PROPOSTA",
+        ip=ip_do_cliente(request),
+        evento_outbox="PROPOSTA_RECUSADA",
+        agendamento_id=a.id,
+    )
+    session.commit()
+    logger.info("proposta recusada: id=%s", a.id)
     return _detalhe(session, paciente.id, s.id)

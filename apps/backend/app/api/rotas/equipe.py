@@ -1,4 +1,5 @@
-"""Área da equipe: filas do escopo, painel ordenado, classificação e critérios.
+"""Área da equipe: filas do escopo, painel ordenado, classificação, critérios, agenda do dia,
+presença (UC-008) e painel de vagas.
 
 Toda consulta filtra por `fila_id IN escopo` dentro da query (ADR-025); fila ou solicitação
 fora do escopo responde 404. Leitura: ATENDENTE, GESTOR e ADMIN. Escrita: só ATENDENTE.
@@ -6,9 +7,10 @@ As consultas ao painel e ao detalhe são auditadas (AM-007), sem nome, CPF nem r
 """
 
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, time, timedelta
 from typing import Annotated, Any, Literal
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
@@ -16,13 +18,30 @@ from sqlalchemy import func, select, true
 from sqlalchemy.orm import Session
 
 from app.api.deps import escopo_da_equipe, exige_papel, get_relogio, get_session, ip_do_cliente
+from app.config import get_settings
+from app.dominio.agendamento.estados import registrar_presenca
+from app.dominio.agendamento.vagas import SituacaoVaga, situacao_da_vaga
 from app.dominio.cadastro import abreviar_nome, mascarar_cpf
+from app.dominio.erros import EntradaInvalida
 from app.dominio.fila.criterios import ORIGENS_DA_EQUIPE, calcular_nota, pontuar_respostas
 from app.dominio.relogio import Relogio
 from app.dominio.solicitacao import classificar as classificar_solicitacao
-from app.dominio.solicitacao import exigir_aceita_respostas, recalcular_nota
+from app.dominio.solicitacao import (
+    exigir_aceita_respostas,
+    recalcular_nota,
+    registrar_atendimento,
+    registrar_falta,
+)
+from app.infra.agendamentos import (
+    ATIVOS,
+    aplicar_agendamento,
+    para_dominio_agendamento,
+    travar_agendamento,
+)
 from app.infra.modelos import (
     STATUS_SOLICITACAO,
+    Agenda,
+    Agendamento,
     Auditoria,
     CriterioFila,
     Especialidade,
@@ -33,6 +52,7 @@ from app.infra.modelos import (
     Solicitacao,
     Unidade,
     Usuario,
+    Vaga,
 )
 from app.infra.solicitacoes import (
     TIPOS_MUDANCA_DE_POSICAO,
@@ -54,6 +74,8 @@ SessionDep = Annotated[Session, Depends(get_session)]
 RelogioDep = Annotated[Relogio, Depends(get_relogio)]
 Limit = Annotated[int, Query(ge=1, le=100)]
 Offset = Annotated[int, Query(ge=0)]
+# Limites evitam OverflowError em `data + 1 dia` (9999-12-31 viraria 500).
+Dia = Annotated[date, Query(ge=date(2000, 1, 1), le=date(2100, 12, 31))]
 StatusSolicitacao = Literal[
     "EM_ANALISE", "NA_FILA", "EM_PROPOSTA", "AGENDADA", "ATENDIDA", "CANCELADA"
 ]
@@ -150,6 +172,37 @@ class RespostasEntrada(BaseModel):
     respostas: list[RespostaEntrada] = Field(min_length=1, max_length=50)
 
 
+class AgendamentoDoDia(BaseModel):
+    id: UUID
+    solicitacao_id: UUID
+    inicio: datetime
+    fim: datetime
+    profissional: str
+    paciente_nome: str  # abreviado
+    status: str
+    presenca_registrada: bool
+
+
+class PresencaEntrada(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    compareceu: bool
+
+
+class VagaPainel(BaseModel):
+    id: UUID
+    inicio: datetime
+    fim: datetime
+    profissional: str
+    situacao: SituacaoVaga
+
+
+class PainelVagasSaida(BaseModel):
+    total: int
+    sem_proposta: int  # livres sem janela para propor: candidatas a encaixe manual (ADR-021)
+    itens: list[VagaPainel]
+
+
 # --- apoio --------------------------------------------------------------------------------
 
 
@@ -207,7 +260,7 @@ def _detalhe(
     historico = session.scalars(
         select(HistoricoSolicitacao)
         .where(HistoricoSolicitacao.solicitacao_id == s.id)
-        .order_by(HistoricoSolicitacao.ocorrido_em, HistoricoSolicitacao.id)
+        .order_by(HistoricoSolicitacao.ocorrido_em, HistoricoSolicitacao.seq)
     )
     return SolicitacaoEquipeSaida(
         id=s.id,
@@ -309,7 +362,7 @@ def painel(
             HistoricoSolicitacao.solicitacao_id == Solicitacao.id,
             HistoricoSolicitacao.tipo.in_(TIPOS_MUDANCA_DE_POSICAO),
         )
-        .order_by(HistoricoSolicitacao.ocorrido_em.desc(), HistoricoSolicitacao.id.desc())
+        .order_by(HistoricoSolicitacao.ocorrido_em.desc(), HistoricoSolicitacao.seq.desc())
         .limit(1)
         .lateral()
     )
@@ -476,3 +529,192 @@ def responder_criterios(
     session.commit()
     logger.info("criterios respondidos: solicitacao=%s", s.id)
     return _detalhe(session, s.id, escopo)
+
+
+# --- agenda do dia, presença e painel de vagas --------------------------------------------
+
+# Agendamentos que aparecem na agenda do dia: os ativos e os já encerrados pela presença.
+STATUS_NA_AGENDA = ("PROPOSTO", "CONFIRMADO", "REALIZADO", "FALTOU")
+MAX_DIAS_PAINEL_VAGAS = 31
+
+
+def _dia_local(dia: date, fuso: ZoneInfo) -> datetime:
+    """Meia-noite de `dia` em Recife, como instante com fuso (ADR-008)."""
+    return datetime.combine(dia, time(0), fuso)
+
+
+@router.get("/filas/{fila_id}/agendamentos")
+def agendamentos_do_dia(
+    fila_id: UUID,
+    data: Dia,
+    request: Request,
+    usuario: LeitorDep,
+    escopo: EscopoDep,
+    session: SessionDep,
+) -> list[AgendamentoDoDia]:
+    """Agenda do dia (UC-008): hora, paciente abreviado, status e se a presença foi registrada.
+    `data` é o dia em Recife. Leitura auditada."""
+    if fila_id not in escopo:
+        raise HTTPException(404, "Fila não encontrada.")
+    fuso = ZoneInfo(get_settings().timezone_exibicao)
+    linhas = session.execute(
+        select(Agendamento, Vaga, Agenda.profissional, Paciente.nome)
+        .join(Vaga, Vaga.id == Agendamento.vaga_id)
+        .join(Agenda, Agenda.id == Vaga.agenda_id)
+        .join(Solicitacao, Solicitacao.id == Agendamento.solicitacao_id)
+        .join(Paciente, Paciente.id == Solicitacao.paciente_id)
+        .where(
+            Agenda.fila_id == fila_id,
+            Agenda.fila_id.in_(escopo),
+            Agendamento.status.in_(STATUS_NA_AGENDA),
+            Vaga.inicio >= _dia_local(data, fuso),
+            Vaga.inicio < _dia_local(data + timedelta(days=1), fuso),
+        )
+        .order_by(Vaga.inicio, Agendamento.id)
+    ).all()
+    itens = [
+        AgendamentoDoDia(
+            id=a.id,
+            solicitacao_id=a.solicitacao_id,
+            inicio=v.inicio.astimezone(fuso),
+            fim=v.fim.astimezone(fuso),
+            profissional=profissional,
+            paciente_nome=abreviar_nome(nome),
+            status=a.status,
+            presenca_registrada=a.status in ("REALIZADO", "FALTOU"),
+        )
+        for a, v, profissional, nome in linhas
+    ]
+    _auditar_leitura(
+        session,
+        usuario,
+        request,
+        "CONSULTAR_AGENDAMENTOS",
+        "fila",
+        fila_id,
+        {"data": data.isoformat()},
+    )
+    return itens
+
+
+@router.post("/agendamentos/{agendamento_id}/presenca")
+def presenca(
+    agendamento_id: UUID,
+    dados: PresencaEntrada,
+    request: Request,
+    atendente: AtendenteDep,
+    escopo: EscopoDep,
+    session: SessionDep,
+    relogio: RelogioDep,
+) -> SolicitacaoEquipeSaida:
+    """UC-008. Compareceu: a partir do início da vaga, REALIZADO e solicitação ATENDIDA.
+    Faltou: só depois da tolerância (RN-013), FALTOU e solicitação no fim da fila (RN-014).
+    Só de CONFIRMADO; fora do escopo → 404."""
+    par = travar_agendamento(session, agendamento_id, Solicitacao.fila_id.in_(escopo))
+    if par is None:
+        raise HTTPException(404, "Agendamento não encontrado.")
+    s, a = par
+    inicio, tolerancia = session.execute(
+        select(Vaga.inicio, Fila.tolerancia_atraso_min)
+        .join(Agenda, Agenda.id == Vaga.agenda_id)
+        .join(Fila, Fila.id == Agenda.fila_id)
+        .where(Vaga.id == a.vaga_id)
+    ).one()
+    agora = relogio.agora()
+    novo = registrar_presenca(
+        para_dominio_agendamento(a), dados.compareceu, inicio, tolerancia, agora
+    )
+    if dados.compareceu:
+        nova, evento = registrar_atendimento(para_dominio(s), agora)
+        eventos, acao, outbox = [evento], "REGISTRAR_COMPARECIMENTO", "ATENDIMENTO_REGISTRADO"
+    else:
+        nova, eventos = registrar_falta(para_dominio(s), agora)
+        acao, outbox = "REGISTRAR_FALTA", "FALTA_REGISTRADA"
+    aplicar_agendamento(
+        session, a, novo, ator_id=atendente.id, acao=acao, ip=ip_do_cliente(request)
+    )
+    gravar_transicao(
+        session,
+        s,
+        nova,
+        eventos,
+        ator_id=atendente.id,
+        acao=acao,
+        ip=ip_do_cliente(request),
+        evento_outbox=outbox,
+        agendamento_id=a.id,
+    )
+    session.commit()
+    logger.info("presenca registrada: agendamento=%s status=%s", a.id, a.status)
+    return _detalhe(session, s.id, escopo)
+
+
+@router.get("/filas/{fila_id}/vagas")
+def painel_de_vagas(
+    fila_id: UUID,
+    de: Dia,
+    ate: Dia,
+    request: Request,
+    usuario: LeitorDep,
+    escopo: EscopoDep,
+    session: SessionDep,
+    relogio: RelogioDep,
+) -> PainelVagasSaida:
+    """Vagas de `de` a `ate` (dias em Recife, inclusivos, até 31 dias) com a situação
+    derivada por `situacao_da_vaga()`. Nada é gravado. Leitura auditada."""
+    if fila_id not in escopo:
+        raise HTTPException(404, "Fila não encontrada.")
+    if ate < de or (ate - de).days >= MAX_DIAS_PAINEL_VAGAS:
+        raise EntradaInvalida(f"Informe um período de 1 a {MAX_DIAS_PAINEL_VAGAS} dias.")
+    cfg = get_settings()
+    fuso = ZoneInfo(cfg.timezone_exibicao)
+    agora = relogio.agora()
+    fila = session.get(Fila, fila_id)
+    ativo = (
+        select(Agendamento.status)
+        .where(Agendamento.vaga_id == Vaga.id, Agendamento.status.in_(ATIVOS))
+        .scalar_subquery()
+    )
+    linhas = session.execute(
+        select(Vaga, Agenda.profissional, ativo)
+        .join(Agenda, Agenda.id == Vaga.agenda_id)
+        .where(
+            Agenda.fila_id == fila_id,
+            Agenda.fila_id.in_(escopo),
+            Vaga.inicio >= _dia_local(de, fuso),
+            Vaga.inicio < _dia_local(ate + timedelta(days=1), fuso),
+        )
+        .order_by(Vaga.inicio, Vaga.id)
+    ).all()
+    itens = [
+        VagaPainel(
+            id=v.id,
+            inicio=v.inicio.astimezone(fuso),
+            fim=v.fim.astimezone(fuso),
+            profissional=profissional,
+            situacao=situacao_da_vaga(
+                v.inicio,
+                v.status_admin,
+                status_ativo,
+                agora,
+                fila.prazo_confirmacao_horas,
+                cfg.proposta_antecedencia_minima_horas,
+                janela_minima_horas=cfg.proposta_janela_minima_horas,
+            ),
+        )
+        for v, profissional, status_ativo in linhas
+    ]
+    _auditar_leitura(
+        session,
+        usuario,
+        request,
+        "CONSULTAR_VAGAS",
+        "fila",
+        fila_id,
+        {"de": de.isoformat(), "ate": ate.isoformat()},
+    )
+    return PainelVagasSaida(
+        total=len(itens),
+        sem_proposta=sum(i.situacao == "LIVRE_SEM_PROPOSTA" for i in itens),
+        itens=itens,
+    )

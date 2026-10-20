@@ -17,6 +17,7 @@ Não está definido quem propõe a vaga ao paciente: o sistema, por matching aut
 ## Ponto único de troca
 
 - Função de domínio `propor_vaga(solicitacao, vaga, proposto_por)`. Toda proposta passa por ela.
+  - *Nota de implementação (2026-10-20):* a assinatura ficou `propor_vaga(candidatas, vaga, agora, ...)`. Ela recebe as candidatas, escolhe a primeira apta na ordem da fila e devolve a proposta com o evento e o `expira_em`; quem chama grava `proposto_por_usuario_id` (nulo no automático). A decisão não muda: toda proposta passa por ela.
 - O prazo vem de `calcular_expira_em()`; `None` significa "não propor".
 - Flag `MATCHING_AUTOMATICO` (no MVP, `true`).
 - `agendamento.proposto_por_usuario_id` continua anulável: nulo = automático. Os dois modos convivem sem migração.

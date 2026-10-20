@@ -4,8 +4,16 @@ from uuid import UUID
 
 import pytest
 
-from app.dominio.erros import TransicaoInvalida
-from app.dominio.solicitacao import MOTIVOS_REENTRADA, Solicitacao, reentrar_no_fim_da_fila
+from app.dominio.erros import EntradaInvalida, TransicaoInvalida
+from app.dominio.solicitacao import (
+    MOTIVOS_CANCELAMENTO,
+    MOTIVOS_REENTRADA,
+    Solicitacao,
+    cancelar,
+    classificar,
+    recalcular_nota,
+    reentrar_no_fim_da_fila,
+)
 from app.infra.relogio import RelogioFixo
 
 CHEGADA = datetime(2026, 9, 1, 12, 0, tzinfo=UTC)
@@ -58,3 +66,57 @@ def test_adr026_estado_de_origem_invalido_levanta_transicao_invalida(motivo, sta
 def test_adr026_motivo_livre_e_recusado():
     with pytest.raises(ValueError, match="motivo"):
         reentrar_no_fim_da_fila(sol("AGENDADA"), CHEGADA, "você era o 3º da fila")
+
+
+AGORA = datetime(2026, 10, 19, 12, 0, tzinfo=UTC)
+
+
+def test_uc007_classificar_em_analise_entra_na_fila_com_dois_eventos():
+    nova, eventos = classificar(
+        Solicitacao(UUID(int=1), "EM_ANALISE", None, 5, None), "VERMELHO", None, AGORA
+    )
+
+    assert (nova.status, nova.classificacao_risco, nova.data_entrada_fila) == (
+        "NA_FILA",
+        "VERMELHO",
+        AGORA,
+    )
+    assert [(e.tipo, e.visivel_paciente) for e in eventos] == [
+        ("CLASSIFICADA", False),
+        ("ENTROU_NA_FILA", True),
+    ]
+
+
+def test_uc007_reclassificar_na_fila_exige_motivo_e_mantem_a_chegada():
+    with pytest.raises(EntradaInvalida):
+        classificar(sol("NA_FILA"), "VERMELHO", None, AGORA)
+    nova, (evento,) = classificar(sol("NA_FILA"), "VERMELHO", "Motivo sintético", AGORA)
+
+    assert nova.data_entrada_fila == CHEGADA
+    assert (evento.tipo, evento.visivel_paciente) == ("RECLASSIFICADA", False)
+
+
+@pytest.mark.parametrize("status", ["EM_PROPOSTA", "AGENDADA", "ATENDIDA", "CANCELADA"])
+def test_uc007_classificar_e_cancelar_fora_do_estado_levantam_transicao_invalida(status):
+    with pytest.raises(TransicaoInvalida):
+        classificar(sol(status), "VERDE", "Motivo sintético", AGORA)
+    with pytest.raises(TransicaoInvalida):
+        cancelar(sol(status), "OUTRO", AGORA)
+
+
+def test_adr024_recalcular_nota_so_gera_evento_na_fila_e_com_nota_diferente():
+    assert recalcular_nota(sol("NA_FILA"), 25, AGORA)[1] is None
+    assert recalcular_nota(sol("EM_ANALISE"), 40, AGORA)[1] is None
+    nova, evento = recalcular_nota(sol("NA_FILA"), 40, AGORA)
+    assert nova.nota == 40 and evento.tipo == "RECLASSIFICADA" and not evento.visivel_paciente
+    with pytest.raises(TransicaoInvalida):
+        recalcular_nota(sol("CANCELADA"), 40, AGORA)
+
+
+def test_uc002_cancelar_usa_o_rotulo_do_codigo_e_recusa_codigo_desconhecido():
+    nova, evento = cancelar(sol("NA_FILA"), "CONFLITO_DE_HORARIO", AGORA)
+
+    assert nova.status == "CANCELADA"
+    assert evento.motivo == MOTIVOS_CANCELAMENTO["CONFLITO_DE_HORARIO"]
+    with pytest.raises(EntradaInvalida):
+        cancelar(sol("NA_FILA"), "texto livre", AGORA)

@@ -1,6 +1,15 @@
 import pytest
 
-from app.dominio.fila.criterios import Criterio, calcular_nota, calcular_pontos
+from app.dominio.cadastro import abreviar_nome, mascarar_cpf
+from app.dominio.erros import EntradaInvalida
+from app.dominio.fila.criterios import (
+    ORIGENS_DA_EQUIPE,
+    ORIGENS_DO_PACIENTE,
+    Criterio,
+    calcular_nota,
+    calcular_pontos,
+    pontuar_respostas,
+)
 
 FILHOS = Criterio(
     "NUM_FILHOS",
@@ -70,3 +79,28 @@ def test_adr024_fator_invalido_levanta_value_error(fator):
 
     with pytest.raises(ValueError, match="fator"):
         calcular_pontos(criterio, 5)
+
+
+def test_adr024_pontuar_respostas_valida_origem_e_repeticao():
+    criterios = {
+        "p": Criterio("P", "SIM_NAO", 10, origem="PACIENTE"),
+        "r": Criterio("R", "SIM_NAO", 7, origem="REGULACAO"),
+    }
+
+    assert pontuar_respostas(criterios, [("p", True)], ORIGENS_DO_PACIENTE) == {"p": 10}
+    assert pontuar_respostas(criterios, [("r", True)], ORIGENS_DA_EQUIPE) == {"r": 7}
+    for respostas, origens in [
+        ([("r", True)], ORIGENS_DO_PACIENTE),  # paciente não responde pela regulação
+        ([("p", True)], ORIGENS_DA_EQUIPE),
+        ([("x", True)], ORIGENS_DO_PACIENTE),  # outra fila
+        ([("p", True), ("p", False)], ORIGENS_DO_PACIENTE),
+        ([("p", "sim")], ORIGENS_DO_PACIENTE),
+    ]:
+        with pytest.raises(EntradaInvalida):
+            pontuar_respostas(criterios, respostas, origens)
+
+
+def test_lgpd_mascara_cpf_e_abrevia_nome():
+    assert mascarar_cpf("12348212310") == "***.482.***-10"
+    assert abreviar_nome("Maria Sintética da Silva") == "Maria S."
+    assert abreviar_nome(" Maria ") == "Maria"

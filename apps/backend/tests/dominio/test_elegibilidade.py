@@ -4,9 +4,13 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from app.dominio.fila.elegibilidade import (
+    MOTIVO_DADO_AUSENTE,
+    MOTIVO_IDADE,
+    MOTIVO_SEXO,
     DadosPaciente,
     RestricoesFila,
     idade_em_anos,
+    motivo_inelegivel,
     verificar_elegibilidade,
 )
 from app.infra.relogio import RelogioFixo
@@ -70,3 +74,17 @@ def test_adr027_nascimento_no_futuro_e_inelegivel():
     so_maxima = RestricoesFila(idade_maxima=12)
 
     assert not verificar_elegibilidade(paciente(nascimento=date(2027, 1, 1)), so_maxima, HOJE)
+
+
+def test_rn017_motivo_inelegivel_diz_o_porque():
+    assert motivo_inelegivel(paciente("MASCULINO"), LAQUEADURA, HOJE) == MOTIVO_SEXO
+    assert motivo_inelegivel(paciente(sexo=None), LAQUEADURA, HOJE) == MOTIVO_DADO_AUSENTE
+    # Sem data de nascimento: o banco exige a data (0002); a regra falha fechada mesmo assim.
+    assert motivo_inelegivel(paciente(nascimento=None), FAIXA_40_69, HOJE) == MOTIVO_DADO_AUSENTE
+    assert (
+        motivo_inelegivel(paciente(nascimento=date(2000, 1, 1)), FAIXA_40_69, HOJE) == MOTIVO_IDADE
+    )
+    assert (
+        motivo_inelegivel(paciente(nascimento=date(1950, 1, 1)), FAIXA_40_69, HOJE) == MOTIVO_IDADE
+    )
+    assert motivo_inelegivel(paciente(), LAQUEADURA, HOJE) is None

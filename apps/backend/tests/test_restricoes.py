@@ -1,4 +1,4 @@
-"""Restrições do banco (migração 0002). Cada teste confere a restrição exata que disparou."""
+"""Restrições do banco (migrações 0002 e 0004). Cada teste confere a restrição que disparou."""
 
 from datetime import UTC, date, datetime, time, timedelta
 
@@ -48,15 +48,30 @@ def usuario(c, papel="PACIENTE", **extra):
 
 
 def solicitacao(c, grafo, **extra):
-    valores = {"status": "NA_FILA", "classificacao_risco": "VERDE", "data_entrada_fila": T0}
+    valores = {
+        "status": "NA_FILA",
+        "classificacao_risco": "VERDE",
+        "data_entrada_fila": T0,
+        "paciente_id": grafo["paciente"],
+    }
     valores.update(extra)
     return inserir(
         c,
         "solicitacao",
-        paciente_id=grafo["paciente"],
         fila_id=grafo["fila"],
         data_pedido=date(2026, 10, 1),
         **valores,
+    )
+
+
+def outro_paciente(c, cpf):
+    return inserir(
+        c,
+        "paciente",
+        usuario_id=usuario(c),
+        nome="Outro Paciente Sintético",
+        cpf=cpf,
+        data_nascimento=date(1990, 1, 1),
     )
 
 
@@ -158,8 +173,10 @@ def test_grafo_minimo_completo_e_aceito(conexao, grafo):
 @pytest.mark.parametrize("liberado", ["CANCELADO", "EXPIRADO"])
 def test_adr004_vaga_so_tem_um_agendamento_ativo(conexao, grafo, liberado):
     v = vaga(conexao, grafo)
-    # Duas solicitações diferentes: senão quem dispara é o índice da RN-002.
-    s1, s2 = solicitacao(conexao, grafo), solicitacao(conexao, grafo)
+    # Duas solicitações diferentes: senão quem dispara é o índice da RN-002. Pacientes
+    # diferentes: senão quem dispara é o da RN-018.
+    s1 = solicitacao(conexao, grafo)
+    s2 = solicitacao(conexao, grafo, paciente_id=outro_paciente(conexao, "52998224725"))
     a1 = agendamento(conexao, s1, v)
 
     viola(conexao, "ux_agendamento_vaga_ativa", lambda: agendamento(conexao, s2, v))
@@ -173,6 +190,18 @@ def test_adr004_vaga_so_tem_um_agendamento_ativo(conexao, grafo, liberado):
         text("UPDATE agendamento SET status = :s WHERE id = :id"), {"s": liberado, "id": a1}
     )
     agendamento(conexao, s2, v)  # com a primeira liberada, a vaga aceita nova proposta
+
+
+@pytest.mark.parametrize("encerrada", ["ATENDIDA", "CANCELADA"])
+def test_rn018_uma_solicitacao_ativa_por_paciente_e_fila(conexao, grafo, encerrada):
+    s1 = solicitacao(conexao, grafo)
+
+    viola(conexao, "ux_solicitacao_ativa_por_fila", lambda: solicitacao(conexao, grafo))
+
+    conexao.execute(
+        text("UPDATE solicitacao SET status = :s WHERE id = :id"), {"s": encerrada, "id": s1}
+    )
+    solicitacao(conexao, grafo)  # com a primeira encerrada, uma nova é permitida
 
 
 def test_rn002_solicitacao_so_tem_uma_proposta_ativa(conexao, grafo):
@@ -378,3 +407,17 @@ def test_auditoria_e_append_only(conexao):
     append_only(conexao, "UPDATE auditoria SET acao = 'x' WHERE id = :id", {"id": a})
     append_only(conexao, "DELETE FROM auditoria WHERE id = :id", {"id": a})
     append_only(conexao, "TRUNCATE auditoria", {})
+
+
+def test_minimizacao_motivo_de_cancelamento_e_codigo_fechado(conexao, grafo):
+    viola(
+        conexao,
+        "ck_solicitacao_motivo_cancelamento",
+        lambda: solicitacao(conexao, grafo, status="CANCELADA", motivo_cancelamento="texto livre"),
+    )
+    viola(
+        conexao,
+        "ck_solicitacao_motivo_so_se_cancelada",
+        lambda: solicitacao(conexao, grafo, motivo_cancelamento="OUTRO"),
+    )
+    solicitacao(conexao, grafo, status="CANCELADA", motivo_cancelamento="OUTRO")

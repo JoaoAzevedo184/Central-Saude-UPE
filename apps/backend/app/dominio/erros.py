@@ -14,3 +14,9 @@ class TransicaoInvalida(ErroDeDominio):
     """Estado de origem não permite a transição pedida. Responde 409."""
 
     tipo = "/problemas/transicao-invalida"
+
+
+class OperacaoNaoPermitida(ErroDeDominio):
+    """A operação é válida em geral, mas não neste alvo (ex.: suspender a si mesmo). 409."""
+
+    tipo = "/problemas/operacao-nao-permitida"

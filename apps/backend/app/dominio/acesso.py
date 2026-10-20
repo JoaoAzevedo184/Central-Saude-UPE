@@ -1,7 +1,12 @@
 """Acesso da equipe: escopo por fila (ADR-025) e usuário suspenso (ADR-028)."""
 
 from collections.abc import Mapping
+from datetime import datetime, timedelta
 from uuid import UUID
+
+from app.dominio.erros import OperacaoNaoPermitida, TransicaoInvalida
+
+PAPEIS_EQUIPE = frozenset({"ATENDENTE", "GESTOR", "ADMIN"})
 
 
 def pode_autenticar(situacao: str) -> bool:
@@ -37,3 +42,56 @@ def calcular_escopo(
     if papel == "ATENDENTE":
         return filas_atribuidas & frozenset(unidade_da_fila)
     return frozenset()
+
+
+def refresh_na_tolerancia(
+    revogado_em: datetime,
+    substituido: bool,
+    ja_reapresentado: bool,
+    agora: datetime,
+    tolerancia: timedelta,
+) -> bool:
+    """Refresh já substituído, reapresentado uma única vez dentro da tolerância: duas abas
+    renovando juntas, não roubo (ADR-003, AM-003). Fora dela, numa segunda reapresentação ou
+    revogado sem substituto (logout), é reuso."""
+    return substituido and not ja_reapresentado and agora - revogado_em < tolerancia
+
+
+def tentativas_esgotadas(falhas_na_janela: int, maximo: int) -> bool:
+    """Limite de tentativas (AM-004): bloqueia ao atingir `maximo` dentro da janela."""
+    return falhas_na_janela >= maximo
+
+
+def verificar_suspensao(
+    ator_id: UUID, alvo_id: UUID, alvo_papel: str, alvo_situacao: str, admins_ativos: int
+) -> None:
+    """Pode suspender? Só contas da equipe, nunca a si mesmo nem o último ADMIN ativo.
+
+    `admins_ativos` deve ser contado com as linhas dos ADMIN ativos travadas (FOR UPDATE):
+    sem isso, dois admins podem suspender um ao outro ao mesmo tempo e não sobrar nenhum.
+    """
+    if alvo_situacao != "ATIVO":
+        raise TransicaoInvalida("A conta já está suspensa.")
+    if alvo_id == ator_id:
+        raise OperacaoNaoPermitida("Não é possível suspender a própria conta.")
+    if alvo_papel not in PAPEIS_EQUIPE:
+        raise OperacaoNaoPermitida("Só contas da equipe podem ser suspensas.")
+    if alvo_papel == "ADMIN" and admins_ativos <= 1:
+        raise OperacaoNaoPermitida("Não é possível suspender o último administrador ativo.")
+
+
+def verificar_reativacao(alvo_situacao: str) -> None:
+    if alvo_situacao != "SUSPENSO":
+        raise TransicaoInvalida("A conta já está ativa.")
+
+
+def normalizar_identificador(valor: str) -> tuple[str, str]:
+    """Login: 11 dígitos (com ou sem pontuação) é CPF; o resto é e-mail, em minúsculas.
+
+    A mesma forma normalizada é usada na busca e no hash do limite de tentativas.
+    """
+    valor = valor.strip()
+    digitos = valor.replace(".", "").replace("-", "")
+    if len(digitos) == 11 and digitos.isdigit():
+        return "CPF", digitos
+    return "EMAIL", valor.lower()

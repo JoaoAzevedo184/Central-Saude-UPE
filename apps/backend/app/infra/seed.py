@@ -1,10 +1,14 @@
-"""Dados SINTÉTICOS para desenvolvimento: `python -m app.infra.seed`.
+"""Dados SINTÉTICOS para desenvolvimento: `SEED_SENHA=... python -m app.infra.seed`.
 
 Nomes, pesos e critérios são simulados (ADR-011). Idempotente: se as unidades já existem,
 não faz nada. Só roda com APP_ENV=development (lista de permissão, não de bloqueio).
+Todos os usuários do seed recebem a senha de SEED_SENHA, passada só na linha de comando;
+sem ela, uma senha aleatória é gerada e impressa uma vez.
 """
 
 import logging
+import os
+import secrets
 import sys
 from datetime import date
 from typing import Any
@@ -13,7 +17,9 @@ from sqlalchemy import insert, select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
+from app.dominio.cadastro import cpf_com_digitos as cpf_sintetico
 from app.dominio.relogio import Relogio
+from app.infra.autenticacao import hash_senha
 from app.infra.db import SessionLocal
 from app.infra.modelos import (
     CriterioFila,
@@ -30,18 +36,7 @@ from app.logging import configurar_logging
 
 logger = logging.getLogger(__name__)
 
-# Não é um hash válido: ninguém entra com estes usuários até a tarefa de autenticação
-# definir o algoritmo e o seed gravar senhas de desenvolvimento.
-SENHA_INDISPONIVEL = "!sem-senha"
-
-
-def cpf_sintetico(base: str) -> str:
-    """CPF com dígitos verificadores válidos a partir de 9 dígitos fictícios."""
-    digitos = [int(d) for d in base]
-    for tamanho in (9, 10):
-        soma = sum(d * (tamanho + 1 - i) for i, d in enumerate(digitos[:tamanho]))
-        digitos.append(0 if soma % 11 < 2 else 11 - soma % 11)
-    return "".join(map(str, digitos))
+__all__ = ["cpf_sintetico", "semear"]
 
 
 def _faixas(*faixas: tuple[int | None, int | None, int]) -> dict[str, Any]:
@@ -163,7 +158,7 @@ UNIDADES = [
 ]
 
 
-def semear(session: Session, relogio: Relogio) -> bool:
+def semear(session: Session, relogio: Relogio, senha_hash: str) -> bool:
     """Grava os dados sintéticos. Devolve False se já existiam. Não faz commit."""
     if session.scalar(select(Unidade).where(Unidade.sigla == "CISAM")) is not None:
         return False
@@ -200,7 +195,7 @@ def semear(session: Session, relogio: Relogio) -> bool:
         )
 
     def usuario(email: str, papel: str, **extra: Any) -> Usuario:
-        u = Usuario(email=email, senha_hash=SENHA_INDISPONIVEL, papel=papel, **extra)
+        u = Usuario(email=email, senha_hash=senha_hash, papel=papel, **extra)
         session.add(u)
         return u
 
@@ -248,9 +243,13 @@ def main() -> None:
     configurar_logging(settings.log_level)
     if settings.app_env != "development":
         sys.exit(f"seed recusado: só roda com APP_ENV=development (atual: {settings.app_env})")
+    senha = os.environ.get("SEED_SENHA") or secrets.token_urlsafe(12)
     with SessionLocal() as session:
-        criou = semear(session, RelogioReal())
+        criou = semear(session, RelogioReal(), hash_senha(senha))
         session.commit()
+    if criou and not os.environ.get("SEED_SENHA"):
+        # print, não logger: a senha não vai para logs coletados.
+        print(f"seed: SEED_SENHA ausente; senha gerada para todos os usuários: {senha}")
     logger.info("seed: %s", "dados criados" if criou else "já existia, nada feito")
 
 

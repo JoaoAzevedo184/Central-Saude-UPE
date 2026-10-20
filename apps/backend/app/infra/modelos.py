@@ -11,6 +11,7 @@ from uuid import UUID
 
 from sqlalchemy import (
     ARRAY,
+    Boolean,
     CheckConstraint,
     Column,
     DateTime,
@@ -58,6 +59,7 @@ TIPOS_HISTORICO = (
 CANAIS = ("IN_APP", "EMAIL")
 STATUS_ENVIO = ("PENDENTE", "ENVIADA", "FALHOU")
 STATUS_OUTBOX = ("PENDENTE", "PROCESSADO", "FALHOU")
+TIPOS_TENTATIVA = ("LOGIN", "REGISTRO")
 
 
 def em(coluna: str, valores: tuple[str, ...]) -> CheckConstraint:
@@ -88,7 +90,8 @@ class Usuario(Base):
     )
 
     id: Mapped[UUID] = pk_uuid()
-    email: Mapped[str] = mapped_column(Text, unique=True)
+    # Anulável: o e-mail do paciente é opcional (UC-001); a equipe entra por e-mail.
+    email: Mapped[str | None] = mapped_column(Text, unique=True)
     senha_hash: Mapped[str] = mapped_column(Text)
     papel: Mapped[str] = mapped_column(Text)
     situacao: Mapped[str] = mapped_column(Text, server_default="ATIVO")
@@ -135,6 +138,46 @@ class Consentimento(Base):
     versao_termo: Mapped[str] = mapped_column(Text)
     concedido_em: Mapped[datetime] = agora()
     revogado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class SessaoRefresh(Base):
+    """Refresh token (ADR-003). Só o hash SHA-256; cada refresh gera um novo na mesma família."""
+
+    __tablename__ = "sessao_refresh"
+
+    id: Mapped[UUID] = pk_uuid()
+    usuario_id: Mapped[UUID] = fk("usuario.id", index=True)
+    familia_id: Mapped[UUID] = mapped_column(index=True)
+    token_hash: Mapped[str] = mapped_column(Text, unique=True)
+    criado_em: Mapped[datetime] = agora()
+    expira_em: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    revogado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    substituido_por_id: Mapped[UUID | None] = fk("sessao_refresh.id")
+    reapresentado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ip: Mapped[str | None] = mapped_column(INET)
+
+
+class TentativaLogin(Base):
+    """Tentativas de login e de registro, para o limite do AM-004. Sem identificador em claro."""
+
+    __tablename__ = "tentativa_login"
+    __table_args__ = (
+        em("tipo", TIPOS_TENTATIVA),
+        CheckConstraint(
+            "tipo = 'REGISTRO' OR identificador_hash IS NOT NULL", name="login_identificado"
+        ),
+        Index(
+            "ix_tentativa_login_identificador_hash_ocorrido_em", "identificador_hash", "ocorrido_em"
+        ),
+        Index("ix_tentativa_login_ip_ocorrido_em", "ip", "ocorrido_em"),
+    )
+
+    id: Mapped[UUID] = pk_uuid()
+    tipo: Mapped[str] = mapped_column(Text)
+    identificador_hash: Mapped[str | None] = mapped_column(Text)  # HMAC-SHA256 do CPF/e-mail
+    ip: Mapped[str | None] = mapped_column(INET)
+    sucesso: Mapped[bool] = mapped_column(Boolean)
+    ocorrido_em: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class Unidade(Base):

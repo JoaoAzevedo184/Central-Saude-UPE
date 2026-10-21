@@ -31,7 +31,7 @@
    - devolve a solicitação para `NA_FILA` no **fim da fila**, com `reentrar_no_fim_da_fila()`: `data_entrada_fila` recebe o horário atual (RN-014);
    - registra na linha do tempo os eventos `FALTOU` e `REENTROU_NA_FILA`, este com o motivo "Você não compareceu à consulta" e visível ao paciente;
    - registra a auditoria e o evento `FALTA_REGISTRADA` na outbox.
-5. O paciente recebe o aviso com o motivo, sem posição na fila.
+5. O paciente recebe o aviso no site com o motivo, sem posição na fila. O e-mail, se houver, usa texto neutro ("Há uma atualização no seu atendimento. Para ver os detalhes, entre na Central.") e não menciona a falta (AM-008).
 
 ## Exceções
 

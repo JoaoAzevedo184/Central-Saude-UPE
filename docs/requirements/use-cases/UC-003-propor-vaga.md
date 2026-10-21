@@ -60,7 +60,7 @@ Job `propor_vagas` do Worker, só com `MATCHING_AUTOMATICO=true`, a cada `WORKER
 - **Dado** uma vaga de tarde, **quando** a vaga é proposta, **então** a solicitação que prefere manhã é pulada (`test_uc003_respeita_o_turno`).
 - **Dado** uma solicitação `EM_ANALISE`, **quando** o Worker propõe, **então** ela não recebe vaga (`test_uc003_nao_propoe_para_solicitacao_em_analise`).
 - **Dado** as primeiras candidatas que já receberam a vaga, **quando** o teto é atingido, **então** o aviso sai uma vez, sem dado pessoal (`test_uc003_teto_de_candidatas_registra_aviso_sem_dado_pessoal`).
-- *(Próxima tarefa: consumo da outbox)* **Dado** uma proposta criada, **quando** o Worker processa a outbox, **então** o paciente tem um aviso no site e um e-mail na fila de envio.
+- **Dado** uma proposta criada, **quando** o Worker processa a outbox, **então** o paciente tem um aviso no site e um e-mail na fila de envio.
 
 ## Segurança
 

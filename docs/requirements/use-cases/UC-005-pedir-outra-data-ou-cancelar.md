@@ -49,6 +49,8 @@ Rota: `POST /api/v1/solicitacoes/{id}/cancelar`, com `motivo_codigo` da lista fe
    - registra a auditoria dos dois e grava o evento `AGENDAMENTO_CANCELADO` na outbox.
 5. A vaga fica livre e o Worker a oferece ao próximo da fila (**reaproveitamento**, RN-005), **se ainda couber a janela mínima** para o paciente responder (RN-016). Se não couber, ela aparece no painel de vagas como "livre sem proposta".
 
+> O aviso do cancelamento aparece no site com o detalhe. O e-mail, se houver, usa texto neutro ("Há uma atualização no seu atendimento. Para ver os detalhes, entre na Central.") e não menciona cancelamento (AM-008).
+
 > O cancelamento sem proposta (`EM_ANALISE` e `NA_FILA`) usa a mesma rota e está em [UC-002](UC-002-solicitar-atendimento.md); nesse caso a outbox recebe `SOLICITACAO_CANCELADA`.
 
 ## Exceções

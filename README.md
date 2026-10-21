@@ -101,6 +101,15 @@ Sem a variável, os testes de integração falham com `password authentication f
 - Documentação da API: http://127.0.0.1:8000/api/v1/docs
 - E-mails enviados em desenvolvimento (mailpit): http://127.0.0.1:8025
 
+### Trabalhando com o Orca
+
+O Orca roda um agente por tarefa, cada um num worktree. Regras (detalhes no [AGENTS.md](AGENTS.md)):
+
+- O Compose sobe **só no checkout principal**; nunca dentro de um worktree.
+- Nos worktrees, rode os testes com `scripts/testar.sh [args do pytest]`. Ele usa o `.env` e o Postgres do checkout principal e um banco de teste próprio por worktree. `scripts/testar.sh --limpar-bancos-orfaos` limpa os de worktrees removidos.
+- Deixe o Orca em modo **Manual** (Settings → Agents → Agent Permissions). **Nunca use o Yolo.**
+- O commit é sempre da pessoa, depois de revisar o diff.
+
 ## Documentação
 
 O mapa completo, com a responsabilidade de cada documento, está em [docs/README.md](docs/README.md).

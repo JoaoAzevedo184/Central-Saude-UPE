@@ -12,10 +12,15 @@ os.environ["APP_ENV"] = "test"  # vale também dentro do container, cujo .env di
 os.environ.setdefault("JWT_SECRET_KEY", "segredo-somente-para-testes")
 os.environ.setdefault("LOGIN_HASH_KEY", "chave-de-hash-somente-para-testes")
 
-# Os testes nunca tocam o banco de desenvolvimento: usam <POSTGRES_DB>_test, recriado a cada
-# execução. Isto roda antes de qualquer import de `app`, que lê DATABASE_URL uma vez só.
+# Os testes nunca tocam o banco de desenvolvimento: usam <POSTGRES_DB>_test[_sufixo], recriado a
+# cada execução. Isto roda antes de qualquer import de `app`, que lê DATABASE_URL uma vez só.
 URL_ORIGINAL = make_url(os.environ["DATABASE_URL"])
-URL_TESTE = URL_ORIGINAL.set(database=f"{URL_ORIGINAL.database}_test")
+# Cada worktree vinculado ganha o próprio banco (sufixo), para execuções paralelas não se apagarem.
+from tests.banco_teste import nome_banco_teste, raiz_git  # noqa: E402
+
+URL_TESTE = URL_ORIGINAL.set(
+    database=nome_banco_teste(URL_ORIGINAL.database, raiz_git(Path(__file__).resolve().parent))
+)
 os.environ["DATABASE_URL"] = URL_TESTE.render_as_string(hide_password=False)
 
 from datetime import UTC, datetime  # noqa: E402

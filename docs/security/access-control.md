@@ -24,6 +24,7 @@ Legenda:
 | Criar solicitação | 🔒 | — | — | — |
 | Ver solicitações, agendamentos e linha do tempo | 🔒 (só eventos visíveis ao paciente; sem posição na fila) | 🏥 | 🏥 | ✅ |
 | Confirmar, pedir outra data (só proposta), cancelar (até o início da vaga) | 🔒 | — | — | — |
+| Ver e marcar como lidos os próprios avisos do site (`/avisos`; aviso de outro usuário → `404`) | 🔒 | 🔒 | 🔒 | 🔒 |
 | Ver data, hora, unidade, endereço e **nome do profissional** da própria proposta ou consulta | 🔒 | 🏥 | 🏥 | ✅ |
 | Cancelar agendamento em nome do paciente | — | 🏥 *(proposta)* | — | — |
 | Validar/classificar solicitação (simulação da regulação) | — | 🏥 | — | — |

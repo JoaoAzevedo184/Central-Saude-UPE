@@ -39,7 +39,7 @@ O sistema **não** guarda diagnóstico, prontuário, resultados de exames nem qu
 - **Consentimento por finalidade:** `AGENDAMENTO` (obrigatório para usar o serviço) e `LEMBRETE_EMAIL` (opcional), com versão do termo e data; revogável a qualquer momento (RN-009).
 - **Mascaramento:** CPF e cartão do SUS mascarados nas interfaces e nas respostas da API, exceto para o próprio titular quando necessário.
 - **Separação de visão:** o paciente não vê nada sobre outros pacientes, nem a posição, o tamanho da fila, a nota ou os pontos (RN-007). A equipe vê só as filas do seu escopo ([ADR-025](../decisions/ADR-025-escopo-por-fila.md)).
-- **E-mails mínimos:** o e-mail avisa que há uma novidade e leva ao site; não contém especialidade, classificação nem CPF *(proposta)*.
+- **E-mails mínimos:** o e-mail avisa que há uma novidade e leva ao site (`APP_URL_PUBLICA`); não contém nome, CPF, especialidade, unidade, profissional, fila, classificação, nota nem posição. Falta, cancelamento e prazo expirado (inclusive o retorno ao fim da fila) nunca são revelados por e-mail: o texto é neutro ("Há uma atualização no seu atendimento. Para ver os detalhes, entre na Central.") e o detalhe fica só no aviso do site, atrás do login. O e-mail só sai para quem informou endereço (finalidade `AGENDAMENTO`); o lembrete exige também `LEMBRETE_EMAIL` vigente, conferido de novo no envio.
 - **Logs sem dados pessoais:** os logs da aplicação usam IDs, nunca nome, CPF ou corpo de requisição. Erros inesperados (API e Worker) registram só o tipo da exceção e o SQLSTATE, porque a mensagem do Postgres pode repetir valores, como um CPF duplicado.
 - **Auditoria minimizada:** `dados_antes` e `dados_depois` guardam só os campos alterados de estado, não cópias completas do registro.
 

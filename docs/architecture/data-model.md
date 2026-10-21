@@ -198,12 +198,15 @@ erDiagram
     uuid usuario_id FK
     uuid solicitacao_id FK "opcional"
     uuid agendamento_id FK "opcional"
+    uuid outbox_id FK "evento que originou o aviso; nulo = lembrete; migracao 0006"
     text canal "CHECK IN_APP EMAIL"
     text tipo
     text titulo
     text corpo
-    text status_envio "CHECK PENDENTE ENVIADA FALHOU"
+    text status_envio "CHECK PENDENTE ENVIADA FALHOU CANCELADA"
     int tentativas
+    timestamptz proximo_retry_em "proxima tentativa do e-mail; 0006"
+    timestamptz enviada_em "0006"
     timestamptz lida_em
     timestamptz criada_em
   }
@@ -330,6 +333,25 @@ ALTER TABLE agenda ADD CONSTRAINT ck_agenda_dias_semana_iso
 -- Migração 0005: ordem de gravação da linha do tempo
 ALTER TABLE historico_solicitacao ADD COLUMN seq bigint GENERATED ALWAYS AS IDENTITY;
 
+-- Migração 0006: avisos e envio de e-mail
+ALTER TABLE notificacao ADD CONSTRAINT fk_notificacao_outbox_id_outbox
+  FOREIGN KEY (outbox_id) REFERENCES outbox (id) ON DELETE RESTRICT;
+ALTER TABLE notificacao DROP CONSTRAINT ck_notificacao_status_envio;
+ALTER TABLE notificacao ADD CONSTRAINT ck_notificacao_status_envio
+  CHECK (status_envio IN ('PENDENTE', 'ENVIADA', 'FALHOU', 'CANCELADA'));
+-- consumo idempotente da outbox (ADR-006): o mesmo evento não duplica avisos
+ALTER TABLE notificacao ADD CONSTRAINT uq_notificacao_outbox_usuario_canal
+  UNIQUE (outbox_id, usuario_id, canal);
+-- um lembrete por agendamento e canal (RF-024; outbox_id nulo, fora da UNIQUE acima)
+CREATE UNIQUE INDEX ux_notificacao_lembrete
+  ON notificacao (agendamento_id, tipo, canal) WHERE tipo = 'LEMBRETE';
+-- job enviar_emails
+CREATE INDEX ix_notificacao_email_pendente
+  ON notificacao (canal, proximo_retry_em) WHERE status_envio = 'PENDENTE';
+-- lista e contagem dos avisos do site
+CREATE INDEX ix_notificacao_avisos_usuario
+  ON notificacao (usuario_id, criada_em DESC) WHERE canal = 'IN_APP';
+
 -- Ordenação da fila e Worker
 CREATE INDEX ix_solicitacao_fila_ordem ON solicitacao (fila_id, data_entrada_fila) WHERE status = 'NA_FILA';
 CREATE INDEX ix_outbox_pendente ON outbox (proximo_retry_em) WHERE status = 'PENDENTE';
@@ -370,6 +392,6 @@ Tipos de evento de `historico_solicitacao.tipo`: `CRIADA`, `CLASSIFICADA`, `ENTR
 - **`tentativa_login`:** guarda o CPF ou e-mail só como HMAC-SHA256 com `LOGIN_HASH_KEY`, para o limite de tentativas sem o identificador em claro. Não tem FK para `usuario`.
 - **Usuários não são apagados**, só suspensos ([ADR-028](../decisions/ADR-028-suspensao-de-acesso.md)); a auditoria continua apontando para eles.
 - **Histórico familiar** é só a resposta do paciente a um critério; não há dados de parentes ([ADR-030](../decisions/ADR-030-historico-familiar-como-criterio.md)).
-- **Notificação** pode se referir a uma solicitação, a um agendamento ou a nenhum dos dois (avisos de conta).
-- **Outbox** é gravada na mesma transação da mudança de estado e consumida pelo Worker com `FOR UPDATE SKIP LOCKED`.
+- **Notificação** pode se referir a uma solicitação, a um agendamento ou a nenhum dos dois (avisos de conta). Cada linha é um aviso por canal: `IN_APP` nasce `ENVIADA` (é o próprio aviso do site); `EMAIL` nasce `PENDENTE` e o `enviar_emails` o leva a `ENVIADA`, `FALHOU` (esgotou `OUTBOX_MAX_TENTATIVAS`) ou `CANCELADA` (lembrete cujo agendamento deixou de estar `CONFIRMADO`, consentimento `LEMBRETE_EMAIL` revogado ou e-mail removido). `tentativas` e `proximo_retry_em` valem só para o e-mail. `outbox_id` é nulo no lembrete, que não vem da outbox.
+- **Outbox** é gravada na mesma transação da mudança de estado e consumida pelo Worker com `FOR UPDATE SKIP LOCKED`. Evento novo (`tentativas = 0`) está sempre vencido, porque `proximo_retry_em` nasce com o `now()` do banco; só as novas tentativas esperam `proximo_retry_em`. O `payload` leva `solicitacao_id` e, quando há, `agendamento_id`; nos eventos da solicitação leva também `fim_da_fila` (booleano). `ix_outbox_pendente` fica como está.
 - Sem aging ([ADR-024](../decisions/ADR-024-protocolo-por-fila.md)).

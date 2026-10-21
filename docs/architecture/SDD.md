@@ -117,7 +117,7 @@ Se o projeto crescer a ponto de API e Worker precisarem de ciclos de versão ind
 
 | Interface | Para que serve | Implementações |
 | --- | --- | --- |
-| `CanalNotificacao` | Entregar um aviso por um canal | `InApp`, `Email` (SMTP); depois Telegram e push ([ADR-010](../decisions/ADR-010-integracoes-por-interface.md)) |
+| `CanalNotificacao` | Entregar uma mensagem por um canal externo (`enviar(Mensagem)`; falha = exceção) | `CanalEmailSmtp` (`infra/email.py`); depois Telegram e push ([ADR-010](../decisions/ADR-010-integracoes-por-interface.md)). O aviso no site não passa pela interface: é a própria linha de `notificacao` com canal `IN_APP` |
 | `ReguladorGateway` | Obter encaminhamentos e a classificação de risco | Simulada com dados sintéticos |
 | `Relogio` | Fornecer "agora" com fuso | Real; fixo nos testes ([ADR-008](../decisions/ADR-008-datas-e-fuso.md)) |
 | Repositórios | Persistir e consultar agregados | SQLAlchemy |
@@ -152,6 +152,15 @@ Se o estado de origem não for o esperado, a resposta é `409`. Isso cobre cliqu
 
 Ver [UC-003](../requirements/use-cases/UC-003-propor-vaga.md) e o [diagrama de atividades da fila](diagrams/activity-queue.md). A proposta grava o agendamento e o evento; o Worker consome o evento, cria os avisos e envia o e-mail.
 
+**Avisos (RF-018, RF-019, RF-024).** O mapeamento evento → aviso e os textos ficam em `dominio/notificacoes/` (`montar_avisos()`, `textos.py`).
+
+- `processar_outbox` cria, por evento, o aviso no site (nasce `ENVIADA`) e, se o tipo prevê e o paciente tem e-mail cadastrado, um aviso `EMAIL` `PENDENTE`. O mesmo evento processado duas vezes não duplica (`uq_notificacao_outbox_usuario_canal`). Tipo de evento sem texto definido falha em teste na CI.
+- `enviar_emails` envia os `PENDENTE` vencidos pelo `CanalNotificacao`. Falha agenda nova tentativa em 1, 5, 15 e 60 min; ao chegar em `OUTBOX_MAX_TENTATIVAS`, o aviso fica `FALHOU`. Entrega "pelo menos uma vez": se o Worker cair entre o envio e o commit, o e-mail sai de novo.
+- O evento sobre a solicitação leva `fim_da_fila` no payload, para o aviso dizer o efeito da transição e não o estado de quando for lido.
+- E-mail (AM-008, AM-015): assunto fixo, só prazo ou data e hora, e o link `APP_URL_PUBLICA`. Falta, cancelamento e prazo expirado (`FALTA_REGISTRADA`, `AGENDAMENTO_CANCELADO`, `SOLICITACAO_CANCELADA`, `PROPOSTA_EXPIRADA`) usam texto neutro: "Há uma atualização no seu atendimento. Para ver os detalhes, entre na Central." Nenhum e-mail revela falta, cancelamento nem o retorno ao fim da fila; o detalhe fica só no aviso do site.
+- Tipos que vão por e-mail: `PROPOSTA_ENVIADA`, `AGENDAMENTO_CONFIRMADO`, `PROPOSTA_EXPIRADA`, `AGENDAMENTO_CANCELADO`, `SOLICITACAO_CANCELADA`, `FALTA_REGISTRADA` e `LEMBRETE`. Os demais (`SOLICITACAO_CRIADA`, `SOLICITACAO_NA_FILA`, `PROPOSTA_RECUSADA`, `ATENDIMENTO_REGISTRADO`) só no site.
+- Para os eventos, o e-mail sai para quem tem e-mail cadastrado (finalidade `AGENDAMENTO`); o lembrete exige também o consentimento `LEMBRETE_EMAIL` vigente (RN-009), conferido de novo no envio.
+
 ### 5.3 Confirmação
 
 Ver [UC-004](../requirements/use-cases/UC-004-confirmar-proposta.md) e o [diagrama de sequência](diagrams/sequence-confirmation.md). O prazo é verificado na própria confirmação, sem depender de o Worker já ter expirado a proposta.
@@ -171,10 +180,15 @@ Ver [UC-008](../requirements/use-cases/UC-008-registrar-comparecimento-ou-falta.
 | Gerar vagas (`gerar_vagas`) | `WORKER_INTERVALO_VAGAS_S` (padrão 3600 s) | Agendas ativas de filas ativas; vagas dos próximos `VAGAS_HORIZONTE_DIAS` dias (padrão 30), em hora local de Recife, gravadas em `timestamptz` | Idempotente: `ON CONFLICT (agenda_id, inicio) DO NOTHING`; agenda travada com `SKIP LOCKED` |
 | Matching automático (`propor_vagas`) | `WORKER_INTERVALO_MATCHING_S` (padrão 60 s); só com `MATCHING_AUTOMATICO=true` ([ADR-021](../decisions/ADR-021-matching-automatico.md)) | Vagas `ATIVA`, futuras, sem agendamento ativo, de filas com alguém `NA_FILA`, em ordem de início. Escolha por `propor_vaga()` entre as primeiras 50 compatíveis | Vaga e solicitação escolhida com `SKIP LOCKED`; índices únicos decidem a corrida; conflito descarta só aquela vaga |
 | Expirar propostas (`expirar_propostas`) | `WORKER_INTERVALO_EXPIRACAO_S` | `PROPOSTO` com `expira_em <= agora`; a solicitação volta ao fim da fila ([ADR-026](../decisions/ADR-026-prazos-e-volta-ao-fim-da-fila.md)) | Idempotente; `SKIP LOCKED` |
-| Processar outbox *(esqueleto; consumo na próxima tarefa)* | `WORKER_INTERVALO_OUTBOX_S` (padrão 10 s) | `PENDENTE` com `proximo_retry_em <= agora` | Pelo menos uma vez; o consumo tolera evento repetido |
-| Retentar avisos *(a implementar)* | junto com a outbox | `FALHOU` com tentativas abaixo do limite | Recuo progressivo entre tentativas |
+| Processar outbox (`processar_outbox`) | `WORKER_INTERVALO_OUTBOX_S` (padrão 10 s) | `PENDENTE` com `tentativas = 0` (evento novo) ou `proximo_retry_em <= agora` (nova tentativa); cria os avisos do evento | Pelo menos uma vez; `SKIP LOCKED`; `uq_notificacao_outbox_usuario_canal` impede aviso duplicado. Falha agenda nova tentativa; no limite o evento fica `FALHOU` |
+| Enviar e-mails (`enviar_emails`) | `WORKER_INTERVALO_EMAIL_S` (padrão 15 s) | Avisos `EMAIL` `PENDENTE` com `proximo_retry_em <= agora` | Pelo menos uma vez; `SKIP LOCKED`; recuo de 1, 5, 15 e 60 min; `SMTP_TIMEOUT_S` evita travar o Worker. Absorve a antiga "retentativa de avisos": não há job separado |
+| Enviar lembretes (`enviar_lembretes`) | `WORKER_INTERVALO_LEMBRETE_S` (padrão 3600 s) | Agendamentos `CONFIRMADO` com início entre agora e agora + `LEMBRETE_ANTECEDENCIA_HORAS` (padrão 24) e sem lembrete | Um lembrete por agendamento e canal (`ux_notificacao_lembrete`); trava de leitura (`FOR SHARE SKIP LOCKED`) em solicitação e depois agendamento. O `enviar_emails` cancela o e-mail (`CANCELADA`) se o agendamento deixou de estar confirmado ou o consentimento foi revogado |
 
-Cada item (agenda, vaga ou proposta) roda na própria transação: um item com erro não derruba o lote, e o log leva só IDs e o tipo do erro. A ordem das travas é a mesma em todos os caminhos: vaga (só o matching), solicitação, agendamento.
+**Lote por rodada.** Cada job que busca itens pendentes (`propor_vagas`, `expirar_propostas`, `processar_outbox`, `enviar_emails`, `enviar_lembretes`) processa no máximo `WORKER_LOTE_MAXIMO` itens por rodada (padrão 100, mínimo 1); o resto fica para a próxima. `gerar_vagas` e a limpeza de retenção não são limitados.
+
+**Por que o lembrete roda de hora em hora.** A proposta só é feita com antecedência mínima de 24 h antes da vaga (RN-008) e o lembrete sai para consultas que começam nas próximas `LEMBRETE_ANTECEDENCIA_HORAS` (24 h). A janela é de horas, então uma varredura horária basta; um intervalo menor só geraria consultas vazias ao banco.
+
+Cada item (agenda, vaga, proposta, evento ou aviso) roda na própria transação: um item com erro não derruba o lote, e o log leva só IDs e o tipo do erro. A ordem das travas é a mesma em todos os caminhos: vaga (só o matching), solicitação, agendamento.
 
 ### 5.6 Pontos únicos de troca
 
@@ -216,9 +230,10 @@ Toda configuração vem de variáveis de ambiente (nomes definitivos no `.env.ex
 - conexão com o banco;
 - chaves e duração dos tokens;
 - domínio do cookie;
-- SMTP;
-- intervalo dos jobs;
+- SMTP (`SMTP_*`, inclusive `SMTP_TIMEOUT_S`) e o endereço oficial da Central nos e-mails (`APP_URL_PUBLICA`; em produção precisa ser `https://` e público);
+- intervalo dos jobs e `WORKER_LOTE_MAXIMO`;
 - limite de retentativas;
+- `LEMBRETE_ANTECEDENCIA_HORAS` (RF-024);
 - antecedência mínima para propor (RN-008) e janela mínima para o paciente responder (RN-016).
 
 Prazo de confirmação, tolerância de atraso, elegibilidade e critérios de prioridade não são variáveis de ambiente: ficam nos dados de cada fila ([ADR-027](../decisions/ADR-027-fila-como-entidade.md)).

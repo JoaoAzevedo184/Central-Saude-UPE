@@ -108,8 +108,18 @@ Erros de `POST /solicitacoes`:
 | GET | `/pacientes/me/historico` | Histórico de atendimentos: realizados, faltas, propostas expiradas e canceladas |
 | GET | `/pacientes/me/agendamentos` | Propostas, próximos e anteriores |
 | GET | `/agendamentos/{id}` | Detalhe da proposta ou do agendamento (hoje vem em `agendamento_ativo` do detalhe da solicitação) |
-| GET | `/notificacoes` | Avisos do usuário |
-| POST | `/notificacoes/{id}/marcar-lida` | Marca como lido |
+
+### Avisos (RF-019)
+Implementadas. Qualquer usuário autenticado vê só os próprios avisos do site (canal `IN_APP`); o filtro por `usuario_id` da sessão fica dentro da query e aviso de outro usuário responde `404`. A resposta não traz o canal `EMAIL`, o status de envio nem posição na fila. Respostas sem cache (`/api/v1/avisos`). A rota se chama `/avisos`, não `/notificacoes` como estava na proposta anterior.
+
+| Método | Rota | Descrição |
+| --- | --- | --- |
+| GET | `/avisos?somente_nao_lidos&limit&offset` | Mais recentes primeiro (`limit` 1 a 100, padrão 50). Item: `id`, `tipo`, `titulo`, `corpo`, `solicitacao_id`, `criado_em`, `lido_em` (fuso de Recife) |
+| GET | `/avisos/contagem` | `{nao_lidos}`, para o sino do menu |
+| POST | `/avisos/lidos` | Marca todos como lidos; `204` |
+| POST | `/avisos/{id}/lido` | Marca um como lido; `204`, idempotente (mantém a data da primeira leitura). Outro usuário ou inexistente → `404` |
+
+Escrita exige `X-CSRF-Token`, como nas demais rotas.
 
 ### Equipe (atendente e gestor)
 Implementadas as rotas `/equipe`. Prefixo `/equipe`; `escopo_da_equipe` é aplicado dentro da query e recurso fora do escopo responde `404`. Leitura: ATENDENTE, GESTOR e ADMIN. Escrita: só ATENDENTE. Toda leitura é auditada ([controle de acesso](../security/access-control.md)).

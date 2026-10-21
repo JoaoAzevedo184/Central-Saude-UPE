@@ -1,0 +1,25 @@
+# AGENTS.md: sem commit/push/merge/rebase/branch sem pedido explícito.
+prefix_rule(
+    pattern = ["git", ["commit", "push", "merge", "rebase", "switch", "branch", "stash"]],
+    decision = "forbidden",
+    justification = "Sem commit, push, merge, rebase, branch ou stash sem pedido explícito (AGENTS.md).",
+    match = [["git", "commit", "-m", "x"], ["git", "push"], ["git", "stash", "pop"]],
+    not_match = [["git", "status"], ["git", "diff"], ["git", "log", "--oneline"]],
+)
+prefix_rule(
+    pattern = ["git", "checkout", ["-b", "-B"]],
+    decision = "forbidden",
+    justification = "Sem criar branch sem pedido explícito (AGENTS.md).",
+)
+prefix_rule(
+    pattern = ["git", "reset", "--hard"],
+    decision = "forbidden",
+    justification = "reset --hard descarta trabalho (AGENTS.md).",
+)
+# Agentes trabalham na pasta do worktree; -C/-c/--git-dir escapariam das regras acima.
+prefix_rule(
+    pattern = ["git", ["-C", "-c", "--git-dir"]],
+    decision = "forbidden",
+    justification = "agentes trabalham na pasta do worktree; essas formas escapam das regras",
+    match = [["git", "-C", ".", "commit"], ["git", "-c", "k=v", "commit"], ["git", "--git-dir", ".git", "push"]],
+)

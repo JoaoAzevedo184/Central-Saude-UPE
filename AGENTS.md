@@ -4,7 +4,8 @@ Protótipo acadêmico (Extensão III, UNINASSAU Olinda) de teleagendamento para 
 
 ## Regras inegociáveis
 
-- **Nunca faça commit, push, merge ou rebase**, nem crie branches, sem pedido explícito. Deixe as mudanças no working tree para a pessoa revisar.
+- **Nunca faça commit, push, merge ou rebase**, nem crie ou troque de branch, sem pedido explícito. A branch do worktree vem da pessoa (seção "Worktrees e Orca"). Deixe as mudanças no working tree para a pessoa revisar.
+- **Guardas de git:** no Claude Code, `.claude/settings.json` (deny) e o hook `.claude/hooks/bloquear-git` (testes: `.claude/hooks/testar-bloquear-git`). No Codex, `.codex/rules/git.rules`, verificado com `codex execpolicy check`: bloqueia `commit`, `push`, `merge`, `rebase`, `switch`, `branch`, `stash`, `checkout -b`, `reset --hard` e os prefixos `git -C`, `git -c` e `git --git-dir <dir>`. Limite: a regra casa palavras inteiras, então `git --git-dir=<dir> commit` (com `=`) ainda escapa. Nesse caso, e em qualquer comando composto, vale só esta regra escrita: respeite-a. Para ver a branch, use `git status -sb`.
 - Nunca use dados reais de pessoas (nem em testes, seeds, exemplos ou prints). CPFs válidos, porém fictícios.
 - Nunca versione segredos. Configuração nova vai para o `.env.example` com valor de exemplo.
 - As questões ABERTO-1 a 4 foram respondidas pela UPE em 15/10/2026; veja os ADR-021 e 024 a 028. Cada regra tem um ponto único no domínio (`propor_vaga`, `calcular_expira_em`, `ordenar_fila`, `calcular_nota`, `calcular_escopo`/`escopo_da_equipe`, `reentrar_no_fim_da_fila`, `verificar_elegibilidade`, `pode_autenticar`): use-o e nunca espalhe a regra pelo código. ADR-029 e 030 são só propostas: não implemente sem pedido.
@@ -79,6 +80,24 @@ Antes de dizer que terminou, rode os testes e o lint e informe o resultado real.
 - **Erros da API** em Problem Details (RFC 9457).
 - **Testes** citam o ID que cobrem: `test_uc004_proposta_expirada_retorna_409`. Os critérios de aceite dos casos de uso (`docs/requirements/use-cases/`) são a lista mínima de testes.
 - Toda rota nova com ID ganha teste de acesso negado (paciente A acessando recurso de B → `404`).
+
+## Worktrees e Orca
+
+Usamos o Orca para rodar Claude Code e Codex lado a lado, cada tarefa num **git worktree** próprio.
+
+- **Criar o worktree (e a branch dele) é ação da pessoa**, no Orca. Isso autoriza aquela branch local. O agente trabalha normalmente no worktree em que foi aberto.
+- **Agentes nunca:** criam ou trocam de branch (`git branch`, `git checkout -b`, `git switch`), fazem commit, push, merge ou rebase, nem rodam `git stash` ou `git reset --hard`.
+- **Um agente que escreve por vez** no mesmo worktree. Revisores são somente leitura e podem rodar em paralelo.
+- **Não suba o Docker Compose dentro de um worktree.** Banco e serviços rodam só no checkout principal. Os testes de um worktree rodam no host com `scripts/testar.sh`, que lê o `.env` do checkout principal e usa um banco `<POSTGRES_DB>_test_<pasta-do-worktree>` próprio (`TEST_DB_SUFIXO` troca o sufixo). `scripts/testar.sh --limpar-bancos-orfaos` apaga os bancos de worktrees removidos, com confirmação.
+- **Codex:** a trava depende de rodar o Orca em modo **Manual**. **Não use o modo Yolo neste projeto.**
+- **Fluxo sugerido:**
+  1. advisor (opcional), antes de implementar;
+  2. `especialista-migracoes`, se mudar o banco;
+  3. `implementador-backend`;
+  4. `escritor-testes`;
+  5. `revisor-codigo` e `revisor-seguranca` em paralelo, de preferência o **outro** modelo, não o que implementou;
+  6. `guardiao-docs`;
+  7. diff no Orca: a pessoa revisa e faz o commit.
 
 ## Documentação — onde está a verdade
 

@@ -1,0 +1,43 @@
+#!/usr/bin/env python3
+"""Tabela de casos do hook bloquear-git. Uso: .claude/hooks/testar-bloquear-git"""
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+HOOK = Path(__file__).with_name("bloquear-git")
+BLOQUEAR = [
+    "git commit -m x", "git commit", "git  commit   -m  x", "git -C . commit -m x",
+    "git -C /tmp/x push", "git -c user.name=a commit -m x", "git --git-dir=.git commit",
+    "git --git-dir .git commit", "git --no-pager -C . merge main", "git status && git commit -m x",
+    "git status; git push", "git diff | git commit -F -", "git add . && git commit -m x",
+    "sh -c 'git commit -m x'", "bash -c \"git push origin main\"", "bash -lc 'git status && git rebase main'",
+    "git rebase -i HEAD~2", "git merge feature", "git switch main", "git switch -c nova",
+    "git checkout -b nova", "git checkout -B nova", "git branch nova", "git branch -D x", "git branch",
+    "git stash", "git stash pop", "git reset --hard", "git reset --hard HEAD~1", "git -C . reset --hard",
+    "echo $(git commit -m x)", "echo `git push`", "FOO=1 git commit -m x", "/usr/bin/git commit -m x",
+    "sudo git push", "(git commit -m x)", "true & git push", "git commit -m 'a b",
+    "bash -c 'sh -c \"git commit -m x\"'", "git\tcommit -m x", "git status\ngit commit -m x",
+]
+LIBERAR = [
+    "git status", "git status -sb", "git diff", "git diff --stat HEAD", "git log --oneline -5", "git show HEAD",
+    "git -C . status", "git -c color.ui=never diff", "git --git-dir=.git log", "git status && git diff",
+    "git log | head", "bash -c 'git status'", "git checkout main", "git checkout -- arquivo",
+    "git reset HEAD arquivo", "git reset --soft HEAD~1", "git add -N .", "git ls-files", "git rev-parse HEAD",
+    "echo commit push merge", "grep -r 'git commit' docs/", "ls", "docker compose exec api pytest",
+    "python3 -c 'print(1)'", "cat docs/git-commit.md",
+]
+
+
+def bloqueia(cmd):
+    r = subprocess.run([sys.executable, HOOK], input=json.dumps({"tool_input": {"command": cmd}}),
+                       capture_output=True, text=True)
+    return r.returncode == 2
+
+
+falhas = [(c, "deveria bloquear") for c in BLOQUEAR if not bloqueia(c)]
+falhas += [(c, "deveria liberar") for c in LIBERAR if bloqueia(c)]
+print(f"{len(BLOQUEAR) + len(LIBERAR) - len(falhas)}/{len(BLOQUEAR) + len(LIBERAR)} casos ok")
+for c, m in falhas:
+    print(f"FALHA ({m}): {c!r}")
+sys.exit(1 if falhas else 0)

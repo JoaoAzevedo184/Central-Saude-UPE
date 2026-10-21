@@ -86,6 +86,18 @@ docker compose logs -f worker                           # laço de jobs
 
 O `.env` é obrigatório: o `docker-compose.yml` lê dele as credenciais do banco e os segredos, e sem ele os serviços não sobem. Ele nunca é versionado; variáveis novas aparecem primeiro no `.env.example`. Os testes usam um banco separado, `<POSTGRES_DB>_test`, apagado e recriado a cada execução. Para carregar dados sintéticos no banco de desenvolvimento, rode `docker compose exec api python -m app.infra.seed`.
 
+### Testes no host (fora do container)
+
+Dentro do container (`docker compose exec api pytest`) nada além disso é necessário: o Compose já injeta a `DATABASE_URL`. No host, o `pytest` precisa dela apontando para o Postgres do Compose em `127.0.0.1` (porta publicada só na máquina local). Monte a URL a partir das `POSTGRES_*` do `.env`, sem copiar a senha para lugar nenhum:
+
+```bash
+set -a; . ./.env; set +a
+export DATABASE_URL="postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:5432/${POSTGRES_DB}"
+cd apps/backend && uv run pytest
+```
+
+Sem a variável, os testes de integração falham com `password authentication failed`. Fora do container, os testes que leem arquivos da raiz do repositório (`.env.example`, `.claude/`, `.codex/`) rodam; dentro dele são pulados, porque a imagem só leva `apps/backend`. O teste de e-mail real é pulado se o mailpit estiver fora do ar (`--profile dev`).
+
 - Documentação da API: http://127.0.0.1:8000/api/v1/docs
 - E-mails enviados em desenvolvimento (mailpit): http://127.0.0.1:8025
 

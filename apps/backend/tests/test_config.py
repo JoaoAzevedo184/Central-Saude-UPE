@@ -1,13 +1,11 @@
-from pathlib import Path
-
 import pytest
 from pydantic import ValidationError
 
 from app.config import Settings
+from tests.raiz import raiz_do_repositorio
 
-# Na raiz do repositório. Na imagem (/app/tests) não há parents[3]: o teste é pulado.
-_PAIS = Path(__file__).resolve().parents
-ENV_EXAMPLE = _PAIS[3] / ".env.example" if len(_PAIS) > 3 else None
+RAIZ = raiz_do_repositorio()
+ENV_EXAMPLE = RAIZ / ".env.example" if RAIZ else None
 
 
 def test_le_variaveis_do_ambiente(monkeypatch):

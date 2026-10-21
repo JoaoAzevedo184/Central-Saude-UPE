@@ -22,12 +22,12 @@
 | RF-016 | Vaga liberada por cancelamento ou expiração volta a ser oferecida ao próximo da fila | Sistema ou Atendente | M | UC-003 | RN-005 |
 | RF-017 | Atendente registra comparecimento ou falta; a falta só depois da tolerância e devolve a solicitação ao fim da fila | Atendente | M | UC-008 | RN-013, RN-014 |
 | RF-018 | O sistema avisa o paciente no site e por e-mail quando a solicitação ou o agendamento mudam | Sistema | M | UC-003 a UC-006 | RN-011 |
-| RF-019 | Paciente consulta seus avisos e os marca como lidos | Paciente | M | — | — |
+| RF-019 | Paciente consulta seus avisos e os marca como lidos (`/avisos`, [API](../architecture/api-design.md)) | Paciente | M | — | — |
 | RF-020 | Paciente acompanha o status das solicitações e dos agendamentos, sem posição na fila | Paciente | M | — | RN-007 |
 | RF-021 | Gestor consulta indicadores: confirmação, faltas, tempo até confirmação, vagas reaproveitadas, fila por especialidade | Gestor | M | UC-009 | — |
 | RF-022 | Admin configura o protocolo de cada fila: critérios, tipos, pesos e faixas, marcados como simulados | Admin | M | UC-010 | RN-006 |
 | RF-023 | Admin consulta a trilha de auditoria de uma solicitação ou agendamento | Admin | M | — | RN-010 |
-| RF-024 | O sistema envia lembrete antes do atendimento confirmado | Sistema | D | — | RN-009 |
+| RF-024 | O sistema envia lembrete antes do atendimento confirmado: aviso no site e, com `LEMBRETE_EMAIL`, e-mail, para consultas nas próximas `LEMBRETE_ANTECEDENCIA_HORAS` (padrão 24). Implementado (job `enviar_lembretes`) | Sistema | D | — | RN-009 |
 | RF-025 | Paciente ouve em voz alta os detalhes do agendamento | Paciente | D | — | — |
 | RF-026 | Avisos por Telegram | Sistema | F | — | — |
 | RF-027 | App mobile com notificações push | Paciente | F | — | — |

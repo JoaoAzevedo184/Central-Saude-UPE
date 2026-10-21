@@ -38,7 +38,7 @@ Metas marcadas com *(proposta)* ainda não foram validadas pelo grupo; servem de
 | ID | Requisito | Meta |
 | --- | --- | --- |
 | RNF-030 | Tempo de resposta das leituras do paciente | p95 abaixo de 300 ms no teste de carga |
-| RNF-031 | Atraso entre a ação e o aviso no site | Menor que o intervalo de leitura do Worker (ex.: 30 s) |
+| RNF-031 | Atraso entre a ação e o aviso no site | Menor que o intervalo de leitura do Worker (ex.: 30 s); hoje `WORKER_INTERVALO_OUTBOX_S` = 10 s |
 
 ## Manutenibilidade e operação
 

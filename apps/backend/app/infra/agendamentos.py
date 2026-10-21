@@ -185,7 +185,7 @@ def _filtro_vaga_livre(agora: datetime) -> list[ColumnElement[bool]]:
     ]
 
 
-def vagas_livres(session: Session, agora: datetime) -> list[UUID]:
+def vagas_livres(session: Session, agora: datetime, limite: int) -> list[UUID]:
     """Vagas livres no futuro, de filas com alguém `NA_FILA`, na ordem do início."""
     return list(
         session.scalars(
@@ -194,6 +194,7 @@ def vagas_livres(session: Session, agora: datetime) -> list[UUID]:
             .join(Fila, Fila.id == Agenda.fila_id)
             .where(*_filtro_vaga_livre(agora))
             .order_by(Vaga.inicio, Vaga.id)
+            .limit(limite)
         )
     )
 
@@ -314,12 +315,13 @@ def propor_na_vaga(session: Session, vaga_id: UUID, agora: datetime, cfg: Settin
 # --- expirar_propostas --------------------------------------------------------------------
 
 
-def propostas_vencidas(session: Session, agora: datetime) -> list[UUID]:
+def propostas_vencidas(session: Session, agora: datetime, limite: int) -> list[UUID]:
     return list(
         session.scalars(
             select(Agendamento.id)
             .where(Agendamento.status == "PROPOSTO", Agendamento.expira_em <= agora)
             .order_by(Agendamento.expira_em, Agendamento.id)
+            .limit(limite)
         )
     )
 

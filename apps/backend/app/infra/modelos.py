@@ -72,7 +72,7 @@ TIPOS_HISTORICO = (
     "RECLASSIFICADA",
 )
 CANAIS = ("IN_APP", "EMAIL")
-STATUS_ENVIO = ("PENDENTE", "ENVIADA", "FALHOU")
+STATUS_ENVIO = ("PENDENTE", "ENVIADA", "FALHOU", "CANCELADA")
 STATUS_OUTBOX = ("PENDENTE", "PROCESSADO", "FALHOU")
 TIPOS_TENTATIVA = ("LOGIN", "REGISTRO")
 
@@ -453,18 +453,49 @@ class Agendamento(Base):
 
 class Notificacao(Base):
     __tablename__ = "notificacao"
-    __table_args__ = (em("canal", CANAIS), em("status_envio", STATUS_ENVIO))
+    __table_args__ = (
+        em("canal", CANAIS),
+        em("status_envio", STATUS_ENVIO),
+        # ADR-006: reprocessar o mesmo evento não duplica avisos.
+        UniqueConstraint(
+            "outbox_id", "usuario_id", "canal", name="uq_notificacao_outbox_usuario_canal"
+        ),
+        # Um lembrete por agendamento e canal (não vem da outbox: outbox_id nulo).
+        Index(
+            "ux_notificacao_lembrete",
+            "agendamento_id",
+            "tipo",
+            "canal",
+            unique=True,
+            postgresql_where=text("tipo = 'LEMBRETE'"),
+        ),
+        Index(
+            "ix_notificacao_email_pendente",
+            "canal",
+            "proximo_retry_em",
+            postgresql_where=text("status_envio = 'PENDENTE'"),
+        ),
+        Index(
+            "ix_notificacao_avisos_usuario",
+            "usuario_id",
+            text("criada_em DESC"),
+            postgresql_where=text("canal = 'IN_APP'"),
+        ),
+    )
 
     id: Mapped[UUID] = pk_uuid()
     usuario_id: Mapped[UUID] = fk("usuario.id")
     solicitacao_id: Mapped[UUID | None] = fk("solicitacao.id")
     agendamento_id: Mapped[UUID | None] = fk("agendamento.id")
+    outbox_id: Mapped[UUID | None] = fk("outbox.id")  # nulo = lembrete
     canal: Mapped[str] = mapped_column(Text)
     tipo: Mapped[str] = mapped_column(Text)
     titulo: Mapped[str] = mapped_column(Text)
     corpo: Mapped[str] = mapped_column(Text)
     status_envio: Mapped[str] = mapped_column(Text, server_default="PENDENTE")
     tentativas: Mapped[int] = mapped_column(server_default="0")
+    proximo_retry_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    enviada_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     lida_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     criada_em: Mapped[datetime] = agora()
 

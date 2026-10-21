@@ -79,8 +79,10 @@ def gravar_transicao(
     Quem chama já travou a solicitação (`FOR UPDATE`) e conferiu dono ou escopo, ou acabou de
     inseri-la (`criacao`, já com flush); o commit também é de quem chama. A auditoria guarda
     só os campos de estado que mudaram, mais `auditoria_antes`/`auditoria_depois`.
-    `ator_id=None` é o Worker. `agendamento_id` vai no payload da outbox.
+    `ator_id=None` é o Worker. `agendamento_id` vai no payload da outbox, junto com
+    `fim_da_fila`: o aviso diz o efeito da transição, não o estado de quando for lido.
     """
+    eventos = list(eventos)
     campos = ("status", "classificacao_risco", "nota", "data_entrada_fila")
     antes = dict.fromkeys(campos) if criacao else {c: getattr(modelo, c) for c in campos}
     for campo in campos:
@@ -120,7 +122,10 @@ def gravar_transicao(
                 tipo_evento=evento_outbox,
                 agregado_tipo="solicitacao",
                 agregado_id=modelo.id,
-                payload={"solicitacao_id": str(modelo.id)}
+                payload={
+                    "solicitacao_id": str(modelo.id),
+                    "fim_da_fila": any(e.tipo == "REENTROU_NA_FILA" for e in eventos),
+                }
                 | ({"agendamento_id": str(agendamento_id)} if agendamento_id else {}),
             )
         )

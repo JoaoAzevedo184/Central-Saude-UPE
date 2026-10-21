@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse, Response
 from starlette.exceptions import HTTPException
 
 from app.api.deps import csrf_valido
-from app.api.rotas import auth, equipe, health, solicitacoes, usuarios
+from app.api.rotas import auth, avisos, equipe, health, solicitacoes, usuarios
 from app.config import get_settings
 from app.dominio.erros import ErroDeDominio
 from app.logging import configurar_logging, resumo_do_erro
@@ -32,6 +32,7 @@ api_v1.include_router(auth.router)
 api_v1.include_router(usuarios.router)
 api_v1.include_router(solicitacoes.router)
 api_v1.include_router(equipe.router)
+api_v1.include_router(avisos.router)
 app.include_router(api_v1)
 
 
@@ -81,6 +82,7 @@ PREFIXOS_SEM_CACHE = (
     "/api/v1/filas",
     "/api/v1/solicitacoes",
     "/api/v1/equipe/",
+    "/api/v1/avisos",
 )
 
 

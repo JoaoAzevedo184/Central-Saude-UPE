@@ -13,10 +13,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
+from app.dominio.notificacoes.canal import CanalNotificacao
 from app.dominio.relogio import Relogio
-from app.infra import agendamentos
+from app.infra import agendamentos, avisos
 from app.infra.autenticacao import apagar_dados_vencidos
 from app.infra.db import SessionLocal
+from app.infra.email import CanalEmailSmtp
 from app.infra.relogio import RelogioReal
 from app.logging import resumo_do_erro
 
@@ -72,7 +74,7 @@ def propor_vagas(fabrica: Fabrica = SessionLocal, relogio: Relogio | None = None
     agora = (relogio or RelogioReal()).agora()
     cfg = get_settings()
     with fabrica() as session:
-        ids = agendamentos.vagas_livres(session, agora)
+        ids = agendamentos.vagas_livres(session, agora, cfg.worker_lote_maximo)
     feitos = _por_item(
         "propor_vagas", fabrica, ids, lambda s, i: agendamentos.propor_na_vaga(s, i, agora, cfg)
     )
@@ -83,8 +85,9 @@ def propor_vagas(fabrica: Fabrica = SessionLocal, relogio: Relogio | None = None
 def expirar_propostas(fabrica: Fabrica = SessionLocal, relogio: Relogio | None = None) -> int:
     """Expira agendamentos PROPOSTO com `expira_em <= agora` (UC-006, ADR-005)."""
     agora = (relogio or RelogioReal()).agora()
+    cfg = get_settings()
     with fabrica() as session:
-        ids = agendamentos.propostas_vencidas(session, agora)
+        ids = agendamentos.propostas_vencidas(session, agora, cfg.worker_lote_maximo)
     feitos = _por_item(
         "expirar_propostas",
         fabrica,
@@ -95,10 +98,50 @@ def expirar_propostas(fabrica: Fabrica = SessionLocal, relogio: Relogio | None =
     return feitos
 
 
-def processar_outbox() -> int:
-    """Consome eventos PENDENTE da outbox com `FOR UPDATE SKIP LOCKED` (ADR-006)."""
-    logger.info("processar_outbox: nada a fazer (esqueleto)")
-    return 0
+def processar_outbox(fabrica: Fabrica = SessionLocal, relogio: Relogio | None = None) -> int:
+    """Consome eventos PENDENTE da outbox e cria os avisos (ADR-006). `SKIP LOCKED`."""
+    agora = (relogio or RelogioReal()).agora()
+    cfg = get_settings()
+    with fabrica() as session:
+        ids = avisos.eventos_pendentes(session, agora, cfg.worker_lote_maximo)
+    feitos = _por_item(
+        "processar_outbox", fabrica, ids, lambda s, i: avisos.processar_evento(s, i, agora, cfg)
+    )
+    logger.info("processar_outbox: %d eventos processados", feitos)
+    return feitos
+
+
+def enviar_emails(
+    fabrica: Fabrica = SessionLocal,
+    relogio: Relogio | None = None,
+    canal: CanalNotificacao | None = None,
+) -> int:
+    """E-mails PENDENTE vencidos, pelo `CanalNotificacao` (ADR-010), com novas tentativas."""
+    agora = (relogio or RelogioReal()).agora()
+    cfg = get_settings()
+    canal = canal or CanalEmailSmtp(cfg)
+    with fabrica() as session:
+        ids = avisos.emails_pendentes(session, agora, cfg.worker_lote_maximo)
+    feitos = _por_item(
+        "enviar_emails", fabrica, ids, lambda s, i: avisos.enviar_email(s, i, agora, canal, cfg)
+    )
+    logger.info("enviar_emails: %d enviados", feitos)
+    return feitos
+
+
+def enviar_lembretes(fabrica: Fabrica = SessionLocal, relogio: Relogio | None = None) -> int:
+    """Lembrete das consultas CONFIRMADO nas próximas `LEMBRETE_ANTECEDENCIA_HORAS` (RF-024)."""
+    agora = (relogio or RelogioReal()).agora()
+    cfg = get_settings()
+    with fabrica() as session:
+        ids = avisos.agendamentos_para_lembrar(
+            session, agora, cfg.lembrete_antecedencia_horas, cfg.worker_lote_maximo
+        )
+    feitos = _por_item(
+        "enviar_lembretes", fabrica, ids, lambda s, i: avisos.criar_lembrete(s, i, agora, cfg)
+    )
+    logger.info("enviar_lembretes: %d lembretes", feitos)
+    return feitos
 
 
 def limpar_dados_de_autenticacao() -> int:

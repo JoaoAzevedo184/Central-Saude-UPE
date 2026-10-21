@@ -22,6 +22,8 @@ def montar_agenda(settings: Settings) -> list[tuple[Job, float]]:
         (jobs.gerar_vagas, settings.worker_intervalo_vagas_s),
         (jobs.expirar_propostas, settings.worker_intervalo_expiracao_s),
         (jobs.processar_outbox, settings.worker_intervalo_outbox_s),
+        (jobs.enviar_emails, settings.worker_intervalo_email_s),
+        (jobs.enviar_lembretes, settings.worker_intervalo_lembrete_s),
         (jobs.limpar_dados_de_autenticacao, settings.worker_intervalo_retencao_s),
     ]
     if settings.matching_automatico:

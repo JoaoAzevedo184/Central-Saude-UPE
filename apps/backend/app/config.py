@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import SecretStr, model_validator
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     smtp_password: SecretStr = SecretStr("")
     smtp_starttls: bool = False
     smtp_from: str = "Central de Agendamento <nao-responda@exemplo.com>"
+    smtp_timeout_s: float = 10  # conexão e cada operação: SMTP lento não trava o Worker
+    # Link dos e-mails (AM-008, AM-015): sempre o endereço oficial da Central.
+    app_url_publica: str = "http://localhost:8000"
 
     # Worker (ADR-005, ADR-006)
     worker_intervalo_expiracao_s: float = 60
@@ -61,6 +64,9 @@ class Settings(BaseSettings):
     worker_intervalo_matching_s: float = 60  # ADR-021: varredura das vagas livres
     worker_intervalo_vagas_s: float = 3600  # geração das vagas a partir das agendas
     vagas_horizonte_dias: int = 30  # quantos dias à frente as vagas são geradas
+    worker_intervalo_email_s: float = 15  # envio dos e-mails pendentes e novas tentativas
+    worker_intervalo_lembrete_s: float = 3600  # RF-024: lembretes antes da consulta
+    worker_lote_maximo: int = Field(100, ge=1)  # itens por rodada; o resto fica para a próxima
 
     # Regras de negócio configuráveis
     proposta_antecedencia_minima_horas: int = 24  # RN-008 / ADR-021
@@ -68,6 +74,7 @@ class Settings(BaseSettings):
     matching_automatico: bool = True  # ADR-021
     # UC-005 (proposta): recusas que mantêm a posição; a seguinte volta para o fim da fila.
     recusas_mantendo_posicao: int = 1
+    lembrete_antecedencia_horas: int = 24  # RF-024: lembrete para consultas nas próximas N horas
 
     @model_validator(mode="after")
     def _producao_segura(self) -> "Settings":
@@ -84,6 +91,10 @@ class Settings(BaseSettings):
                 raise ValueError("LOGIN_HASH_KEY precisa ser diferente de JWT_SECRET_KEY")
             if not self.cookie_secure:
                 raise ValueError("COOKIE_SECURE precisa ser true em produção")
+            # AM-015: o link dos e-mails leva ao endereço oficial, com TLS.
+            url = self.app_url_publica
+            if not url.startswith("https://") or "localhost" in url:
+                raise ValueError("APP_URL_PUBLICA de produção precisa ser https:// e público")
         return self
 
     @property

@@ -64,6 +64,7 @@ def test_seed_so_roda_em_desenvolvimento(monkeypatch, ambiente):
     monkeypatch.setenv("JWT_SECRET_KEY", "x" * 64)  # produção exige segredo forte (AM-009)
     monkeypatch.setenv("LOGIN_HASH_KEY", "y" * 64)
     monkeypatch.setenv("COOKIE_SECURE", "true")
+    monkeypatch.setenv("APP_URL_PUBLICA", "https://central.exemplo.com")  # AM-015
     config.get_settings.cache_clear()
     try:
         with pytest.raises(SystemExit, match="development"):

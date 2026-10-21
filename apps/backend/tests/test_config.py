@@ -101,10 +101,23 @@ def test_am009_producao_recusa_configuracao_insegura(monkeypatch, jwt, hash_logi
         Settings()
 
 
+@pytest.mark.parametrize("url", ["http://central.exemplo.com", "https://localhost:8000"])
+def test_am015_producao_recusa_link_dos_emails_inseguro(monkeypatch, url):
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("JWT_SECRET_KEY", "x" * 64)
+    monkeypatch.setenv("LOGIN_HASH_KEY", "y" * 64)
+    monkeypatch.setenv("COOKIE_SECURE", "true")
+    monkeypatch.setenv("APP_URL_PUBLICA", url)
+
+    with pytest.raises(ValidationError):
+        Settings()
+
+
 def test_am009_producao_aceita_configuracao_segura(monkeypatch):
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.setenv("JWT_SECRET_KEY", "x" * 64)
     monkeypatch.setenv("LOGIN_HASH_KEY", "y" * 64)
     monkeypatch.setenv("COOKIE_SECURE", "true")
+    monkeypatch.setenv("APP_URL_PUBLICA", "https://central.exemplo.com")
 
     assert Settings().cookie_secure is True

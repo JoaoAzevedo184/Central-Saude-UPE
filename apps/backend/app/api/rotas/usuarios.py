@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import exige_papel, get_relogio, get_session, ip_do_cliente
+from app.api.problemas import CSRF, NAO_AUTENTICADO, SEM_PERMISSAO, erros
 from app.dominio.acesso import verificar_reativacao, verificar_suspensao
 from app.dominio.relogio import Relogio
 from app.infra.autenticacao import revogar_sessoes
@@ -39,7 +40,18 @@ def _travar_alvo(session: Session, usuario_id: UUID) -> Usuario:
     return alvo
 
 
-@router.post("/{usuario_id}/suspender", status_code=204)
+@router.post(
+    "/{usuario_id}/suspender",
+    status_code=204,
+    responses=erros(
+        NAO_AUTENTICADO,
+        SEM_PERMISSAO,
+        CSRF,
+        404,
+        (409, "transicao-invalida", "operacao-nao-permitida"),
+        422,
+    ),
+)
 def suspender(
     usuario_id: UUID,
     dados: SuspensaoEntrada,
@@ -81,7 +93,11 @@ def suspender(
     return Response(status_code=204)
 
 
-@router.post("/{usuario_id}/reativar", status_code=204)
+@router.post(
+    "/{usuario_id}/reativar",
+    status_code=204,
+    responses=erros(NAO_AUTENTICADO, SEM_PERMISSAO, CSRF, 404, (409, "transicao-invalida"), 422),
+)
 def reativar(usuario_id: UUID, request: Request, admin: AdminDep, session: SessionDep) -> Response:
     """Volta a ATIVO. `suspenso_em` e `motivo_suspensao` ficam como registro (ADR-028)."""
     alvo = _travar_alvo(session, usuario_id)

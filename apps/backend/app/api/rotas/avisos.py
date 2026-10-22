@@ -9,12 +9,15 @@ from typing import Annotated
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_relogio, get_session, usuario_da_sessao
+from app.api.paginacao import Limit, Offset, Pagina
+from app.api.problemas import CSRF, NAO_AUTENTICADO, erros
+from app.api.tipos import TipoAviso
 from app.config import get_settings
 from app.dominio.relogio import Relogio
 from app.infra.modelos import Notificacao, Usuario
@@ -24,18 +27,22 @@ router = APIRouter(prefix="/avisos", tags=["avisos"])
 UsuarioDep = Annotated[Usuario, Depends(usuario_da_sessao)]
 SessionDep = Annotated[Session, Depends(get_session)]
 RelogioDep = Annotated[Relogio, Depends(get_relogio)]
-Limit = Annotated[int, Query(ge=1, le=100)]
-Offset = Annotated[int, Query(ge=0)]
+LEITURA = (NAO_AUTENTICADO, 422)
+ESCRITA = (*LEITURA, CSRF)
 
 
 class AvisoSaida(BaseModel):
     id: UUID
-    tipo: str
+    tipo: TipoAviso
     titulo: str
     corpo: str
     solicitacao_id: UUID | None
     criado_em: datetime
     lido_em: datetime | None
+
+
+class PaginaAvisos(Pagina[AvisoSaida]):
+    pass
 
 
 class ContagemSaida(BaseModel):
@@ -46,20 +53,21 @@ def _meus(usuario: Usuario):
     return (Notificacao.usuario_id == usuario.id, Notificacao.canal == "IN_APP")
 
 
-@router.get("")
+@router.get("", responses=erros(*LEITURA))
 def listar(
     usuario: UsuarioDep,
     session: SessionDep,
     somente_nao_lidos: bool = False,
     limit: Limit = 50,
     offset: Offset = 0,
-) -> list[AvisoSaida]:
+) -> PaginaAvisos:
     """Mais recentes primeiro."""
     consulta = select(Notificacao).where(*_meus(usuario))
     if somente_nao_lidos:
         consulta = consulta.where(Notificacao.lida_em.is_(None))
     fuso = ZoneInfo(get_settings().timezone_exibicao)
-    return [
+    total = session.scalar(select(func.count()).select_from(consulta.subquery()))
+    itens = [
         AvisoSaida(
             id=n.id,
             tipo=n.tipo,
@@ -75,9 +83,10 @@ def listar(
             .offset(offset)
         )
     ]
+    return PaginaAvisos(total=total or 0, itens=itens)
 
 
-@router.get("/contagem")
+@router.get("/contagem", responses=erros(NAO_AUTENTICADO))
 def contagem(usuario: UsuarioDep, session: SessionDep) -> ContagemSaida:
     """Para o sino do menu."""
     total = session.scalar(
@@ -88,7 +97,7 @@ def contagem(usuario: UsuarioDep, session: SessionDep) -> ContagemSaida:
     return ContagemSaida(nao_lidos=total or 0)
 
 
-@router.post("/lidos", status_code=204)
+@router.post("/lidos", status_code=204, responses=erros(NAO_AUTENTICADO, CSRF))
 def marcar_todos(usuario: UsuarioDep, session: SessionDep, relogio: RelogioDep) -> Response:
     session.execute(
         update(Notificacao)
@@ -99,7 +108,7 @@ def marcar_todos(usuario: UsuarioDep, session: SessionDep, relogio: RelogioDep) 
     return Response(status_code=204)
 
 
-@router.post("/{aviso_id}/lido", status_code=204)
+@router.post("/{aviso_id}/lido", status_code=204, responses=erros(*ESCRITA, 404))
 def marcar_lido(
     aviso_id: UUID, usuario: UsuarioDep, session: SessionDep, relogio: RelogioDep
 ) -> Response:

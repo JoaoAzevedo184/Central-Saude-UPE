@@ -11,13 +11,22 @@ from typing import Annotated, Literal
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import exists, select
+from sqlalchemy import and_, exists, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_relogio, get_session, ip_do_cliente, paciente_da_sessao
+from app.api.paginacao import Limit, Offset, Pagina
+from app.api.problemas import CSRF, NAO_AUTENTICADO, SEM_PERMISSAO, erros
+from app.api.tipos import (
+    MotivoCancelamento,
+    StatusSolicitacao,
+    TipoCriterio,
+    TipoEventoLinhaDoTempo,
+    Turno,
+)
 from app.config import get_settings
 from app.dominio.agendamento.estados import cancelar_pelo_paciente as cancelar_agendamento
 from app.dominio.agendamento.estados import confirmar as confirmar_agendamento
@@ -58,11 +67,14 @@ router = APIRouter(tags=["paciente"])
 PacienteDep = Annotated[Paciente, Depends(paciente_da_sessao)]
 SessionDep = Annotated[Session, Depends(get_session)]
 RelogioDep = Annotated[Relogio, Depends(get_relogio)]
-Limit = Annotated[int, Query(ge=1, le=100)]
-Offset = Annotated[int, Query(ge=0)]
 
 ENCERRADAS = ("ATENDIDA", "CANCELADA")
 INDICE_SOLICITACAO_ATIVA = "ux_solicitacao_ativa_por_fila"
+
+
+# Erros comuns: sessão (401), papel (403) e, nas escritas, CSRF (403).
+PACIENTE_LEITURA = (NAO_AUTENTICADO, SEM_PERMISSAO, 422)
+PACIENTE_ESCRITA = (*PACIENTE_LEITURA, CSRF)
 
 
 # --- schemas ------------------------------------------------------------------------------
@@ -95,7 +107,7 @@ class CriterioPacienteSaida(BaseModel):
     id: UUID
     codigo: str
     descricao: str
-    tipo: str
+    tipo: TipoCriterio
     opcoes: list[str] | None
 
 
@@ -113,10 +125,12 @@ class RespostaEntrada(BaseModel):
 class SolicitacaoEntrada(BaseModel):
     """AM-013: sem status, risco, nota nem pontos; o servidor calcula."""
 
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    model_config = ConfigDict(
+        extra="forbid", str_strip_whitespace=True, use_enum_values=True, validate_default=True
+    )
 
     fila_id: UUID
-    turno_preferido: Literal["MANHA", "TARDE", "QUALQUER"] = "QUALQUER"
+    turno_preferido: Turno = Turno.QUALQUER
     origem_encaminhamento: str = Field(min_length=2, max_length=200)
     respostas: list[RespostaEntrada] = Field(default_factory=list, max_length=50)
 
@@ -124,9 +138,9 @@ class SolicitacaoEntrada(BaseModel):
 class CancelamentoEntrada(BaseModel):
     """Sem texto livre: só o código (`MOTIVOS_CANCELAMENTO`), validado pelo domínio."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", use_enum_values=True)
 
-    motivo_codigo: str = Field(max_length=40)
+    motivo_codigo: MotivoCancelamento
 
 
 class FilaResumo(BaseModel):
@@ -137,7 +151,7 @@ class FilaResumo(BaseModel):
 
 class SolicitacaoResumo(BaseModel):
     id: UUID
-    status: str
+    status: StatusSolicitacao
     fila: FilaResumo
     data_pedido: date
     criada_em: datetime
@@ -146,7 +160,7 @@ class SolicitacaoResumo(BaseModel):
 class EventoPaciente(BaseModel):
     """Só o dia, sem hora: a hora de ENTROU_NA_FILA revelaria `data_entrada_fila` (ADR-007)."""
 
-    tipo: str
+    tipo: TipoEventoLinhaDoTempo
     data: date
     motivo: str | None
 
@@ -156,21 +170,38 @@ class RespostaPaciente(BaseModel):
     valor: bool | int | float | str
 
 
-class AgendamentoPaciente(BaseModel):
+class AgendamentoResumo(BaseModel):
     """Proposta (com `expira_em`) ou consulta confirmada. Horários no fuso de Recife."""
 
-    id: UUID
+    id: UUID  # para confirmar ou recusar sem abrir o detalhe
     status: Literal["PROPOSTO", "CONFIRMADO"]
     inicio: datetime
-    fim: datetime
-    profissional: str  # UC-004: o paciente vê o profissional
-    unidade: UnidadeSaida
-    endereco: str | None
     expira_em: datetime | None  # só na proposta
+    unidade: UnidadeSaida
+    profissional: str  # UC-004: o paciente vê o profissional
+
+
+class AgendamentoPaciente(AgendamentoResumo):
+    fim: datetime
+    endereco: str | None
+
+
+class SolicitacaoItem(SolicitacaoResumo):
+    """Item de "Meus atendimentos": o resumo da solicitação e do agendamento ativo."""
+
+    agendamento_ativo: AgendamentoResumo | None
+
+
+class PaginaSolicitacoes(Pagina[SolicitacaoItem]):
+    pass
+
+
+class PaginaFilas(Pagina[FilaSaida]):
+    pass
 
 
 class SolicitacaoDetalhe(SolicitacaoResumo):
-    turno_preferido: str
+    turno_preferido: Turno
     origem_encaminhamento: str | None
     respostas: list[RespostaPaciente]
     linha_do_tempo: list[EventoPaciente]
@@ -269,41 +300,54 @@ def _detalhe(session: Session, paciente_id: UUID, solicitacao_id: UUID) -> Solic
     )
 
 
+def _agendamento_resumo(
+    a: Agendamento, vaga: Vaga, profissional: str, unidade: Unidade, fuso: ZoneInfo
+) -> dict:
+    return {
+        "id": a.id,
+        "status": a.status,
+        "inicio": vaga.inicio.astimezone(fuso),
+        "expira_em": a.expira_em.astimezone(fuso) if a.status == "PROPOSTO" else None,
+        "unidade": UnidadeSaida(id=unidade.id, sigla=unidade.sigla, nome=unidade.nome),
+        "profissional": profissional,
+    }
+
+
 def _agendamento_paciente(
     a: Agendamento, vaga: Vaga, profissional: str, unidade: Unidade, fuso: ZoneInfo
 ) -> AgendamentoPaciente:
     return AgendamentoPaciente(
-        id=a.id,
-        status=a.status,
-        inicio=vaga.inicio.astimezone(fuso),
+        **_agendamento_resumo(a, vaga, profissional, unidade, fuso),
         fim=vaga.fim.astimezone(fuso),
-        profissional=profissional,
-        unidade=UnidadeSaida(id=unidade.id, sigla=unidade.sigla, nome=unidade.nome),
         endereco=unidade.endereco,
-        expira_em=a.expira_em.astimezone(fuso) if a.status == "PROPOSTO" else None,
     )
 
 
 # --- filas --------------------------------------------------------------------------------
 
 
-@router.get("/filas")
+@router.get("/filas", responses=erros(*PACIENTE_LEITURA))
 def listar_filas(
     paciente: PacienteDep,
     session: SessionDep,
     relogio: RelogioDep,
     limit: Limit = 50,
     offset: Offset = 0,
-) -> list[FilaSaida]:
-    """Filas ativas, com a elegibilidade do paciente (RN-017). Sem contagem de pessoas."""
+) -> PaginaFilas:
+    """Filas ativas, com a elegibilidade do paciente (RN-017). `total` é o das filas ativas,
+    nunca contagem de pessoas."""
     hoje = _hoje(relogio)
     linhas = session.execute(
         _filas_ativas().order_by(Unidade.sigla, Fila.nome, Fila.id).limit(limit).offset(offset)
     )
-    return [FilaSaida(**_fila_saida(f, u, e, _motivo(paciente, f, hoje))) for f, u, e in linhas]
+    total = session.scalar(select(func.count()).select_from(Fila).where(Fila.ativa))
+    return PaginaFilas(
+        total=total or 0,
+        itens=[FilaSaida(**_fila_saida(f, u, e, _motivo(paciente, f, hoje))) for f, u, e in linhas],
+    )
 
 
-@router.get("/filas/{fila_id}")
+@router.get("/filas/{fila_id}", responses=erros(*PACIENTE_LEITURA, 404))
 def detalhar_fila(
     fila_id: UUID, paciente: PacienteDep, session: SessionDep, relogio: RelogioDep
 ) -> FilaDetalheSaida:
@@ -337,7 +381,15 @@ def detalhar_fila(
 # --- solicitações -------------------------------------------------------------------------
 
 
-@router.post("/solicitacoes", status_code=201)
+@router.post(
+    "/solicitacoes",
+    status_code=201,
+    responses=erros(
+        *PACIENTE_ESCRITA,
+        (403, "sem-consentimento"),
+        (409, "nao-elegivel", "solicitacao-duplicada"),
+    ),
+)
 def criar(
     dados: SolicitacaoEntrada,
     request: Request,
@@ -425,32 +477,57 @@ def criar(
     return _detalhe(session, paciente.id, s.id)
 
 
-@router.get("/solicitacoes")
+@router.get("/solicitacoes", responses=erros(*PACIENTE_LEITURA))
 def listar(
     paciente: PacienteDep,
     session: SessionDep,
     situacao: Literal["abertas", "encerradas"] | None = None,
     limit: Limit = 50,
     offset: Offset = 0,
-) -> list[SolicitacaoResumo]:
-    """Solicitações do paciente. `encerradas` alimenta o "Histórico de atendimentos"."""
-    consulta = (
-        select(Solicitacao, Fila, Unidade)
+) -> PaginaSolicitacoes:
+    """Solicitações do paciente. `encerradas` alimenta o "Histórico de atendimentos".
+
+    Uma consulta traz o agendamento ativo de cada item (sem N+1), mais a contagem do filtro.
+    """
+    filtro = [Solicitacao.paciente_id == paciente.id]
+    if situacao == "abertas":
+        filtro.append(Solicitacao.status.not_in(ENCERRADAS))
+    elif situacao == "encerradas":
+        filtro.append(Solicitacao.status.in_(ENCERRADAS))
+    linhas = session.execute(
+        select(Solicitacao, Fila, Unidade, Agendamento, Vaga, Agenda.profissional)
         .join(Fila, Fila.id == Solicitacao.fila_id)
         .join(Unidade, Unidade.id == Fila.unidade_id)
-        .where(Solicitacao.paciente_id == paciente.id)
+        .outerjoin(
+            Agendamento,
+            and_(Agendamento.solicitacao_id == Solicitacao.id, Agendamento.status.in_(ATIVOS)),
+        )
+        .outerjoin(Vaga, Vaga.id == Agendamento.vaga_id)
+        .outerjoin(Agenda, Agenda.id == Vaga.agenda_id)
+        .where(*filtro)
+        .order_by(Solicitacao.criada_em.desc(), Solicitacao.id)
+        .limit(limit)
+        .offset(offset)
     )
-    if situacao == "abertas":
-        consulta = consulta.where(Solicitacao.status.not_in(ENCERRADAS))
-    elif situacao == "encerradas":
-        consulta = consulta.where(Solicitacao.status.in_(ENCERRADAS))
-    linhas = session.execute(
-        consulta.order_by(Solicitacao.criada_em.desc(), Solicitacao.id).limit(limit).offset(offset)
+    total = session.scalar(select(func.count()).select_from(Solicitacao).where(*filtro))
+    fuso = ZoneInfo(get_settings().timezone_exibicao)
+    return PaginaSolicitacoes(
+        total=total or 0,
+        itens=[
+            SolicitacaoItem(
+                **_resumo(s, f, u),
+                agendamento_ativo=(
+                    AgendamentoResumo(**_agendamento_resumo(a, v, profissional, u, fuso))
+                    if a
+                    else None
+                ),
+            )
+            for s, f, u, a, v, profissional in linhas
+        ],
     )
-    return [SolicitacaoResumo(**_resumo(s, f, u)) for s, f, u in linhas]
 
 
-@router.get("/solicitacoes/{solicitacao_id}")
+@router.get("/solicitacoes/{solicitacao_id}", responses=erros(*PACIENTE_LEITURA, 404))
 def detalhar(
     solicitacao_id: UUID, paciente: PacienteDep, session: SessionDep
 ) -> SolicitacaoDetalhe:
@@ -458,7 +535,10 @@ def detalhar(
     return _detalhe(session, paciente.id, solicitacao_id)
 
 
-@router.post("/solicitacoes/{solicitacao_id}/cancelar")
+@router.post(
+    "/solicitacoes/{solicitacao_id}/cancelar",
+    responses=erros(*PACIENTE_ESCRITA, 404, (409, "transicao-invalida")),
+)
 def cancelar(
     solicitacao_id: UUID,
     request: Request,
@@ -533,7 +613,10 @@ def _travar_do_paciente(
     return par
 
 
-@router.post("/agendamentos/{agendamento_id}/confirmar")
+@router.post(
+    "/agendamentos/{agendamento_id}/confirmar",
+    responses=erros(*PACIENTE_ESCRITA, 404, (409, "transicao-invalida", "proposta-expirada")),
+)
 def confirmar(
     agendamento_id: UUID,
     request: Request,
@@ -570,7 +653,10 @@ def confirmar(
     return _detalhe(session, paciente.id, s.id)
 
 
-@router.post("/agendamentos/{agendamento_id}/recusar")
+@router.post(
+    "/agendamentos/{agendamento_id}/recusar",
+    responses=erros(*PACIENTE_ESCRITA, 404, (409, "transicao-invalida", "proposta-expirada")),
+)
 def recusar(
     agendamento_id: UUID,
     request: Request,

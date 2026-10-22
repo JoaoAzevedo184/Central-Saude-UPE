@@ -18,9 +18,21 @@ from sqlalchemy import func, select, true
 from sqlalchemy.orm import Session
 
 from app.api.deps import escopo_da_equipe, exige_papel, get_relogio, get_session, ip_do_cliente
+from app.api.paginacao import Limit, Offset, Pagina
+from app.api.problemas import CSRF, NAO_AUTENTICADO, SEM_PERMISSAO, erros
+from app.api.tipos import (
+    ClassificacaoRisco,
+    OrigemCriterio,
+    SituacaoVaga,
+    StatusAgendamento,
+    StatusSolicitacao,
+    TipoCriterio,
+    TipoEventoLinhaDoTempo,
+    Turno,
+)
 from app.config import get_settings
 from app.dominio.agendamento.estados import registrar_presenca
-from app.dominio.agendamento.vagas import SituacaoVaga, situacao_da_vaga
+from app.dominio.agendamento.vagas import situacao_da_vaga
 from app.dominio.cadastro import abreviar_nome, mascarar_cpf
 from app.dominio.erros import EntradaInvalida
 from app.dominio.fila.criterios import ORIGENS_DA_EQUIPE, calcular_nota, pontuar_respostas
@@ -32,6 +44,7 @@ from app.dominio.solicitacao import (
     registrar_atendimento,
     registrar_falta,
 )
+from app.dominio.vocabulario import STATUS_SOLICITACAO
 from app.infra.agendamentos import (
     ATIVOS,
     aplicar_agendamento,
@@ -39,7 +52,6 @@ from app.infra.agendamentos import (
     travar_agendamento,
 )
 from app.infra.modelos import (
-    STATUS_SOLICITACAO,
     Agenda,
     Agendamento,
     Auditoria,
@@ -72,13 +84,12 @@ AtendenteDep = Annotated[Usuario, Depends(exige_papel("ATENDENTE"))]
 EscopoDep = Annotated[frozenset[UUID], Depends(escopo_da_equipe)]
 SessionDep = Annotated[Session, Depends(get_session)]
 RelogioDep = Annotated[Relogio, Depends(get_relogio)]
-Limit = Annotated[int, Query(ge=1, le=100)]
-Offset = Annotated[int, Query(ge=0)]
 # Limites evitam OverflowError em `data + 1 dia` (9999-12-31 viraria 500).
 Dia = Annotated[date, Query(ge=date(2000, 1, 1), le=date(2100, 12, 31))]
-StatusSolicitacao = Literal[
-    "EM_ANALISE", "NA_FILA", "EM_PROPOSTA", "AGENDADA", "ATENDIDA", "CANCELADA"
-]
+
+# Erros comuns: sessão (401), papel (403) e, nas escritas, CSRF (403). Fora do escopo é 404.
+EQUIPE_LEITURA = (NAO_AUTENTICADO, SEM_PERMISSAO, 422)
+EQUIPE_ESCRITA = (*EQUIPE_LEITURA, CSRF)
 
 
 # --- schemas ------------------------------------------------------------------------------
@@ -90,21 +101,21 @@ class FilaEquipeSaida(BaseModel):
     unidade_sigla: str
     especialidade: str
     ativa: bool
-    contagem_por_status: dict[str, int]
+    contagem_por_status: dict[StatusSolicitacao, int]
 
 
 class UltimaMudanca(BaseModel):
     """Sem motivo: texto livre da reclassificação fica só no detalhe, que é auditado."""
 
-    tipo: str
+    tipo: TipoEventoLinhaDoTempo
     ocorrido_em: datetime
 
 
 class ItemPainel(BaseModel):
     id: UUID
-    status: str
+    status: StatusSolicitacao
     posicao: int | None  # só NA_FILA; calculada na consulta, nunca gravada
-    classificacao_risco: str | None
+    classificacao_risco: ClassificacaoRisco | None
     nota: int
     data_entrada_fila: datetime | None
     paciente_nome: str  # abreviado
@@ -112,24 +123,27 @@ class ItemPainel(BaseModel):
     ultima_mudanca: UltimaMudanca | None
 
 
-class PainelSaida(BaseModel):
-    total: int
-    itens: list[ItemPainel]
+class PainelSaida(Pagina[ItemPainel]):
+    pass
+
+
+class PaginaFilasEquipe(Pagina[FilaEquipeSaida]):
+    pass
 
 
 class RespostaEquipeSaida(BaseModel):
     criterio_id: UUID
     codigo: str
     descricao: str
-    origem: str
+    origem: OrigemCriterio
     valor: Any
     pontos: int
 
 
 class EventoEquipe(BaseModel):
-    tipo: str
-    status_anterior: str | None
-    status_novo: str | None
+    tipo: TipoEventoLinhaDoTempo
+    status_anterior: StatusSolicitacao | None
+    status_novo: StatusSolicitacao | None
     motivo: str | None
     visivel_paciente: bool
     ator_usuario_id: UUID | None
@@ -138,24 +152,24 @@ class EventoEquipe(BaseModel):
 
 class SolicitacaoEquipeSaida(BaseModel):
     id: UUID
-    status: str
+    status: StatusSolicitacao
     fila_id: UUID
     paciente_nome: str
     paciente_cpf: str
-    classificacao_risco: str | None
+    classificacao_risco: ClassificacaoRisco | None
     nota: int
     data_entrada_fila: datetime | None
     data_pedido: date
-    turno_preferido: str
+    turno_preferido: Turno
     origem_encaminhamento: str | None
     respostas: list[RespostaEquipeSaida]
     historico: list[EventoEquipe]
 
 
 class ClassificacaoEntrada(BaseModel):
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True, use_enum_values=True)
 
-    classificacao_risco: Literal["VERMELHO", "AMARELO", "VERDE"]
+    classificacao_risco: ClassificacaoRisco
     motivo: str | None = Field(default=None, min_length=3, max_length=500)
 
 
@@ -172,6 +186,26 @@ class RespostasEntrada(BaseModel):
     respostas: list[RespostaEntrada] = Field(min_length=1, max_length=50)
 
 
+class FaixaCriterio(BaseModel):
+    """Faixa de um critério `NUMERO` (limites inclusivos e opcionais). Sem o fator: o peso fica
+    com o protocolo."""
+
+    min: float | None = None
+    max: float | None = None
+
+
+class CriterioEquipeSaida(BaseModel):
+    """Pergunta que a equipe responde para montar o formulário. Sem peso, fator nem pontos."""
+
+    id: UUID
+    codigo: str
+    descricao: str
+    tipo: TipoCriterio
+    origem: Literal["REGULACAO", "EQUIPE"]
+    opcoes: list[str] | None  # só OPCAO
+    faixas: list[FaixaCriterio] | None  # só NUMERO
+
+
 class AgendamentoDoDia(BaseModel):
     id: UUID
     solicitacao_id: UUID
@@ -179,7 +213,7 @@ class AgendamentoDoDia(BaseModel):
     fim: datetime
     profissional: str
     paciente_nome: str  # abreviado
-    status: str
+    status: StatusAgendamento
     presenca_registrada: bool
 
 
@@ -303,10 +337,10 @@ def _detalhe(
 # --- leitura ------------------------------------------------------------------------------
 
 
-@router.get("/filas")
+@router.get("/filas", responses=erros(*EQUIPE_LEITURA))
 def listar_filas(
     _: LeitorDep, escopo: EscopoDep, session: SessionDep, limit: Limit = 50, offset: Offset = 0
-) -> list[FilaEquipeSaida]:
+) -> PaginaFilasEquipe:
     """Filas do escopo, com a contagem de solicitações por status."""
     linhas = session.execute(
         select(Fila, Unidade.sigla, Especialidade.nome)
@@ -326,20 +360,24 @@ def listar_filas(
         .group_by(Solicitacao.fila_id, Solicitacao.status)
     ):
         contagens[fila_id][status] = n
-    return [
-        FilaEquipeSaida(
-            id=f.id,
-            nome=f.nome,
-            unidade_sigla=sigla,
-            especialidade=especialidade,
-            ativa=f.ativa,
-            contagem_por_status=contagens[f.id],
-        )
-        for f, sigla, especialidade in linhas
-    ]
+    return PaginaFilasEquipe(
+        total=session.scalar(select(func.count()).select_from(Fila).where(Fila.id.in_(escopo)))
+        or 0,
+        itens=[
+            FilaEquipeSaida(
+                id=f.id,
+                nome=f.nome,
+                unidade_sigla=sigla,
+                especialidade=especialidade,
+                ativa=f.ativa,
+                contagem_por_status=contagens[f.id],
+            )
+            for f, sigla, especialidade in linhas
+        ],
+    )
 
 
-@router.get("/filas/{fila_id}/solicitacoes")
+@router.get("/filas/{fila_id}/solicitacoes", responses=erros(*EQUIPE_LEITURA, 404))
 def painel(
     fila_id: UUID,
     request: Request,
@@ -424,7 +462,7 @@ def painel(
     )
 
 
-@router.get("/solicitacoes/{solicitacao_id}")
+@router.get("/solicitacoes/{solicitacao_id}", responses=erros(*EQUIPE_LEITURA, 404))
 def detalhar(
     solicitacao_id: UUID,
     request: Request,
@@ -440,10 +478,49 @@ def detalhar(
     return detalhe
 
 
+@router.get("/filas/{fila_id}/criterios", responses=erros(*EQUIPE_LEITURA, 404))
+def criterios_da_equipe(
+    fila_id: UUID, _: LeitorDep, escopo: EscopoDep, session: SessionDep
+) -> list[CriterioEquipeSaida]:
+    """Critérios ativos de origem REGULACAO e EQUIPE da fila, para montar o formulário de
+    `PUT /equipe/solicitacoes/{id}/respostas`. Sem peso, fator nem pontos: a matriz de acesso
+    não os libera para a leitura da equipe. Sem auditoria: não traz dado de paciente."""
+    if fila_id not in escopo:
+        raise HTTPException(404, "Fila não encontrada.")
+    criterios = session.scalars(
+        select(CriterioFila)
+        .where(
+            CriterioFila.fila_id == fila_id,
+            CriterioFila.ativo,
+            CriterioFila.origem.in_(ORIGENS_DA_EQUIPE),
+        )
+        .order_by(CriterioFila.codigo)
+    )
+    return [
+        CriterioEquipeSaida(
+            id=c.id,
+            codigo=c.codigo,
+            descricao=c.descricao,
+            tipo=c.tipo,
+            origem=c.origem,
+            opcoes=sorted(c.parametros.get("opcoes", {})) if c.tipo == "OPCAO" else None,
+            faixas=(
+                [FaixaCriterio(min=f.get("min"), max=f.get("max")) for f in c.parametros["faixas"]]
+                if c.tipo == "NUMERO" and "faixas" in c.parametros
+                else None
+            ),
+        )
+        for c in criterios
+    ]
+
+
 # --- escrita (só ATENDENTE) ---------------------------------------------------------------
 
 
-@router.post("/solicitacoes/{solicitacao_id}/classificar")
+@router.post(
+    "/solicitacoes/{solicitacao_id}/classificar",
+    responses=erros(*EQUIPE_ESCRITA, 404, (409, "transicao-invalida")),
+)
 def classificar(
     solicitacao_id: UUID,
     dados: ClassificacaoEntrada,
@@ -475,7 +552,10 @@ def classificar(
     return _detalhe(session, s.id, escopo)
 
 
-@router.put("/solicitacoes/{solicitacao_id}/respostas")
+@router.put(
+    "/solicitacoes/{solicitacao_id}/respostas",
+    responses=erros(*EQUIPE_ESCRITA, 404, (409, "transicao-invalida")),
+)
 def responder_criterios(
     solicitacao_id: UUID,
     dados: RespostasEntrada,
@@ -543,7 +623,7 @@ def _dia_local(dia: date, fuso: ZoneInfo) -> datetime:
     return datetime.combine(dia, time(0), fuso)
 
 
-@router.get("/filas/{fila_id}/agendamentos")
+@router.get("/filas/{fila_id}/agendamentos", responses=erros(*EQUIPE_LEITURA, 404))
 def agendamentos_do_dia(
     fila_id: UUID,
     data: Dia,
@@ -597,7 +677,10 @@ def agendamentos_do_dia(
     return itens
 
 
-@router.post("/agendamentos/{agendamento_id}/presenca")
+@router.post(
+    "/agendamentos/{agendamento_id}/presenca",
+    responses=erros(*EQUIPE_ESCRITA, 404, (409, "transicao-invalida", "tolerancia-nao-encerrada")),
+)
 def presenca(
     agendamento_id: UUID,
     dados: PresencaEntrada,
@@ -649,7 +732,7 @@ def presenca(
     return _detalhe(session, s.id, escopo)
 
 
-@router.get("/filas/{fila_id}/vagas")
+@router.get("/filas/{fila_id}/vagas", responses=erros(*EQUIPE_LEITURA, 404))
 def painel_de_vagas(
     fila_id: UUID,
     de: Dia,

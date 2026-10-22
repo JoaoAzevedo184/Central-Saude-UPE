@@ -7,12 +7,13 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_session
+from app.api.problemas import erros
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["saude"])
 
 
-@router.get("/health")
+@router.get("/health", responses=erros(503))
 def health(session: Annotated[Session, Depends(get_session)]) -> dict[str, str]:
     try:
         session.execute(text("SELECT 1"))

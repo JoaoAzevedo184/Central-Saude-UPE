@@ -8,7 +8,7 @@ from typing import Annotated, Literal
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Request, Response, Security
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 from sqlalchemy import select
@@ -20,11 +20,14 @@ from app.api.deps import (
     COOKIE_CSRF,
     COOKIE_REFRESH,
     Problema,
+    esquema_refresh,
     get_relogio,
     get_session,
     ip_do_cliente,
     usuario_da_sessao,
 )
+from app.api.problemas import CSRF, NAO_AUTENTICADO, erros
+from app.api.tipos import Papel
 from app.config import get_settings
 from app.dominio.acesso import (
     normalizar_identificador,
@@ -159,17 +162,21 @@ class LoginEntrada(BaseModel):
 class SessaoSaida(BaseModel):
     """Os tokens vão só em cookies httpOnly (ADR-003); o corpo não traz token."""
 
-    papel: str
+    papel: Papel
     expira_em: datetime
 
 
 class EuSaida(BaseModel):
-    """Para o paciente, nunca posição nem tamanho da fila (ADR-007)."""
+    """Para o paciente, nunca posição nem tamanho da fila (ADR-007).
+
+    Todas as chaves vêm sempre. `nome` é `null` na equipe (`usuario` não tem nome) e `filas`
+    é `null` no paciente; na equipe, `filas` traz o escopo (ADR-025), `[]` se não houver.
+    """
 
     id: UUID
-    papel: str
+    papel: Papel
     nome: str | None
-    filas: list[UUID] | None = None
+    filas: list[UUID] | None
 
 
 def _cookie(response: Response, nome: str, valor: str, path: str, max_age: int, httponly: bool):
@@ -225,7 +232,11 @@ def _apagar_cookies(response: Response) -> None:
         response.delete_cookie(nome, path=path, domain=domain)
 
 
-@router.post("/auth/registro", status_code=201)
+@router.post(
+    "/auth/registro",
+    status_code=201,
+    responses=erros((409, "cadastro-nao-concluido"), (429, "muitas-tentativas"), 422),
+)
 def registrar(
     dados: RegistroEntrada,
     request: Request,
@@ -297,7 +308,10 @@ def registrar(
     return corpo
 
 
-@router.post("/auth/login")
+@router.post(
+    "/auth/login",
+    responses=erros((401, "credenciais-invalidas"), (429, "muitas-tentativas"), 422),
+)
 def login(
     dados: LoginEntrada,
     request: Request,
@@ -342,9 +356,13 @@ def login(
     return corpo
 
 
-@router.post("/auth/refresh")
+@router.post("/auth/refresh", responses=erros(NAO_AUTENTICADO, CSRF))
 def renovar(
-    request: Request, response: Response, session: SessionDep, relogio: RelogioDep
+    request: Request,
+    response: Response,
+    session: SessionDep,
+    relogio: RelogioDep,
+    _cookie: Annotated[str | None, Security(esquema_refresh)] = None,
 ) -> SessaoSaida:
     """Rotação: o token usado é revogado e outro da mesma família é emitido. Reuso de um token
     já revogado indica roubo e revoga a família inteira, exceto dentro da tolerância
@@ -396,8 +414,13 @@ def renovar(
     return corpo
 
 
-@router.post("/auth/logout", status_code=204)
-def logout(request: Request, session: SessionDep, relogio: RelogioDep) -> Response:
+@router.post("/auth/logout", status_code=204, responses=erros(CSRF))
+def logout(
+    request: Request,
+    session: SessionDep,
+    relogio: RelogioDep,
+    _cookie: Annotated[str | None, Security(esquema_refresh)] = None,
+) -> Response:
     """Revoga a família do refresh token e apaga os cookies. Idempotente: 204 mesmo sem sessão."""
     token = request.cookies.get(COOKIE_REFRESH)
     if token:
@@ -412,12 +435,12 @@ def logout(request: Request, session: SessionDep, relogio: RelogioDep) -> Respon
     return response
 
 
-@router.get("/me", response_model_exclude_none=True)
+@router.get("/me", responses=erros(NAO_AUTENTICADO))
 def eu(usuario: Annotated[Usuario, Depends(usuario_da_sessao)], session: SessionDep) -> EuSaida:
     """Dados do usuário logado. A equipe recebe também as filas do seu escopo (ADR-025)."""
     if usuario.papel == "PACIENTE":
         nome = session.scalar(select(Paciente.nome).where(Paciente.usuario_id == usuario.id))
-        return EuSaida(id=usuario.id, papel=usuario.papel, nome=nome)
-    # A equipe ainda não tem nome no modelo de dados (só e-mail).
+        return EuSaida(id=usuario.id, papel=usuario.papel, nome=nome, filas=None)
+    # A equipe não tem nome no modelo de dados (só e-mail): `nome` fica `null`.
     filas = sorted(carregar_escopo(session, usuario.id))
     return EuSaida(id=usuario.id, papel=usuario.papel, nome=None, filas=filas)

@@ -21,7 +21,7 @@ venv/
 htmlcov/
 coverage.xml
 
-# --- Node (apps/web, apps/mobile) --------------------------------------------
+# --- Node (apps/web) --------------------------------------------
 node_modules/
 dist/
 build/
@@ -30,14 +30,6 @@ build/
 npm-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-
-# --- React Native / Expo (apps/mobile) ---------------------------------------
-.expo/
-apps/mobile/android/
-apps/mobile/ios/
-*.apk
-*.aab
-*.ipa
 
 # --- Backups e dumps (nunca no Git) -------------------------------------------
 backups/

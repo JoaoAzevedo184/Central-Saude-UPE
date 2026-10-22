@@ -6,10 +6,9 @@ from typing import Literal
 from zoneinfo import ZoneInfo
 
 from app.dominio.agendamento.prazos import calcular_expira_em
+from app.dominio.vocabulario import SITUACOES_VAGA
 
-SituacaoVaga = Literal[
-    "LIVRE", "LIVRE_SEM_PROPOSTA", "PROPOSTA", "CONFIRMADA", "BLOQUEADA", "ENCERRADA"
-]
+SituacaoVaga = Literal[*SITUACOES_VAGA]
 
 
 @dataclass(frozen=True)

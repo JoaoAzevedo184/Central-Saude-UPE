@@ -31,6 +31,8 @@ TIPOS_EVENTO_OUTBOX = frozenset(
 )
 # O lembrete não vem da outbox: é criado pelo job `enviar_lembretes`.
 TIPO_LEMBRETE = "LEMBRETE"
+# Valores de `notificacao.tipo`, em ordem estável para o contrato da API.
+TIPOS_AVISO = (*sorted(TIPOS_EVENTO_OUTBOX), TIPO_LEMBRETE)
 
 # Espera antes da tentativa seguinte: 1, 5, 15 e depois 60 minutos.
 ESPERAS = (timedelta(minutes=1), timedelta(minutes=5), timedelta(minutes=15), timedelta(hours=1))

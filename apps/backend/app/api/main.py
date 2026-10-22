@@ -6,11 +6,13 @@ from typing import Any
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse, Response
 from starlette.exceptions import HTTPException
 
 from app.api.deps import csrf_valido
-from app.api.rotas import auth, avisos, equipe, health, solicitacoes, usuarios
+from app.api.problemas import MEDIA_TYPE, REF_PROBLEMA, Problema
+from app.api.rotas import auth, avisos, equipe, health, solicitacoes, termos, usuarios
 from app.config import get_settings
 from app.dominio.erros import ErroDeDominio
 from app.logging import configurar_logging, resumo_do_erro
@@ -33,6 +35,7 @@ api_v1.include_router(usuarios.router)
 api_v1.include_router(solicitacoes.router)
 api_v1.include_router(equipe.router)
 api_v1.include_router(avisos.router)
+api_v1.include_router(termos.router)
 app.include_router(api_v1)
 
 
@@ -120,6 +123,52 @@ async def _inesperado(
         )
         return problema(500)
 
+
+ESQUEMA_CSRF = "csrfToken"
+
+
+def _openapi() -> dict[str, Any]:
+    """OpenAPI com o contrato real de erro e de segurança.
+
+    - Erros (>= 400) são `application/problem+json` com o schema `Problema`; o
+      `HTTPValidationError` do FastAPI sai, porque o 422 real também é Problem Details.
+    - Rotas de escrita (menos `ROTAS_SEM_CSRF`) exigem o header CSRF, além do cookie.
+    """
+    if app.openapi_schema:
+        return app.openapi_schema
+    esquema = get_openapi(
+        title=app.title,
+        version=app.version,
+        openapi_version=app.openapi_version,
+        description=app.description,
+        routes=app.routes,
+    )
+    componentes = esquema.setdefault("components", {})
+    schemas = componentes.setdefault("schemas", {})
+    for nome in ("HTTPValidationError", "ValidationError"):
+        schemas.pop(nome, None)
+    problema = Problema.model_json_schema(ref_template="#/components/schemas/{model}")
+    schemas.update(problema.pop("$defs", {}))
+    schemas["Problema"] = problema
+    componentes.setdefault("securitySchemes", {})[ESQUEMA_CSRF] = {
+        "type": "apiKey",
+        "in": "header",
+        "name": settings.csrf_header_name,
+        "description": "Double-submit (ADR-003): o mesmo valor do cookie `csrf_token`.",
+    }
+    for caminho, operacoes in esquema["paths"].items():
+        for metodo, operacao in operacoes.items():
+            for status, resposta in operacao["responses"].items():
+                if int(status) >= 400:
+                    resposta["content"] = {MEDIA_TYPE: {"schema": REF_PROBLEMA}}
+            if metodo.upper() in METODOS_DE_ESCRITA and caminho not in ROTAS_SEM_CSRF:
+                exigencias = operacao.get("security") or [{}]
+                operacao["security"] = [{**e, ESQUEMA_CSRF: []} for e in exigencias]
+    app.openapi_schema = esquema
+    return esquema
+
+
+app.openapi = _openapi  # type: ignore[method-assign]
 
 # Registrado depois do middleware do 500 para ficar por fora dele: assim a resposta 500
 # também leva os cabeçalhos CORS e o navegador recebe o Problem Details.

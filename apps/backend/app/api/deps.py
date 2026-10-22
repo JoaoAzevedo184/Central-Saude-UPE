@@ -4,7 +4,8 @@ from collections.abc import Callable, Iterator
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends, HTTPException, Request
+from fastapi import Depends, HTTPException, Request, Security
+from fastapi.security import APIKeyCookie
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -20,6 +21,21 @@ from app.infra.relogio import RelogioReal
 COOKIE_ACCESS = "access_token"
 COOKIE_REFRESH = "refresh_token"
 COOKIE_CSRF = "csrf_token"
+
+# Só documentação: declaram os cookies no OpenAPI. `auto_error=False` mantém o comportamento
+# (a leitura e o 401 continuam em `usuario_da_sessao` e `/auth/refresh`).
+esquema_acesso = APIKeyCookie(
+    name=COOKIE_ACCESS,
+    scheme_name="cookieSessao",
+    auto_error=False,
+    description="Access token em cookie httpOnly, emitido por login, registro e refresh.",
+)
+esquema_refresh = APIKeyCookie(
+    name=COOKIE_REFRESH,
+    scheme_name="cookieRefresh",
+    auto_error=False,
+    description="Refresh token em cookie httpOnly, com path /api/v1/auth.",
+)
 
 
 class Problema(HTTPException):
@@ -62,6 +78,7 @@ def usuario_da_sessao(
     request: Request,
     session: Annotated[Session, Depends(get_session)],
     relogio: Annotated[Relogio, Depends(get_relogio)],
+    _cookie: Annotated[str | None, Security(esquema_acesso)] = None,
 ) -> Usuario:
     """Usuário do access token, carregado do banco a cada requisição.
 

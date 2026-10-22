@@ -5,6 +5,7 @@ from datetime import datetime
 from uuid import UUID
 
 from app.dominio.erros import EntradaInvalida, TransicaoInvalida
+from app.dominio.vocabulario import MOTIVOS_CANCELAMENTO, RISCOS
 
 
 @dataclass(frozen=True)
@@ -81,23 +82,11 @@ TEXTO_RECUSADA = "Você pediu outra data. A vaga foi liberada."
 TEXTO_PROPOSTA_EXPIRADA = "O prazo para confirmar a vaga acabou."
 TEXTO_ATENDIDA = "Consulta realizada."
 TEXTO_FALTOU = "A equipe registrou sua falta à consulta."
-RISCOS = frozenset({"VERMELHO", "AMARELO", "VERDE"})
 # Estados em que a equipe ainda responde critérios (a nota só pesa antes da proposta).
 STATUS_COM_RESPOSTAS_DA_EQUIPE = frozenset({"EM_ANALISE", "NA_FILA"})
 # Em EM_PROPOSTA e AGENDADA, quem chama cancela o agendamento ativo na mesma transação
 # (`estados.cancelar_pelo_paciente`, que confere o início da vaga).
 STATUS_CANCELAVEIS = frozenset({"EM_ANALISE", "NA_FILA", "EM_PROPOSTA", "AGENDADA"})
-
-
-# Motivo do cancelamento pelo paciente: lista fechada, sem texto livre (minimização,
-# docs/security/data-protection.md). O rótulo vai para a linha do tempo.
-MOTIVOS_CANCELAMENTO = {
-    "NAO_PRECISO_MAIS": "Não preciso mais do atendimento.",
-    "CONSEGUI_EM_OUTRO_LUGAR": "Consegui atendimento em outro lugar.",
-    "DIFICULDADE_DE_DESLOCAMENTO": "Dificuldade de deslocamento.",
-    "CONFLITO_DE_HORARIO": "Conflito de horário.",
-    "OUTRO": "Outro motivo.",
-}
 
 
 def evento_criada(agora: datetime) -> EventoHistorico:

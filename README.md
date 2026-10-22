@@ -2,7 +2,7 @@
 
 Plataforma web para marcação, confirmação e reagendamento de consultas, exames e procedimentos dos usuários do SUS atendidos pelo Complexo Hospitalar da Universidade de Pernambuco (CISAM, HUOC e PROCAPE).
 
-> **Status:** 🚧 em planejamento (outubro/2026). A arquitetura e o modelo de dados estão definidos; o código ainda não foi iniciado.
+> **Status:** 🚧 em desenvolvimento (outubro/2026). Backend em implementação; base técnica do frontend disponível, ainda sem telas de negócio.
 >
 > **Protótipo acadêmico.** O sistema usa apenas dados sintéticos. Nenhum dado real de paciente é coletado, armazenado ou processado.
 
@@ -25,10 +25,13 @@ Hoje parte do agendamento e do reagendamento depende de ligações, atendimento 
 - LGPD: consentimento registrado, trilha de auditoria, CPF mascarado e minimização de dados
 
 **Fica para depois**
-- App mobile (React Native) e notificações push
-- WhatsApp, SMS e Telegram
+- WhatsApp e SMS
 - Integração real com sistemas de regulação
 - Chatbot e modelos preditivos
+
+**Fora do escopo (descartado)**
+- App mobile nativo e notificações push ([ADR-015](docs/decisions/ADR-015-app-mobile.md)): o paciente usa o site responsivo, mobile-first, no celular
+- Telegram ([ADR-013](docs/decisions/ADR-013-n8n-telegram.md))
 
 ## Arquitetura em uma frase
 
@@ -40,7 +43,7 @@ Uma API FastAPI e um Worker Python compartilham o mesmo código e o mesmo Postgr
 | --- | --- |
 | Backend | Python, FastAPI (síncrono), SQLAlchemy 2, Alembic, Pydantic, Pytest |
 | Banco | PostgreSQL |
-| Frontend | Web responsivo — tecnologia em revisão pelo grupo (proposta: React + TypeScript + Vite) |
+| Frontend | React + TypeScript + Vite; base técnica implementada, sem telas de negócio |
 | Infra | Docker Compose, Nginx, VM Oracle Cloud |
 | CI | GitHub Actions |
 
@@ -59,8 +62,7 @@ Uma API FastAPI e um Worker Python compartilham o mesmo código e o mesmo Postgr
 │   │   ├── tests/
 │   │   ├── Dockerfile        # uma imagem para a API e o Worker
 │   │   └── pyproject.toml
-│   ├── web/                  # frontend web (tecnologia em revisão)
-│   └── mobile/               # app React Native — fase 2
+│   ├── web/                  # base React + TypeScript + Vite, sem telas de negócio
 ├── infra/
 │   └── nginx/                # configuração do Nginx
 ├── scripts/                  # backup, carga de dados sintéticos, utilitários
@@ -72,6 +74,8 @@ Uma API FastAPI e um Worker Python compartilham o mesmo código e o mesmo Postgr
 **API e Worker** usam o mesmo código e a mesma imagem Docker; o que muda é o comando de inicialização no `docker-compose.yml`. A API responde às requisições do frontend. O Worker roda sozinho, guiado pelo relógio: expira propostas vencidas e envia os avisos. Os dois se comunicam pelo banco, não diretamente ([SDD](docs/architecture/SDD.md#2-organização-do-código)).
 
 ## Como rodar
+
+Para executar e validar a base web, consulte [apps/web/README.md](apps/web/README.md).
 
 Requisitos: Docker com Compose v2.
 

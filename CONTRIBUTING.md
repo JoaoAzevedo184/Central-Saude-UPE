@@ -54,7 +54,7 @@ Tipos: `feat`, `fix`, `docs`, `test`, `refactor`, `chore`, `ci`.
   - uma migração por mudança de esquema, gerada e **revisada à mão** antes do PR;
   - nunca editar uma migração que já está na `main`; para corrigir, crie uma nova;
   - restrições importantes (índices únicos parciais, `CHECK`) ficam na migração, não só no código Python.
-- **Onde fica o código:** tudo do backend em `apps/backend`; o frontend web em `apps/web`; o mobile (fase 2) em `apps/mobile`.
+- **Onde fica o código:** tudo do backend em `apps/backend`; o frontend web em `apps/web`.
 - **Camadas do backend:** rotas em `app/api`, jobs em `app/worker`, regras de negócio em `app/dominio` (sem importar FastAPI nem SQLAlchemy), acesso a banco e serviços externos em `app/infra`. Regra nova vai para `dominio`, nunca direto na rota ou no job, para a API e o Worker usarem a mesma implementação.
 
 ## Dados e segurança

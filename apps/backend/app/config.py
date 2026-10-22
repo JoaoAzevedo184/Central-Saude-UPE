@@ -40,7 +40,9 @@ class Settings(BaseSettings):
     # HMAC do CPF/e-mail em tentativa_login: sem a chave, o hash não é revertido por força bruta.
     login_hash_key: SecretStr
     refresh_tolerancia_s: int = 10  # ADR-003: duas abas renovando juntas não contam como roubo
-    termo_versao_atual: str = "1.0"  # UC-001: só aceita o aceite da versão vigente
+    termo_versao_atual: str = Field(
+        "1.0", pattern=r"^\d+(\.\d+)*$"
+    )  # UC-001: só aceita o aceite da versão vigente
 
     # Tempo (ADR-008)
     timezone_exibicao: str = "America/Recife"

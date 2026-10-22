@@ -16,7 +16,7 @@ Protótipo acadêmico (Extensão III, UNINASSAU Olinda) de teleagendamento para 
 - **Banco:** PostgreSQL.
 - **Infra:** Docker Compose, Nginx, VM Oracle; CI no GitHub Actions.
 - **Web:** tecnologia em revisão pelo grupo; não crie código em `apps/web` sem pedido.
-- **Mobile:** fase 2.
+- **Mobile:** fora do escopo (ADR-015). O paciente usa o site responsivo, mobile-first; não crie `apps/mobile`.
 
 ## Estrutura
 
@@ -28,7 +28,7 @@ apps/backend/app/
   infra/      SQLAlchemy, repositórios, SMTP, ReguladorGateway simulado, Relogio
 apps/backend/migrations/   Alembic
 apps/backend/tests/
-apps/web/  apps/mobile/  infra/nginx/  scripts/  docs/
+apps/web/  infra/nginx/  scripts/  docs/
 docker-compose.yml   (raiz)
 ```
 

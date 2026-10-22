@@ -29,8 +29,8 @@
 | RF-023 | Admin consulta a trilha de auditoria de uma solicitação ou agendamento | Admin | M | — | RN-010 |
 | RF-024 | O sistema envia lembrete antes do atendimento confirmado: aviso no site e, com `LEMBRETE_EMAIL`, e-mail, para consultas nas próximas `LEMBRETE_ANTECEDENCIA_HORAS` (padrão 24). Implementado (job `enviar_lembretes`) | Sistema | D | — | RN-009 |
 | RF-025 | Paciente ouve em voz alta os detalhes do agendamento | Paciente | D | — | — |
-| RF-026 | Avisos por Telegram | Sistema | F | — | — |
-| RF-027 | App mobile com notificações push | Paciente | F | — | — |
+| RF-026 | ~~Avisos por Telegram~~ Descartado ([ADR-013](../decisions/ADR-013-n8n-telegram.md)) | Sistema | — | — | — |
+| RF-027 | ~~App mobile com notificações push~~ Descartado ([ADR-015](../decisions/ADR-015-app-mobile.md)) | Paciente | — | — | — |
 | RF-028 | Paciente vê a descrição de cada fila (para que serve e quem pode entrar) antes de pedir | Paciente | M | UC-002 | RN-017 |
 | RF-029 | Paciente acompanha a linha do tempo da solicitação, com o motivo de cada mudança e sem posição na fila | Paciente | M | UC-002, UC-006, UC-008 | RN-007, RN-014 |
 | RF-030 | Paciente consulta o histórico de atendimentos (realizados, faltas, propostas expiradas e canceladas). *Atendido em parte:* `GET /solicitacoes?situacao=encerradas` cobre `ATENDIDA` e `CANCELADA`; faltam as faltas e as propostas expiradas, que estão no agendamento (UC-004, UC-008) | Paciente | M | UC-002 | RN-007 |

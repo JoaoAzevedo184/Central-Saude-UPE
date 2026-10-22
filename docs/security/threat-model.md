@@ -64,6 +64,6 @@ flowchart LR
 ## Revisão
 
 Revisar esta tabela quando:
-- entrar um ponto de entrada novo (canal, integração, app mobile);
+- entrar um ponto de entrada novo (canal, integração);
 - uma questão em aberto for respondida;
 - houver qualquer incidente ([resposta a incidentes](incident-response.md)).

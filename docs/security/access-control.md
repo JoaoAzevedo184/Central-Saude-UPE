@@ -32,6 +32,8 @@ Legenda:
 | Ver painel da fila e detalhe da solicitação, com posição e histórico | — | 🏥 | 🏥 | ✅ |
 | Propor vaga | — | 🏥 fase futura ([ADR-021](../decisions/ADR-021-matching-automatico.md)) | — | — |
 | Ver agenda do dia (nome abreviado) e painel de vagas | — | 🏥 | 🏥 | ✅ |
+| Ler os critérios de origem `REGULACAO`/`EQUIPE` de uma fila (`GET /equipe/filas/{id}/criterios`): só o formulário, sem pesos, fatores nem pontos; sem auditoria | — | 🏥 | 🏥 | ✅ |
+| Ler o termo de uso vigente (`GET /termos/vigente`) | público | público | público | público |
 | Registrar comparecimento ou falta | — | 🏥 | — | — |
 | Ver indicadores | — | — | 🏥 | ✅ |
 | Cadastrar unidades, especialidades e filas (elegibilidade, prazos) | — | — | — | ✅ |

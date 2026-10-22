@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Versão** | 0.1 — outubro/2026 |
-| **Escopo** | Backend, banco, Worker e implantação do MVP. O frontend será detalhado quando a tecnologia for definida ([ADR-001](../decisions/ADR-001-stack.md)) |
+| **Escopo** | Backend, banco, Worker, implantação do MVP e [base técnica do frontend](frontend.md), autorizada sem telas de negócio ([ADR-001](../decisions/ADR-001-stack.md)) |
 | **Documentos relacionados** | [PRD](../product/PRD.md) · [requisitos](../requirements/functional-requirements.md) · [modelo de dados](data-model.md) · [API](api-design.md) · [segurança](../security/security-overview.md) |
 
 ## 1. Visão geral
@@ -65,7 +65,7 @@ flowchart LR
 
 ## 2. Organização do código
 
-O backend fica em `apps/backend`, ao lado de `apps/web` e de `apps/mobile` (fase 2). É um único pacote Python:
+O backend fica em `apps/backend`, ao lado de `apps/web`. É um único pacote Python:
 
 ```
 apps/backend/app/
@@ -117,7 +117,7 @@ Se o projeto crescer a ponto de API e Worker precisarem de ciclos de versão ind
 
 | Interface | Para que serve | Implementações |
 | --- | --- | --- |
-| `CanalNotificacao` | Entregar uma mensagem por um canal externo (`enviar(Mensagem)`; falha = exceção) | `CanalEmailSmtp` (`infra/email.py`); depois Telegram e push ([ADR-010](../decisions/ADR-010-integracoes-por-interface.md)). O aviso no site não passa pela interface: é a própria linha de `notificacao` com canal `IN_APP` |
+| `CanalNotificacao` | Entregar uma mensagem por um canal externo (`enviar(Mensagem)`; falha = exceção) | `CanalEmailSmtp` (`infra/email.py`); Telegram e push foram descartados ([ADR-010](../decisions/ADR-010-integracoes-por-interface.md)). O aviso no site não passa pela interface: é a própria linha de `notificacao` com canal `IN_APP` |
 | `ReguladorGateway` | Obter encaminhamentos e a classificação de risco | Simulada com dados sintéticos |
 | `Relogio` | Fornecer "agora" com fuso | Real; fixo nos testes ([ADR-008](../decisions/ADR-008-datas-e-fuso.md)) |
 | Repositórios | Persistir e consultar agregados | SQLAlchemy |

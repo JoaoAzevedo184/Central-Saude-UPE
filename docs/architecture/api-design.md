@@ -6,7 +6,7 @@
 
 - **Base:** `/api/v1`. Uma versão nova de URL só para mudanças incompatíveis.
 - **Formato:** JSON com campos em `snake_case`. Datas em ISO 8601 com fuso (`2026-10-08T08:30:00-03:00`).
-- **Autenticação:** cookies, descritos em [Sessão, cookies e CSRF](#sessão-cookies-e-csrf). O mobile, quando existir, usa `Authorization: Bearer` ([ADR-003](../decisions/ADR-003-autenticacao-web.md)).
+- **Autenticação:** cookies, descritos em [Sessão, cookies e CSRF](#sessão-cookies-e-csrf).
 - **Erros:** formato *Problem Details* (RFC 9457), `application/problem+json`, com `type`, `title`, `status` e `detail`. O `type` é um caminho relativo estável; o frontend decide o tratamento pelo `type`, nunca pelo texto. Valores em uso:
 
   | `type` | Status | Quando aparece |
@@ -26,6 +26,7 @@
   | `/problemas/sem-permissao` | `403` | Papel sem permissão para a rota (`exige_papel`) |
   | `/problemas/csrf-invalido` | `403` | Escrita sem o header `X-CSRF-Token` ou com valor diferente do cookie |
   | `/problemas/muitas-tentativas` | `429` | Limite de tentativas de login ou de registro; traz o header `Retry-After` (em segundos) |
+  - **No OpenAPI:** o corpo de erro é o schema `Problema` (`type`, `title`, `status`, `detail`, `instance`, `errors`), servido como `application/problem+json`. O `HTTPValidationError` do FastAPI não existe no contrato, porque o `422` real também é Problem Details. Cada rota declara as respostas de erro que pode dar (`401`, `403`, `404`, `409`, `422`…), com o `type` na descrição. Os tipos ficam sob `/problemas/*` (tabela acima).
 - **Códigos de status mais usados:**
   - `401`: sem sessão
   - `403`: sem permissão para o papel ou o escopo; CSRF inválido
@@ -34,19 +35,20 @@
   - `422`: validação
   - `429`: muitas tentativas de login ou de registro (`Retry-After`)
 - **Ações de estado** são sub-recursos com `POST` (`/agendamentos/{id}/confirmar`), não `PATCH` no campo `status`. Assim cada transição tem validação, autorização e auditoria próprias.
-- **Paginação** de listas: `?limit=&offset=`. `limit` de 1 a 100 (padrão 50); `offset` a partir de 0.
+- **Paginação** de listas: `?limit=&offset=`. `limit` de 1 a 100 (padrão 50); `offset` a partir de 0. A resposta é sempre `{total, itens}`, em que `total` conta os itens do filtro antes de `limit` e `offset`. Vale para `GET /filas`, `/solicitacoes`, `/avisos`, `/equipe/filas`, e o painel `/equipe/filas/{fila_id}/solicitacoes`. Exceções: o painel de vagas (`{total, sem_proposta, itens}`, que não pagina), `/avisos/contagem` (`{nao_lidos}`) e a agenda do dia, que segue um array simples.
+- **Enums nomeados:** papéis, riscos, turnos, status, situações da vaga, tipos de evento, tipos e origens de critério e motivos de cancelamento vêm de `app/dominio/vocabulario.py`, a mesma fonte do `CHECK` do banco, e aparecem como enums com nome no OpenAPI. Mudar um valor exige migração e regenerar o snapshot (ver [Contrato OpenAPI](#contrato-openapi)).
 - **Escopo da equipe por fila** ([ADR-025](../decisions/ADR-025-escopo-por-fila.md)): toda rota da equipe recebe `escopo = Depends(escopo_da_equipe)`, um conjunto de `fila_id`, e filtra por `fila_id IN escopo` **dentro da query**. Recurso de fila fora do escopo responde `404`, como recurso de outro paciente. Usuário suspenso não tem sessão ([ADR-028](../decisions/ADR-028-suspensao-de-acesso.md)).
 - **O que o paciente vê** ([ADR-007](../decisions/ADR-007-paciente-ve-status.md)):
   - status da solicitação, a fila (nome e descrição) e a linha do tempo, com só os eventos de `historico_solicitacao` em que `visivel_paciente = true` (tipo, data e motivo);
   - **nunca** posição na fila, tamanho da fila, nota, pontos dos critérios, classificação de risco ou estimativa derivada deles;
   - os schemas de entrada do paciente aceitam só as respostas dos critérios com origem `PACIENTE`; os pontos e a nota são calculados no servidor.
 - **O que a equipe vê:** além do que o paciente vê, a posição calculada na consulta, o risco, a nota, as respostas com os pontos e o histórico completo, com motivo. O CPF vai mascarado e o nome, abreviado na lista (ver [proteção de dados](../security/data-protection.md)).
-- **Cache:** as respostas de `/api/v1/filas`, `/api/v1/solicitacoes` e `/api/v1/equipe/` levam `Cache-Control: no-store`, como `/auth/*` e `/me`.
+- **Cache:** as respostas de `/api/v1/filas`, `/api/v1/solicitacoes` e `/api/v1/equipe/` levam `Cache-Control: no-store`, como `/auth/*` e `/me`. A exceção é `/termos/vigente` (público, `Cache-Control: public, max-age=3600`).
 
 ## Endpoints
 
 ### Sessão e conta
-Caminhos sob `/api/v1`. Respostas de `/auth/*` e `/me` levam `Cache-Control: no-store`.
+Caminhos sob `/api/v1`. Respostas de `/auth/*` e `/me` levam `Cache-Control: no-store`; `/termos/vigente` é a exceção pública.
 
 | Método | Rota | Quem | CSRF | Descrição |
 | --- | --- | --- | --- | --- |
@@ -54,7 +56,8 @@ Caminhos sob `/api/v1`. Respostas de `/auth/*` e `/me` levam `Cache-Control: no-
 | POST | `/auth/login` | público | não | Corpo `{identificador, senha}`. `identificador` com 11 dígitos (com ou sem pontuação) é CPF e vale só para paciente; qualquer outro valor é e-mail e vale só para a equipe. Responde `{papel, expira_em}`, nunca o token. Falha → `401` (`credenciais-invalidas`); bloqueio → `429` |
 | POST | `/auth/refresh` | cookie `refresh_token` | sim | Renova a sessão com rotação do refresh token. Responde `{papel, expira_em}` |
 | POST | `/auth/logout` | cookie `refresh_token` | sim | Revoga a família da sessão e apaga os cookies. `204`, idempotente: também responde `204` sem sessão |
-| GET | `/me` | sessão | — | `{id, papel, nome}`. O paciente nunca recebe posição nem tamanho da fila ([ADR-007](../decisions/ADR-007-paciente-ve-status.md)). A equipe recebe `filas` (IDs do escopo, [ADR-025](../decisions/ADR-025-escopo-por-fila.md)) e `nome` fica ausente, porque `usuario` não tem nome |
+| GET | `/me` | sessão | — | `{id, papel, nome, filas}`, sempre com as quatro chaves. Paciente: `nome` preenchido e `filas` `null`. Equipe: `nome` `null`, porque `usuario` não tem nome, e `filas` com os IDs do escopo ([ADR-025](../decisions/ADR-025-escopo-por-fila.md)). Nunca traz posição nem tamanho da fila ([ADR-007](../decisions/ADR-007-paciente-ve-status.md)) |
+| GET | `/termos/vigente` | público | — | `{versao, texto}` do termo em vigor (`TERMO_VERSAO_ATUAL`), para a tela de cadastro; é a versão que `/auth/registro` aceita ([UC-001](../requirements/use-cases/UC-001-cadastrar-paciente.md)). Única rota com cache: `Cache-Control: public, max-age=3600` |
 
 ### Sessão, cookies e CSRF
 
@@ -67,17 +70,17 @@ Caminhos sob `/api/v1`. Respostas de `/auth/*` e `/me` levam `Cache-Control: no-
 - `Secure`, `SameSite` e `Domain` vêm da configuração (`COOKIE_SECURE`, `COOKIE_SAMESITE`, `COOKIE_DOMAIN`).
 - **CSRF (double-submit):** o header `X-CSRF-Token` tem de ser igual ao cookie `csrf_token`. É exigido em todo `POST`, `PUT`, `PATCH` e `DELETE`, menos `/auth/registro` e `/auth/login`. Falha → `403` (`csrf-invalido`). Premissas e risco: AM-002 no [modelo de ameaças](../security/threat-model.md).
 - **A cada requisição**, a dependência `usuario_da_sessao` relê o usuário e a família da sessão. Suspensão, logout e reuso do refresh cortam o acesso na hora ([ADR-028](../decisions/ADR-028-suspensao-de-acesso.md)).
-- O serviço de tokens está pronto para `Authorization: Bearer`, mas a API ainda **não lê** esse header ([ADR-003](../decisions/ADR-003-autenticacao-web.md)).
+- O serviço de tokens aceita o token fora de cookie, mas a API **não lê** `Authorization: Bearer` e não vai ler: o app mobile foi descartado ([ADR-003](../decisions/ADR-003-autenticacao-web.md)).
 
 ### Paciente: filas e solicitações
 Implementadas. Papel `PACIENTE` (dependência `paciente_da_sessao`); toda consulta filtra por `paciente_id` da sessão **dentro da query** e recurso alheio responde `404`. Os schemas de entrada usam `extra="forbid"` (AM-013).
 
 | Método | Rota | Descrição |
 | --- | --- | --- |
-| GET | `/filas` | Filas ativas com unidade, especialidade, `descricao_paciente`, `elegivel` e `motivo_inelegivel` (texto fixo de `motivo_inelegivel()`). Sem contagem de pessoas |
+| GET | `/filas?limit&offset` | `{total, itens}` de filas ativas com unidade, especialidade, `descricao_paciente`, `elegivel` e `motivo_inelegivel` (texto fixo de `motivo_inelegivel()`). Sem contagem de pessoas; o `total` é o de filas ativas |
 | GET | `/filas/{id}` | Detalhe da fila com os critérios de origem `PACIENTE` (`id`, `codigo`, `descricao`, `tipo`, `opcoes`). Sem peso, fator nem pontos |
 | POST | `/solicitacoes` | Cria a solicitação `EM_ANALISE` ([UC-002](../requirements/use-cases/UC-002-solicitar-atendimento.md)). Corpo: `fila_id`, `turno_preferido` (`MANHA`, `TARDE`, `QUALQUER`), `origem_encaminhamento` (texto de 2 a 200), `respostas` (`[{criterio_id, valor}]`, até 50; `valor` texto até 200). `201` com o detalhe |
-| GET | `/solicitacoes?situacao=abertas\|encerradas&limit&offset` | Minhas solicitações. `encerradas` = `ATENDIDA` e `CANCELADA` |
+| GET | `/solicitacoes?situacao=abertas\|encerradas&limit&offset` | `{total, itens}` das minhas solicitações. `encerradas` = `ATENDIDA` e `CANCELADA`. Cada item traz o resumo e `agendamento_ativo` `{id, status, inicio, expira_em, unidade, profissional}` ou `null` (`expira_em` só na proposta), para confirmar ou recusar sem abrir o detalhe |
 | GET | `/solicitacoes/{id}` | `status`, fila, unidade, `data_pedido`, turno, `origem_encaminhamento`, as respostas próprias (`descricao`, `valor`; só origem `PACIENTE`), `linha_do_tempo` `[{tipo, data, motivo}]` só com `visivel_paciente = true`, na ordem `(ocorrido_em, seq)`, e `agendamento_ativo` (ver abaixo) |
 | POST | `/solicitacoes/{id}/cancelar` | Corpo obrigatório `{motivo_codigo}`: `NAO_PRECISO_MAIS`, `CONSEGUI_EM_OUTRO_LUGAR`, `DIFICULDADE_DE_DESLOCAMENTO`, `CONFLITO_DE_HORARIO` ou `OUTRO`. Sem texto livre; a linha do tempo mostra o rótulo amigável. Vale em `EM_ANALISE`, `NA_FILA` (outbox `SOLICITACAO_CANCELADA`), `EM_PROPOSTA` e `AGENDADA` (outbox `AGENDAMENTO_CANCELADO`; o agendamento ativo vai para `CANCELADO` com `CANCELADO_PELO_PACIENTE`, só antes do início da vaga). `ATENDIDA`, `CANCELADA` ou vaga já iniciada → `409` (`transicao-invalida`) ([UC-005](../requirements/use-cases/UC-005-pedir-outra-data-ou-cancelar.md)) |
 | POST | `/agendamentos/{id}/confirmar` | Só `PROPOSTO` e antes de `expira_em`. Agendamento `CONFIRMADO`, solicitação `AGENDADA`, evento `CONFIRMADA`, outbox `AGENDAMENTO_CONFIRMADO`. Depois do prazo → `409` `proposta-expirada`. Responde o detalhe da solicitação ([UC-004](../requirements/use-cases/UC-004-confirmar-proposta.md)) |
@@ -94,8 +97,9 @@ Erros de `POST /solicitacoes`:
 | Fila inexistente ou inativa | `422` |
 
 - **`data` da linha do tempo é só o dia**, em `America/Recife`, sem hora: a hora de `ENTROU_NA_FILA` revelaria a `data_entrada_fila` e, com ela, a ordem de chegada (AM-014).
-- **O paciente nunca recebe:** posição, tamanho da fila, total, nota, pontos, pesos, parâmetros ou fatores, `classificacao_risco`, `data_entrada_fila` nem a hora dos eventos.
-- **`agendamento_ativo`** (proposta ou consulta confirmada, ou `null`): `id`, `status` (`PROPOSTO` ou `CONFIRMADO`), `inicio` e `fim` da vaga no fuso de Recife, `profissional`, `unidade` `{id, sigla, nome}`, `endereco` da unidade e `expira_em` (só na proposta). O nome do profissional é visível ao paciente ([proteção de dados](../security/data-protection.md)).
+- **O paciente nunca recebe:** posição, tamanho da fila, nota, pontos, pesos, parâmetros ou fatores, `classificacao_risco`, `data_entrada_fila` nem a hora dos eventos.
+- **`total` do envelope `{total, itens}`** é o tamanho da própria lista do paciente (suas solicitações ou avisos) ou o das filas ativas. Nunca é o tamanho de uma fila de espera (ADR-007).
+- **`agendamento_ativo`** no detalhe (proposta ou consulta confirmada, ou `null`): `id`, `status` (`PROPOSTO` ou `CONFIRMADO`), `inicio` e `fim` da vaga no fuso de Recife, `profissional`, `unidade` `{id, sigla, nome}`, `endereco` da unidade e `expira_em` (só na proposta). O nome do profissional é visível ao paciente ([proteção de dados](../security/data-protection.md)).
 - Agendamento de outro paciente responde `404` em `confirmar` e `recusar`; o dono é conferido dentro da query.
 - **Pendência:** "pedir outra data" com o agendamento já `CONFIRMADO` não existe; por ora o paciente cancela e abre nova solicitação ([UC-005](../requirements/use-cases/UC-005-pedir-outra-data-ou-cancelar.md)).
 
@@ -110,11 +114,11 @@ Erros de `POST /solicitacoes`:
 | GET | `/agendamentos/{id}` | Detalhe da proposta ou do agendamento (hoje vem em `agendamento_ativo` do detalhe da solicitação) |
 
 ### Avisos (RF-019)
-Implementadas. Qualquer usuário autenticado vê só os próprios avisos do site (canal `IN_APP`); o filtro por `usuario_id` da sessão fica dentro da query e aviso de outro usuário responde `404`. A resposta não traz o canal `EMAIL`, o status de envio nem posição na fila. Respostas sem cache (`/api/v1/avisos`). A rota se chama `/avisos`, não `/notificacoes` como estava na proposta anterior.
+Implementadas. Qualquer usuário autenticado vê só os próprios avisos do site (canal `IN_APP`); o filtro por `usuario_id` da sessão fica dentro da query e aviso de outro usuário responde `404`. A resposta não traz o canal `EMAIL`, o status de envio nem posição na fila. Respostas sem cache (`/api/v1/avisos`); a única rota com cache é `/termos/vigente`. A rota se chama `/avisos`, não `/notificacoes` como estava na proposta anterior.
 
 | Método | Rota | Descrição |
 | --- | --- | --- |
-| GET | `/avisos?somente_nao_lidos&limit&offset` | Mais recentes primeiro (`limit` 1 a 100, padrão 50). Item: `id`, `tipo`, `titulo`, `corpo`, `solicitacao_id`, `criado_em`, `lido_em` (fuso de Recife) |
+| GET | `/avisos?somente_nao_lidos&limit&offset` | `{total, itens}`, mais recentes primeiro (`limit` 1 a 100, padrão 50). Item: `id`, `tipo`, `titulo`, `corpo`, `solicitacao_id`, `criado_em`, `lido_em` (fuso de Recife) |
 | GET | `/avisos/contagem` | `{nao_lidos}`, para o sino do menu |
 | POST | `/avisos/lidos` | Marca todos como lidos; `204` |
 | POST | `/avisos/{id}/lido` | Marca um como lido; `204`, idempotente (mantém a data da primeira leitura). Outro usuário ou inexistente → `404` |
@@ -126,7 +130,8 @@ Implementadas as rotas `/equipe`. Prefixo `/equipe`; `escopo_da_equipe` é aplic
 
 | Método | Rota | Descrição |
 | --- | --- | --- |
-| GET | `/equipe/filas` | Filas do escopo (inclui inativas) com `contagem_por_status` |
+| GET | `/equipe/filas?limit&offset` | `{total, itens}` das filas do escopo (inclui inativas) com `contagem_por_status` |
+| GET | `/equipe/filas/{fila_id}/criterios` | Critérios ativos de origem `REGULACAO` e `EQUIPE` da fila, para montar o formulário de `PUT .../respostas`: `[{id, codigo, descricao, tipo, origem, opcoes, faixas}]` (`opcoes` só em `OPCAO`, `faixas` `{min, max}` só em `NUMERO`). Sem peso, fator nem pontos. Fila fora do escopo → `404`. Sem auditoria, porque não traz dado de paciente |
 | GET | `/equipe/filas/{fila_id}/solicitacoes?status&ordenacao=prioridade\|chegada&limit&offset` | `{total, itens}`. Item: `id`, `status`, `posicao`, `classificacao_risco`, `nota`, `data_entrada_fila`, `paciente_nome` abreviado ("Maria S."), `paciente_cpf` mascarado (`***.482.***-10`) e `ultima_mudanca` `{tipo, ocorrido_em}`, **sem motivo** (o motivo fica no detalhe). `ocorrido_em` mantém a hora para a equipe (decidido em 2026-10-19); só o paciente vê a data sem hora |
 | GET | `/equipe/solicitacoes/{id}` | Nome completo, CPF mascarado, respostas (critério, origem, valor, pontos), nota e histórico completo com motivo |
 | POST | `/equipe/solicitacoes/{id}/classificar` | Corpo `{classificacao_risco, motivo?}`. Ver abaixo |
@@ -175,3 +180,12 @@ Implementadas as rotas `/equipe`. Prefixo `/equipe`; `escopo_da_equipe` é aplic
 | Método | Rota | Descrição |
 | --- | --- | --- |
 | GET | `/health` | Verificação de saúde para o Nginx e o monitoramento |
+
+## Contrato OpenAPI
+
+- **Segurança:** o OpenAPI declara três esquemas. `cookieSessao` (cookie do access token) e `cookieRefresh` (cookie do refresh token) são `apiKey` em cookie. `csrfToken` é `apiKey` no header `X-CSRF-Token`; entra nas rotas de escrita, menos `/auth/registro` e `/auth/login`.
+- **Snapshot:** `docs/architecture/openapi.json` é a cópia versionada do contrato. `apps/backend/tests/test_contrato.py` falha se a API gerar algo diferente dela. Depois de mudar rota, schema ou enum, regenere e revise o diff:
+
+  ```bash
+  ATUALIZAR_OPENAPI=1 scripts/testar.sh tests/test_contrato.py
+  ```

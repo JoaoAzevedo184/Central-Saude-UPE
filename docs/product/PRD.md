@@ -53,6 +53,7 @@ O recorte do MVP de novembro/2026 e o que vem depois estão em [escopo e roadmap
 - **Sem integração real com a regulação.** Fica atrás de uma interface com implementação simulada ([ADR-010](../decisions/ADR-010-integracoes-por-interface.md)).
 - **As regras da fila são da instituição.** As do protótipo são exemplos marcados como simulados ([ADR-011](../decisions/ADR-011-regras-de-prioridade.md)).
 - **Sem orçamento.** Uma VM do nível gratuito da Oracle Cloud; nenhum serviço pago (WhatsApp e SMS ficam fora).
+- **Site mobile-first.** Não há app nativo ([ADR-015](../decisions/ADR-015-app-mobile.md)): o paciente usa o site responsivo no celular. O desenho parte do celular simples e da tela pequena, com acessibilidade (contraste, foco visível, rótulos em todo campo, alvos de toque grandes) e sem depender de recurso de aparelho recente.
 - **Prazo.** MVP funcional em novembro/2026 e relatório final em dezembro/2026, com uma equipe de seis estudantes.
 
 ## 6. Premissas e dependências
@@ -64,6 +65,7 @@ O recorte do MVP de novembro/2026 e o que vem depois estão em [escopo e roadmap
 
 - Triagem ou priorização clínica feita pelo sistema.
 - Prontuário, resultados de exames ou qualquer dado clínico além do necessário para agendar.
+- App mobile nativo e notificações push ([ADR-015](../decisions/ADR-015-app-mobile.md)); Telegram ([ADR-013](../decisions/ADR-013-n8n-telegram.md)).
 - Substituir os sistemas oficiais de regulação municipais e estaduais.
 
 ## 8. Glossário

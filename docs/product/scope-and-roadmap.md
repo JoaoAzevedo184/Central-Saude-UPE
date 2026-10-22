@@ -11,7 +11,7 @@
 | Comunicação | Avisos no site e por e-mail | RF-018, RF-019 |
 | Acompanhamento | Paciente vê o status, a linha do tempo e o histórico de atendimentos, sem posição na fila | RF-020, RF-029, RF-030 |
 | Gestão | Painel de indicadores, trilha de auditoria | RF-021, RF-023 |
-| Plataforma | Web responsivo, Docker Compose, CI, deploy numa VM Oracle, backup | RNF-* |
+| Plataforma | Site web **mobile-first** (celular simples, tela pequena, acessibilidade), Docker Compose, CI, deploy numa VM Oracle, backup | RNF-* |
 
 **Desejável no MVP, se houver tempo:** lembrete automático antes do atendimento (RF-024) e leitura em voz alta dos detalhes do agendamento.
 
@@ -19,8 +19,8 @@
 
 | Item | Por quê | Quando |
 | --- | --- | --- |
-| App mobile React Native e push | Dividiria a equipe; o web responsivo atende o celular | Fase 2 ([ADR-002](../decisions/ADR-002-web-primeiro.md)) |
-| Telegram via n8n | Depende do fluxo de e-mail estável | Fase 2 (ADR-013) |
+| App mobile nativo e push | Descartado em 2026-10-21: o site responsivo atende o celular | Fora do escopo ([ADR-015](../decisions/ADR-015-app-mobile.md)) |
+| Telegram via n8n | Descartado: a UPE informou em 15/10 que os pacientes não usam Telegram | Fora do escopo ([ADR-013](../decisions/ADR-013-n8n-telegram.md)) |
 | WhatsApp e SMS | Custo e burocracia de API | Sem data |
 | Integração real com a regulação | Não disponível para alunos | Se a UPE disponibilizar |
 | Chatbot | Só faz sentido com o fluxo principal pronto | Se sobrar tempo |

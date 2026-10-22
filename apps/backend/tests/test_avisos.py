@@ -603,7 +603,8 @@ def test_rf019_lista_so_os_proprios_avisos_do_site(api, sessao, relogio, mundo, 
 
     assert resposta.status_code == 200
     assert resposta.headers["cache-control"] == "no-store"
-    itens = resposta.json()
+    assert resposta.json()["total"] == 2
+    itens = resposta.json()["itens"]
     assert len(itens) == 2  # só IN_APP do próprio usuário
     assert {"canal", "status_envio", "tentativas", "usuario_id"}.isdisjoint(itens[0])
     assert {i["tipo"] for i in itens} == {"SOLICITACAO_CRIADA", "PROPOSTA_ENVIADA"}
@@ -649,7 +650,7 @@ def test_rf019_contagem_e_marcar_todos(api, sessao, logado):
     aviso = avisos_de(sessao, logado.usuario.id, "IN_APP")[0]
     api.post(f"/api/v1/avisos/{aviso.id}/lido", headers=csrf(api))
     assert api.get("/api/v1/avisos/contagem").json() == {"nao_lidos": 1}
-    assert len(api.get("/api/v1/avisos", params={"somente_nao_lidos": True}).json()) == 1
+    assert len(api.get("/api/v1/avisos", params={"somente_nao_lidos": True}).json()["itens"]) == 1
 
     assert api.post("/api/v1/avisos/lidos", headers=csrf(api)).status_code == 204
 
@@ -696,7 +697,7 @@ def test_uc003_uc004_proposta_vira_aviso_e_email_e_paciente_le(
     assert "confirme até" in mensagem.corpo
 
     assert api.get("/api/v1/avisos/contagem").json() == {"nao_lidos": 1}  # 4. paciente vê
-    (aviso,) = api.get("/api/v1/avisos").json()
+    (aviso,) = api.get("/api/v1/avisos").json()["itens"]
     assert aviso["tipo"] == "PROPOSTA_ENVIADA" and aviso["lido_em"] is None
     assert api.post(f"/api/v1/avisos/{aviso['id']}/lido", headers=csrf(api)).status_code == 204
     assert api.get("/api/v1/avisos/contagem").json() == {"nao_lidos": 0}

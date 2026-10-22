@@ -180,6 +180,14 @@ def csrf(cliente):
     return {CSRF: cliente.cookies.get("csrf_token", "")}
 
 
+def chaves_do_paciente(dado) -> set[str]:
+    """Como `chaves`, mas o `total` do envelope `{total, itens}` de uma lista paginada não conta:
+    é o total da própria lista do paciente (ou das filas ativas), nunca o tamanho de uma fila."""
+    if isinstance(dado, dict) and set(dado) == {"total", "itens"}:
+        return chaves(dado["itens"])
+    return chaves(dado)
+
+
 def chaves(dado) -> set[str]:
     """Todas as chaves de um JSON, em qualquer nível."""
     if isinstance(dado, dict):

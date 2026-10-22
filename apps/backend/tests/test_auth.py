@@ -528,6 +528,7 @@ def test_adr007_me_do_paciente_sem_fila(api, sessao):
         "id": str(usuario.id),
         "papel": "PACIENTE",
         "nome": "Paciente Sintética",
+        "filas": None,
     }
     assert resposta.headers["cache-control"] == "no-store"
 
@@ -537,6 +538,20 @@ def test_adr025_me_da_equipe_traz_o_escopo(api, sessao):
     login(api, "atendente.sem.fila@exemplo.com")
 
     assert api.get("/api/v1/me").json()["filas"] == []
+
+
+def test_adr007_me_tem_sempre_as_mesmas_chaves(api, sessao):
+    """Paciente: `filas` null. Equipe: `nome` null. Nenhuma chave some da resposta."""
+    criar_paciente(sessao)
+    equipe = criar_usuario(sessao, "ATENDENTE", email="atendente.chaves@exemplo.com")
+    login(api, CPF_PACIENTE)
+    do_paciente = api.get("/api/v1/me").json()
+    login(api, equipe.email)
+    da_equipe = api.get("/api/v1/me").json()
+
+    assert set(do_paciente) == set(da_equipe) == {"id", "papel", "nome", "filas"}
+    assert do_paciente["filas"] is None and do_paciente["nome"]
+    assert da_equipe["nome"] is None and da_equipe["filas"] == []
 
 
 # --- registro (UC-001) --------------------------------------------------------------------
@@ -741,3 +756,30 @@ def test_adr003_tolerancia_nao_revive_familia_encerrada_no_logout(api, sessao):
     )
 
     assert resposta.status_code == 401  # ainda dentro dos 10 s, mas a família foi encerrada
+
+
+# --- termo vigente (item 5) ---------------------------------------------------------------
+
+
+def test_uc001_termo_vigente_e_publico_com_cache_curto(api):
+    resposta = api.get("/api/v1/termos/vigente")
+
+    assert resposta.status_code == 200
+    assert resposta.headers["cache-control"] == "public, max-age=3600"
+    assert resposta.json()["versao"] == get_settings().termo_versao_atual
+    assert "provisório" in resposta.json()["texto"].lower()
+
+
+def test_uc001_registro_aceita_a_versao_que_o_termo_devolve(api, sessao):
+    versao = api.get("/api/v1/termos/vigente").json()["versao"]
+
+    resposta = registrar(api, versao_termo=versao)
+
+    assert resposta.status_code == 201, resposta.text
+    assert registrar(api, versao_termo=versao + "-velha").status_code == 422
+
+
+def test_uc001_termo_configurado_tem_arquivo_de_texto():
+    from app.api.rotas.termos import PASTA_TERMOS
+
+    assert (PASTA_TERMOS / f"{get_settings().termo_versao_atual}.md").is_file()

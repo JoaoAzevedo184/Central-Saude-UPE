@@ -15,6 +15,7 @@ from app.dominio.fila.ordenacao import ordenar_fila
 from app.dominio.solicitacao import Solicitacao as SolicitacaoDominio
 from app.infra.modelos import Auditoria, HistoricoSolicitacao, Outbox, Paciente, Solicitacao
 from tests.fila_sintetica import (
+    _criterio,
     chaves,
     criar_equipe,
     criar_paciente,
@@ -106,7 +107,7 @@ def test_adr025_atendente_sem_filas_ve_lista_vazia(api, sessao, mundo):
     sem_filas = criar_equipe(sessao, "ATENDENTE")
     entrar(api, sem_filas.email)
 
-    assert api.get("/api/v1/equipe/filas").json() == []
+    assert api.get("/api/v1/equipe/filas").json() == {"total": 0, "itens": []}
     assert api.get(f"/api/v1/equipe/filas/{mundo.fila}/solicitacoes").status_code == 404
 
 
@@ -114,7 +115,7 @@ def test_adr025_gestor_sem_unidade_ve_a_central_inteira(api, sessao, mundo):
     gestor = criar_equipe(sessao, "GESTOR")
     entrar(api, gestor.email)
 
-    ids = {f["id"] for f in api.get("/api/v1/equipe/filas").json()}
+    ids = {f["id"] for f in api.get("/api/v1/equipe/filas").json()["itens"]}
 
     assert {str(mundo.fila), str(mundo.fila_outra_unidade)} <= ids
     assert (
@@ -126,7 +127,7 @@ def test_adr025_gestor_de_um_hospital_nao_ve_outro(api, sessao, mundo):
     gestor = criar_equipe(sessao, "GESTOR", unidades=[mundo.unidade])
     entrar(api, gestor.email)
 
-    ids = {f["id"] for f in api.get("/api/v1/equipe/filas").json()}
+    ids = {f["id"] for f in api.get("/api/v1/equipe/filas").json()["itens"]}
 
     assert str(mundo.fila) in ids and str(mundo.fila_outra_unidade) not in ids
     assert (
@@ -138,7 +139,7 @@ def test_adr025_filas_trazem_contagem_por_status(api, sessao, mundo, atendente):
     na_fila(sessao, mundo.fila, "VERDE", 0, T0)
     na_fila(sessao, mundo.fila, "AMARELO", 0, T0)
 
-    (fila,) = api.get("/api/v1/equipe/filas").json()
+    (fila,) = api.get("/api/v1/equipe/filas").json()["itens"]
 
     assert fila["contagem_por_status"]["NA_FILA"] == 2
     assert fila["contagem_por_status"]["EM_ANALISE"] == 0
@@ -521,3 +522,40 @@ def test_am008_logs_da_equipe_sem_nome_nem_cpf(api, sessao, mundo, atendente, ca
     assert sid in caplog.text
     for dado in (p.nome, p.cpf, "Maria"):
         assert dado not in caplog.text
+
+
+def contar_auditoria(sessao, acao):
+    return sessao.scalar(select(func.count()).select_from(Auditoria).where(Auditoria.acao == acao))
+
+
+# --- critérios que a equipe responde (item 7) ---------------------------------------------
+
+
+def test_adr025_criterios_da_fila_montam_o_formulario_sem_pesos(api, sessao, mundo, atendente):
+    _criterio(sessao, mundo.fila, "E_OPCAO", "OPCAO", 4, "EQUIPE", {"opcoes": {"Y": 2, "X": 1}})
+
+    resposta = api.get(f"/api/v1/equipe/filas/{mundo.fila}/criterios")
+
+    assert resposta.status_code == 200, resposta.text
+    por_codigo = {c["codigo"]: c for c in resposta.json()}
+    assert set(por_codigo) == {"E_OPCAO", "R_GESTACOES"}  # P_* (paciente) fica de fora
+    assert por_codigo["E_OPCAO"]["opcoes"] == ["X", "Y"] and por_codigo["E_OPCAO"]["faixas"] is None
+    assert por_codigo["R_GESTACOES"]["origem"] == "REGULACAO"
+    assert por_codigo["R_GESTACOES"]["faixas"] == [
+        {"min": 0, "max": 1},
+        {"min": 2, "max": None},
+    ]
+    assert not chaves(resposta.json()) & {"peso", "pontos", "fator", "parametros"}
+    assert contar_auditoria(sessao, "CONSULTAR_CRITERIOS") == 0  # sem dado de paciente
+
+
+def test_adr025_criterios_de_fila_fora_do_escopo_respondem_404(api, mundo, atendente):
+    assert api.get(f"/api/v1/equipe/filas/{mundo.fila_outra_unidade}/criterios").status_code == 404
+    assert api.get(f"/api/v1/equipe/filas/{ZERO}/criterios").status_code == 404
+
+
+def test_adr025_paciente_nao_le_criterios_da_equipe(api, sessao, mundo):
+    _, p = criar_paciente(sessao)
+    entrar(api, p.cpf)
+
+    assert api.get(f"/api/v1/equipe/filas/{mundo.fila}/criterios").status_code == 403

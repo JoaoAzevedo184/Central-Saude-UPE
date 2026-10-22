@@ -14,7 +14,7 @@ from app.infra.modelos import (
     Solicitacao,
 )
 from tests.fila_sintetica import (
-    chaves,
+    chaves_do_paciente,
     criar_equipe,
     criar_paciente,
     csrf,
@@ -99,13 +99,13 @@ def test_rf028_filas_com_elegibilidade_e_sem_contagem(api, sessao, mundo):
     resposta = api.get("/api/v1/filas")
 
     assert resposta.status_code == 200
-    filas = {f["id"]: f for f in resposta.json()}
+    filas = {f["id"]: f for f in resposta.json()["itens"]}
     assert filas[str(mundo.fila)]["elegivel"] is True
     assert filas[str(mundo.fila)]["motivo_inelegivel"] is None
     assert filas[str(mundo.laqueadura)]["elegivel"] is False
     assert filas[str(mundo.laqueadura)]["motivo_inelegivel"]
     assert filas[str(mundo.fila)]["descricao_paciente"].startswith("Fila sintética")
-    assert not chaves(resposta.json()) & CHAVES_PROIBIDAS
+    assert not chaves_do_paciente(resposta.json()) & CHAVES_PROIBIDAS
 
 
 def test_rf028_detalhe_da_fila_traz_so_perguntas_do_paciente(api, paciente, mundo):
@@ -116,7 +116,7 @@ def test_rf028_detalhe_da_fila_traz_so_perguntas_do_paciente(api, paciente, mund
     assert set(criterios) == {"P_FILHOS", "P_OPCAO"}  # REGULACAO fica de fora
     assert criterios["P_OPCAO"]["opcoes"] == ["A", "B"]
     assert criterios["P_FILHOS"]["opcoes"] is None
-    assert not chaves(resposta.json()) & CHAVES_PROIBIDAS
+    assert not chaves_do_paciente(resposta.json()) & CHAVES_PROIBIDAS
 
 
 def test_rf028_fila_inexistente_retorna_404(api, paciente, mundo):
@@ -250,7 +250,7 @@ def test_am001_paciente_b_nao_le_nem_cancela_solicitacao_de_a(api, sessao, pacie
 
     assert cliente_b.get(f"/api/v1/solicitacoes/{id_a}").status_code == 404
     assert cancelar(cliente_b, id_a).status_code == 404
-    assert cliente_b.get("/api/v1/solicitacoes").json() == []
+    assert cliente_b.get("/api/v1/solicitacoes").json() == {"total": 0, "itens": []}
     assert sessao.get(Solicitacao, id_a).status == "EM_ANALISE"
 
 
@@ -261,7 +261,7 @@ def test_rf030_situacao_separa_abertas_e_encerradas(api, sessao, paciente, mundo
 
     def ids(situacao=None):
         params = {"situacao": situacao} if situacao else {}
-        return {s["id"] for s in api.get("/api/v1/solicitacoes", params=params).json()}
+        return {s["id"] for s in api.get("/api/v1/solicitacoes", params=params).json()["itens"]}
 
     assert ids() == {aberta, encerrada}
     assert ids("abertas") == {aberta}
@@ -373,7 +373,7 @@ def test_adr007_respostas_do_paciente_sem_chaves_proibidas(api, sessao, paciente
 
     for resposta in respostas:
         assert resposta.status_code in (200, 201), resposta.text
-        assert not chaves(resposta.json()) & CHAVES_PROIBIDAS, resposta.request.url
+        assert not chaves_do_paciente(resposta.json()) & CHAVES_PROIBIDAS, resposta.request.url
     detalhe = respostas[4].json()
     assert detalhe["respostas"] == [{"descricao": "Pergunta sintética P_FILHOS", "valor": True}]
 

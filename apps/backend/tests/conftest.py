@@ -38,6 +38,25 @@ from app.infra.relogio import RelogioFixo  # noqa: E402
 
 BACKEND = Path(__file__).resolve().parent.parent
 
+# Todo erro (>= 400) que algum teste provocou: (método, rota, status). Quem confere é
+# `test_contrato.py`, que roda por último.
+ERROS_PROVOCADOS: set[tuple[str, str, int]] = set()
+_request_original = TestClient.request
+
+
+def _request_registrando(self, method, url, *args, **kwargs):
+    resposta = _request_original(self, method, url, *args, **kwargs)
+    if resposta.status_code >= 400:
+        ERROS_PROVOCADOS.add((method.upper(), resposta.request.url.path, resposta.status_code))
+    return resposta
+
+
+TestClient.request = _request_registrando
+
+
+def pytest_collection_modifyitems(items):
+    items.sort(key=lambda item: item.get_closest_marker("ultimo") is not None)  # estável
+
 
 def alembic_config() -> Config:
     config = Config(str(BACKEND / "alembic.ini"))

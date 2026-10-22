@@ -12,7 +12,7 @@ from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
 import pytest
-from sqlalchemy import func, select, text
+from sqlalchemy import event, func, select, text
 from sqlalchemy.orm import Session
 
 from app.dominio.agendamento.estados import confirmar as confirmar_agendamento
@@ -43,6 +43,7 @@ from app.infra.solicitacoes import gravar_transicao, para_dominio
 from app.worker import jobs
 from tests.fila_sintetica import (
     chaves,
+    chaves_do_paciente,
     criar_equipe,
     criar_paciente,
     csrf,
@@ -433,6 +434,54 @@ def test_uc004_detalhe_mostra_a_proposta(api, proposta):
     assert ativo["unidade"]["sigla"] == "TST1"
     assert "endereco" in ativo
     assert not chaves(detalhe) & CHAVES_PROIBIDAS
+
+
+def test_rf030_lista_traz_o_resumo_do_agendamento_ativo(api, proposta):
+    corpo = api.get("/api/v1/solicitacoes").json()
+
+    assert corpo["total"] == 1
+    (item,) = corpo["itens"]
+    assert item["status"] == "EM_PROPOSTA"
+    ativo = item["agendamento_ativo"]
+    assert ativo["id"] == str(proposta.id) and ativo["status"] == "PROPOSTO"
+    assert ativo["inicio"] == "2026-10-29T09:00:00-03:00"
+    assert ativo["expira_em"] == "2026-10-21T09:00:00-03:00"
+    assert ativo["profissional"] == "Dra. Sintética Exemplo"
+    assert ativo["unidade"]["sigla"] == "TST1"
+    assert {"fim", "endereco"}.isdisjoint(ativo)  # o resto fica no detalhe
+    assert not chaves_do_paciente(corpo) & CHAVES_PROIBIDAS
+
+
+def test_rf030_solicitacao_sem_agendamento_traz_null(api, sessao, paciente, mundo):
+    solicitacao_na_fila(sessao, paciente, mundo.mamografia)
+
+    (item,) = api.get("/api/v1/solicitacoes").json()["itens"]
+
+    assert item["agendamento_ativo"] is None
+
+
+def test_rf030_lista_nao_faz_n_mais_1(api, sessao, conexao, paciente, mundo, proposta):
+    comandos: list[str] = []
+
+    def contar(_conn, _cursor, statement, *_args):
+        comandos.append(statement)
+
+    def consultas_da_lista() -> int:
+        comandos.clear()
+        event.listen(conexao, "before_cursor_execute", contar)
+        try:
+            assert api.get("/api/v1/solicitacoes").status_code == 200
+        finally:
+            event.remove(conexao, "before_cursor_execute", contar)
+        return len(comandos)
+
+    com_uma = consultas_da_lista()
+    for fila in (mundo.mamografia, mundo.laqueadura, mundo.fila_outra_unidade):
+        solicitacao_na_fila(sessao, paciente, fila)
+    com_quatro = consultas_da_lista()
+
+    assert com_quatro == com_uma
+    assert sum("FROM agendamento" in c or "JOIN agendamento" in c for c in comandos) == 1
 
 
 def test_uc004_confirmar_dentro_do_prazo(api, sessao, paciente, proposta, relogio):

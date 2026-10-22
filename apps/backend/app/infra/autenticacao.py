@@ -79,8 +79,8 @@ def emitir_access_token(
 def ler_access_token(token: str, agora: datetime, chave: str) -> tuple[UUID, UUID] | None:
     """(ID do usuário, família da sessão), ou None se o token é inválido ou venceu.
 
-    Não depende do transporte: a web manda o token em cookie; o mobile mandará em
-    `Authorization: Bearer` (ADR-003). O vencimento é conferido com o `Relogio`, não com o
+    Não depende do transporte: a web manda o token em cookie; o Bearer não será
+    ativado (ADR-003). O vencimento é conferido com o `Relogio`, não com o
     relógio do PyJWT, para os testes poderem fixar o tempo.
     """
     try:

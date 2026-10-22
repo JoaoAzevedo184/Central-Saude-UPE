@@ -1,6 +1,6 @@
 # 001 — Stack do projeto
 
-- **Status:** Aceito para backend, banco e infraestrutura. Frontend: Proposto (em revisão pelo grupo)
+- **Status:** Aceito para backend, banco, infraestrutura e base técnica do frontend
 - **Data:** 2026-10-12
 
 ## Contexto
@@ -12,7 +12,7 @@ Seis integrantes, todos atuando como fullstack, com cerca de cinco semanas de de
 - **Backend:** Python com FastAPI **síncrono**, SQLAlchemy 2, Alembic para migrações, Pydantic para validação e Pytest para testes. Python é a linguagem predominante do grupo.
 - **Banco:** PostgreSQL.
 - **Infraestrutura:** Docker Compose, Nginx e GitHub Actions ([ADR-012](ADR-012-implantacao.md)).
-- **Frontend (proposta em revisão):** React + TypeScript + Vite, com React Router, TanStack Query, React Hook Form e Zod. A escolha final depende da conversa do grupo; quando fechar, este ADR é atualizado ou substituído.
+- **Frontend:** React + TypeScript + Vite, com React Router, TanStack Query, React Hook Form e Zod. Em 2026-10-21, foi autorizada a implementação somente da base técnica anteriormente aprovada: configuração, cliente HTTP, sessão, rotas protegidas e layouts vazios. Telas de negócio continuam fora desta tarefa. Detalhes e comandos: [base do frontend](../architecture/frontend.md).
 
 ## Alternativas consideradas
 

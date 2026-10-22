@@ -3,6 +3,8 @@
 - **Status:** Aceito
 - **Data:** 2026-10-12
 
+> **Nota (2026-10-21):** o grupo descartou o app mobile ([ADR-015](ADR-015-app-mobile.md)). O site responsivo, mobile-first, é o único cliente do paciente. As linhas abaixo sobre o app React Native, o push e o segundo cliente ficam como histórico.
+
 ## Contexto
 
 O planejamento inicial previa web e app mobile. Com o prazo do MVP em novembro, fazer os dois dividiria a equipe. O paciente acessa principalmente pelo celular, então a experiência mobile não pode ficar de fora.

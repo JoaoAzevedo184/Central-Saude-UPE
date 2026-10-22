@@ -13,7 +13,7 @@ Toda integração externa fica atrás de uma interface do domínio, com uma impl
 
 | Interface | Implementações no MVP | Depois |
 | --- | --- | --- |
-| `CanalNotificacao` | Site (in-app) e e-mail (SMTP) | Telegram via n8n (ADR-013), push (ADR-015) |
+| `CanalNotificacao` | Site (in-app) e e-mail (SMTP) | Nenhum canal previsto: Telegram ([ADR-013](ADR-013-n8n-telegram.md)) e push ([ADR-015](ADR-015-app-mobile.md)) foram descartados |
 | `ReguladorGateway` | Simulada, com dados sintéticos | Conector real, se a UPE disponibilizar |
 
 ## Consequências

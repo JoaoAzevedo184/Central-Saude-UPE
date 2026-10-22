@@ -1,6 +1,6 @@
 # NNN — Título curto da decisão
 
-- **Status:** Proposto | Provisório | Aceito | Progressivo | Adiado | Substituído por [NNN](NNN-titulo.md)
+- **Status:** Proposto | Provisório | Aceito | Progressivo | Adiado | Substituído por [NNN](NNN-titulo.md) | Descartado
 - **Data:** AAAA-MM-DD
 - **Gatilho** (só para Adiado): métrica e limite que justificam rever a decisão
 

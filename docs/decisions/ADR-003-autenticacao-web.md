@@ -3,6 +3,8 @@
 - **Status:** Aceito
 - **Data:** 2026-10-12
 
+> **Nota (2026-10-21):** o Bearer não será ativado, porque o app mobile foi descartado ([ADR-015](ADR-015-app-mobile.md)). O serviço de tokens pode continuar como está (aceita o token fora de cookie), mas a API só lê cookies.
+
 ## Contexto
 
 O sistema lida com dados de saúde. Guardar tokens em `localStorage` deixa o token acessível a qualquer script injetado na página (XSS). Ao mesmo tempo, o app mobile futuro não usa cookies de navegador.

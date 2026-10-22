@@ -35,4 +35,5 @@ testpaths = ["tests"]
 addopts = "-ra --strict-markers"
 markers = [
     "integracao: usa o PostgreSQL real definido por DATABASE_URL",
+    "ultimo: roda depois de todos os outros (confere o que a suíte inteira provocou)",
 ]

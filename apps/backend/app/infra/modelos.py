@@ -31,46 +31,24 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import INET, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.dominio.vocabulario import (
+    MOTIVOS_CANCELAMENTO,
+    MOTIVOS_CANCELAMENTO_AGENDAMENTO,
+    ORIGENS_CRITERIO,
+    PAPEIS,
+    RISCOS,
+    SITUACOES_USUARIO,
+    STATUS_AGENDAMENTO,
+    STATUS_SOLICITACAO,
+    STATUS_VAGA,
+    TIPOS_CRITERIO,
+    TIPOS_HISTORICO,
+    TURNOS,
+)
 from app.infra.db import Base
 
-PAPEIS = ("PACIENTE", "ATENDENTE", "GESTOR", "ADMIN")
-SITUACOES_USUARIO = ("ATIVO", "SUSPENSO")
 SEXOS = ("FEMININO", "MASCULINO")
 FINALIDADES_CONSENTIMENTO = ("AGENDAMENTO", "LEMBRETE_EMAIL")
-TIPOS_CRITERIO = ("SIM_NAO", "NUMERO", "OPCAO")
-ORIGENS_CRITERIO = ("PACIENTE", "REGULACAO", "EQUIPE")
-STATUS_VAGA = ("ATIVA", "BLOQUEADA")
-RISCOS = ("VERMELHO", "AMARELO", "VERDE")
-TURNOS = ("MANHA", "TARDE", "QUALQUER")
-STATUS_SOLICITACAO = ("EM_ANALISE", "NA_FILA", "EM_PROPOSTA", "AGENDADA", "ATENDIDA", "CANCELADA")
-MOTIVOS_CANCELAMENTO = (
-    "NAO_PRECISO_MAIS",
-    "CONSEGUI_EM_OUTRO_LUGAR",
-    "DIFICULDADE_DE_DESLOCAMENTO",
-    "CONFLITO_DE_HORARIO",
-    "OUTRO",
-)
-STATUS_AGENDAMENTO = ("PROPOSTO", "CONFIRMADO", "CANCELADO", "EXPIRADO", "REALIZADO", "FALTOU")
-MOTIVOS_CANCELAMENTO_AGENDAMENTO = (
-    "RECUSADO_PELO_PACIENTE",
-    "CANCELADO_PELO_PACIENTE",
-    "CANCELADO_PELA_EQUIPE",  # reservado
-    "VAGA_BLOQUEADA",  # reservado
-)
-TIPOS_HISTORICO = (
-    "CRIADA",
-    "CLASSIFICADA",
-    "ENTROU_NA_FILA",
-    "PROPOSTA_ENVIADA",
-    "CONFIRMADA",
-    "RECUSADA",
-    "PROPOSTA_EXPIRADA",
-    "FALTOU",
-    "ATENDIDA",
-    "CANCELADA",
-    "REENTROU_NA_FILA",
-    "RECLASSIFICADA",
-)
 CANAIS = ("IN_APP", "EMAIL")
 STATUS_ENVIO = ("PENDENTE", "ENVIADA", "FALHOU", "CANCELADA")
 STATUS_OUTBOX = ("PENDENTE", "PROCESSADO", "FALHOU")
@@ -321,7 +299,7 @@ class Solicitacao(Base):
         CheckConstraint(
             "status <> 'NA_FILA' OR data_entrada_fila IS NOT NULL", name="na_fila_com_entrada"
         ),
-        em("motivo_cancelamento", MOTIVOS_CANCELAMENTO),
+        em("motivo_cancelamento", tuple(MOTIVOS_CANCELAMENTO)),
         CheckConstraint(
             "motivo_cancelamento IS NULL OR status = 'CANCELADA'", name="motivo_so_se_cancelada"
         ),

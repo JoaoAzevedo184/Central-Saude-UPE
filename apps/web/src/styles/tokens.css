@@ -1,0 +1,24 @@
+:root {
+  --color-brand: #0b5872;
+  --color-brand-dark: #083f52;
+  --color-text: #15232b;
+  --color-text-muted: #4f6168;
+  --color-surface: #fff;
+  --color-surface-soft: #e6f1ef;
+  --color-divider: #d5dfe1;
+  --color-control-border: #4f6168;
+  --color-error: #a12622;
+  --font-body: system-ui, sans-serif;
+  --font-size-input: 1rem;
+  --radius-control: 8px;
+  --control-height: 52px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+}

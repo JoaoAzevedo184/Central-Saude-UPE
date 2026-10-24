@@ -9,10 +9,10 @@ export interface ProblemDetails extends Pick<Problema, 'type' | 'title' | 'statu
 }
 
 export const mensagensPorTipo: Readonly<Record<string, string>> = {
-  '/problemas/cadastro-nao-concluido': 'Não foi possível criar sua conta. Confira seus dados ou procure ajuda da equipe.',
-  '/problemas/credenciais-invalidas': 'Confira seu CPF ou e-mail e sua senha.',
+  '/problemas/cadastro-nao-concluido': 'Não foi possível concluir o cadastro. Se você já tem conta, entre com seu CPF.',
+  '/problemas/credenciais-invalidas': 'CPF/e-mail ou senha incorretos.',
   '/problemas/csrf-invalido': 'Não foi possível verificar esta ação. Atualize a página e tente novamente.',
-  '/problemas/muitas-tentativas': 'Você tentou muitas vezes. Aguarde um pouco antes de tentar novamente.',
+  '/problemas/muitas-tentativas': 'Muitas tentativas. Aguarde alguns minutos e tente de novo.',
   '/problemas/nao-autenticado': 'Sua sessão terminou. Entre novamente para continuar.',
   '/problemas/nao-elegivel': 'Você não atende aos critérios desta fila. Confira as orientações da fila.',
   '/problemas/operacao-nao-permitida': 'Esta ação não está disponível para este atendimento.',

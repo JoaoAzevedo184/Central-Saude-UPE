@@ -3,6 +3,8 @@ import { EquipeLayout } from '../layouts/EquipeLayout'
 import { PacienteLayout } from '../layouts/PacienteLayout'
 import { ExigirPapel } from '../shared/auth/ExigirPapel'
 import { GerenciarSessao } from '../shared/auth/GerenciarSessao'
+import { Entrar } from '../pages/auth/Entrar'
+import { CriarConta } from '../pages/auth/CriarConta'
 
 export function Rotas() {
   return (
@@ -12,9 +14,8 @@ export function Rotas() {
         <Route path="/" element={
           <main><h1>Central de Teleagendamento</h1><p>Base do frontend. Telas em desenvolvimento.</p></main>
         } />
-        <Route path="/entrar" element={
-          <main><h1>Entrar</h1><p>Tela de login em desenvolvimento.</p></main>
-        } />
+        <Route path="/entrar" element={<Entrar />} />
+        <Route path="/criar-conta" element={<CriarConta />} />
         <Route element={<ExigirPapel papeis={['PACIENTE']} />}>
           <Route path="/paciente" element={<PacienteLayout />} />
         </Route>

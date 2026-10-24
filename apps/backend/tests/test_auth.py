@@ -783,3 +783,52 @@ def test_uc001_termo_configurado_tem_arquivo_de_texto():
     from app.api.rotas.termos import PASTA_TERMOS
 
     assert (PASTA_TERMOS / f"{get_settings().termo_versao_atual}.md").is_file()
+
+
+PALAVRAS_DE_EXISTENCIA = ("já cadastrad", "já existe", "já está", "já tem", "já possui", "duplicad", "em uso")
+
+
+@pytest.mark.parametrize(
+    "mudanca",
+    [{"email": "sem-arroba"}, {"senha": "curta"}, {"cns": "123456789019999"}, {"aceite_termo": False}],
+)
+def test_am005_422_do_registro_nao_revela_existencia_de_cpf_cns_ou_email(api, sessao, mudanca):
+    assert registrar(api).status_code == 201  # CPF, CNS e e-mail de dados_registro() já existem
+    # mesmo CPF/CNS/e-mail do cadastro existente, só com o campo inválido
+    existente = registrar(novo_cliente(), **mudanca)
+    # CPF/CNS/e-mail inéditos, mesmo campo inválido
+    inedito = registrar(
+        novo_cliente(),
+        **{
+            "cpf": cpf("888777666"),
+            "cns": cns_definitivo("10000000001"),
+            "email": "outra.pessoa@exemplo.com",
+            **mudanca,
+        },
+    )
+
+    assert existente.status_code == inedito.status_code == 422
+    for resposta in (existente, inedito):
+        texto = resposta.text.lower()
+        assert not any(palavra in texto for palavra in PALAVRAS_DE_EXISTENCIA)
+    # a validação não depende do que existe no banco: mesmos campos acusados, mesmas mensagens
+    def erros(resposta):
+        return sorted((tuple(e["loc"]), e["msg"]) for e in resposta.json()["errors"])
+
+    assert erros(existente) == erros(inedito)
+
+
+def test_am005_422_do_login_nao_revela_existencia_de_cpf_ou_email(api, sessao):
+    criar_paciente(sessao)
+    criar_usuario(sessao, "ATENDENTE", email="equipe.teste@exemplo.com")
+
+    # identificador existente (CPF e e-mail) e inexistente, sem a senha
+    respostas = [
+        api.post("/api/v1/auth/login", json={"identificador": i})
+        for i in (CPF_PACIENTE, "equipe.teste@exemplo.com", cpf("888777666"))
+    ]
+
+    assert {r.status_code for r in respostas} == {422}
+    for resposta in respostas:
+        assert not any(p in resposta.text.lower() for p in PALAVRAS_DE_EXISTENCIA)
+    assert len({tuple((tuple(e["loc"]), e["msg"]) for e in r.json()["errors"]) for r in respostas}) == 1

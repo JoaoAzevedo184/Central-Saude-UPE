@@ -1,5 +1,6 @@
-import { Outlet } from 'react-router'
+import { Outlet, useLocation } from 'react-router'
 
 export function PacienteLayout() {
-  return <main aria-label="Área do paciente"><Outlet /></main>
+  const { state } = useLocation()
+  return <main aria-label="Área do paciente">{state?.mensagem === 'Conta criada.' && <p role="status">Conta criada.</p>}<Outlet /></main>
 }

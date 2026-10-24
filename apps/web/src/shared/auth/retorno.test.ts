@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
+import type { Location } from 'react-router'
 import { estadoParaEntrar, rotaAposLogin } from './retorno'
 
 describe('ADR-003 — retorno após o login', () => {
-  it('preserva caminho, busca e fragmento no estado da navegação', () => {
-    const state = estadoParaEntrar({ pathname: '/equipe', search: '?data=2026-10-21', hash: '#agenda' })
-    expect(rotaAposLogin(state)).toBe('/equipe?data=2026-10-21#agenda')
+  it('guarda só o caminho no estado da navegação, sem busca nem fragmento', () => {
+    const state = estadoParaEntrar({ pathname: '/equipe', search: '?data=2026-10-21', hash: '#agenda' } as Location)
+    expect(state).toEqual({ origem: '/equipe' })
+    expect(rotaAposLogin(state)).toBe('/equipe')
   })
 
   it.each([undefined, null, {}, { origem: 42 }, { origem: 'https://externo.example' },

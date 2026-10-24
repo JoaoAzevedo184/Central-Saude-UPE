@@ -1,7 +1,8 @@
 import type { Location } from 'react-router'
 
-export function estadoParaEntrar(location: Pick<Location, 'pathname' | 'search' | 'hash'>) {
-  return { origem: `${location.pathname}${location.search}${location.hash}` }
+// Guarda só o pathname: query e hash não vão para o history.state (AM-003).
+export function estadoParaEntrar(location: Pick<Location, 'pathname'>) {
+  return { origem: location.pathname }
 }
 
 // A futura tela de login consome o state do Router após autenticar, sem persistir dados no navegador.

@@ -77,8 +77,8 @@ describe('ADR-003/ADR-025/ADR-028 — rotas e proteção por papel', () => {
     abrir('/paciente?aba=abertas#pedido')
     expect(await screen.findByRole('heading', { name: 'Entrar' })).toBeTruthy()
     const location = JSON.parse(screen.getByTestId('localizacao').textContent!)
-    expect(location).toEqual({ pathname: '/entrar', state: { origem: '/paciente?aba=abertas#pedido' } })
-    expect(rotaAposLogin(location.state)).toBe('/paciente?aba=abertas#pedido')
+    expect(location).toEqual({ pathname: '/entrar', state: { origem: '/paciente' } })
+    expect(rotaAposLogin(location.state)).toBe('/paciente')
     expect(fetcher).toHaveBeenCalledTimes(2)
   })
 
@@ -97,7 +97,7 @@ describe('ADR-003/ADR-025/ADR-028 — rotas e proteção por papel', () => {
     </QueryClientProvider>)
     await screen.findByRole('heading', { name: 'Entrar' })
     expect(JSON.parse(screen.getByTestId('localizacao').textContent!)).toEqual({
-      pathname: '/entrar', state: { origem: '/equipe?ordenacao=chegada#fila' },
+      pathname: '/entrar', state: { origem: '/equipe' },
     })
     expect(screen.queryByRole('main')).toBeNull()
   })
@@ -138,7 +138,7 @@ describe('ADR-003/ADR-025/ADR-028 — rotas e proteção por papel', () => {
     expect(client.getQueryData(['avisos'])).toBeUndefined()
     expect(client.isFetching()).toBe(0)
     expect(JSON.parse(screen.getByTestId('localizacao').textContent!)).toEqual({
-      pathname: '/entrar', state: { origem: '/paciente?aba=abertas#pedido' },
+      pathname: '/entrar', state: { origem: '/paciente' },
     })
     expect(fetcher.mock.calls.filter(([url]) => url === '/api/v1/auth/refresh')).toHaveLength(1)
   })

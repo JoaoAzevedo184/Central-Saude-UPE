@@ -9,7 +9,7 @@ describe('RFC 9457 — mensagens dos problemas', () => {
   })
 
   it.each([
-    ['/problemas/credenciais-invalidas', 'Confira seu CPF ou e-mail e sua senha.'],
+    ['/problemas/credenciais-invalidas', 'CPF/e-mail ou senha incorretos.'],
     ['/problemas/proposta-expirada', 'O prazo para confirmar esta vaga terminou.'],
     ['/problemas/solicitacao-duplicada', 'Você já tem um pedido aberto nesta fila.'],
   ])('escolhe a mensagem por type: %s', (type, message) => {

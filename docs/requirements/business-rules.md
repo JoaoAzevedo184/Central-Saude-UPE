@@ -70,3 +70,44 @@ Quando o agendamento termina em `FALTOU`, a solicitação volta para `NA_FILA`, 
 | RN-018 | Cada paciente tem no máximo uma solicitação ativa (status fora de `ATENDIDA` e `CANCELADA`) por fila, garantida pelo índice único parcial `ux_solicitacao_ativa_por_fila`. A segunda tentativa responde `409` com o ID da solicitação existente. Depois de encerrada, uma nova é permitida | [data-model](../architecture/data-model.md) |
 | RN-019 | Turno da vaga pela hora local de início em `America/Recife`: antes de 12h é `MANHA`; a partir de 12h, `TARDE`. A solicitação com `turno_preferido` `QUALQUER` aceita as duas. O matching pula quem prefere outro turno | [UC-003](use-cases/UC-003-propor-vaga.md) |
 | RN-020 | *(Proposta; validar com o grupo e a UPE.)* Recusas contam só desde a última entrada na fila (`data_entrada_fila`). As primeiras `RECUSAS_MANTENDO_POSICAO` (padrão 1) mantêm a posição; a seguinte manda a solicitação para o fim da fila (RN-014), e a contagem zera | [UC-005](use-cases/UC-005-pedir-outra-data-ou-cancelar.md) |
+| RN-021 | Os indicadores do gestor seguem as fórmulas da seção [Indicadores do gestor](#indicadores-do-gestor-rn-021): cada família de contagens tem a própria âncora de tempo, as semanas são as de Recife (segunda-feira) e razão com denominador 0 é `null`. Proposta cancelada sem resposta fica fora das taxas; "ocupadas" inclui vagas futuras; filas inativas contam | [API](../architecture/api-design.md#indicadores-do-gestor) |
+| RN-022 | Conta criada ou redefinida pelo admin (ou pelo terminal do servidor) nasce com senha temporária e só pode trocar a senha: toda rota autenticada responde `403` até a troca, menos `/me`, `/auth/trocar-senha`, `/auth/logout` e `/auth/refresh`. A senha nova tem ao menos 10 caracteres e é diferente da atual. A troca revoga as outras sessões do usuário. Errar a senha atual conta no limite de tentativas do login (AM-020) | [controle de acesso](../security/access-control.md), [API](../architecture/api-design.md#sessão-cookies-e-csrf) |
+
+## Indicadores do gestor (RN-021)
+
+Para as filas do escopo do usuário (e, se pedido, só a unidade ou a fila indicada), dentro de um período de 1 a 366 dias (inclusivos, em `America/Recife`). Cada contagem é agrupada pela **semana de Recife** (segunda-feira) da sua âncora; o total do período é a soma das semanas. Uma conta nunca mistura âncoras: uma proposta feita na semana 1 e confirmada na 2 conta na semana 1.
+
+| Família | Âncora de tempo | Contagens |
+| --- | --- | --- |
+| Propostas | `agendamento.proposto_em` | `confirmadas`, `recusadas`, `expiradas`, `propostas_canceladas_sem_resposta` |
+| Atendimento | `vaga.inicio` | `realizadas`, `faltas` |
+| Solicitações | `solicitacao.criada_em` | `solicitacoes_criadas`, `desistencias` |
+| Vagas | `vaga.inicio` | `vagas_ofertadas`, `vagas_ocupadas`, `vagas_reaproveitadas`, `vagas_perdidas` |
+
+**Propostas** (cada agendamento é uma proposta, [ADR-021](../decisions/ADR-021-matching-automatico.md)):
+
+- `confirmadas`: propostas com `confirmado_em` preenchido. **Uma confirmação que o paciente cancelou depois continua confirmada**: a proposta foi aceita, e o cancelamento aparece nas desistências e na vaga liberada.
+- `recusadas`: `CANCELADO` com motivo `RECUSADO_PELO_PACIENTE`.
+- `expiradas`: `EXPIRADO`.
+- `propostas_encerradas` = `confirmadas` + `recusadas` + `expiradas`. É o denominador das três taxas: `taxa_confirmacao`, `taxa_recusa` e `taxa_expiracao` (cada uma ÷ `propostas_encerradas`). Proposta ainda `PROPOSTO` não entra, porque ainda não tem desfecho.
+- `propostas_canceladas_sem_resposta`: `CANCELADO` sem `confirmado_em` e sem ser recusa (por exemplo, o paciente cancelou a solicitação com a proposta aberta). **Fica à parte e fora das taxas**: não é confirmação, recusa nem expiração, e somá-la distorceria as três.
+
+**Atendimento:** `realizadas` (`REALIZADO`) e `faltas` (`FALTOU`) das vagas que começaram no recorte. `taxa_faltas` = `faltas` ÷ (`realizadas` + `faltas`).
+
+**Solicitações:** `solicitacoes_criadas` e, dessas, `desistencias` (status atual `CANCELADA` com motivo, isto é, cancelada pelo paciente). `taxa_desistencia` = `desistencias` ÷ `solicitacoes_criadas`. A âncora é a criação, então a taxa de uma semana recente ainda pode subir.
+
+**Vagas** (só `status_admin = 'ATIVA'`; vaga bloqueada não é oferta):
+
+- `vagas_ofertadas`: vagas ativas que começam no recorte.
+- `vagas_ocupadas`: ofertadas com agendamento `CONFIRMADO`, `REALIZADO` ou `FALTOU`. **Inclui vagas futuras já confirmadas**: nem toda "ocupada" já foi atendida. Para o que já aconteceu, use `realizadas` e `faltas`.
+- `vagas_reaproveitadas`: ocupadas cujo agendamento confirmado foi precedido, na mesma vaga, por uma proposta desfeita (`CANCELADO` ou `EXPIRADO`) de **outra** solicitação ([RN-005](#regras)).
+- `vagas_perdidas`: ofertadas que já começaram (`inicio` anterior a agora) sem agendamento `CONFIRMADO`, `REALIZADO` ou `FALTOU`.
+
+**Tempo de espera:** das solicitações cuja **primeira confirmação** cai no período, a diferença em dias entre a primeira entrada na fila (`ENTROU_NA_FILA` mais antiga) e essa confirmação. Devolve a quantidade, a mediana e o percentil 90 (interpolados), com 2 casas. Uma volta ao fim da fila (RN-014) não reinicia a contagem. Se duas confirmações da mesma solicitação tiverem exatamente o mesmo `confirmado_em`, as duas contam como "primeira" (empate aceito).
+
+**Fila atual:** solicitações `NA_FILA` agora, por cor de risco. Não depende do período.
+
+**Decisões aceitas:**
+- filas **inativas** entram nas contas (a história delas continua valendo); o filtro `unidade_id` de uma unidade sem nenhuma fila no escopo responde `404`, e esse `404` não é auditado;
+- as taxas só têm sentido quando o denominador é maior que 0; senão a resposta traz `null`, nunca `0`;
+- vagas e propostas de dados anteriores à migração 0007 podem ter `confirmado_em` aproximado ([modelo de dados](../architecture/data-model.md)).

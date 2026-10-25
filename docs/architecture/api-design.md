@@ -1,6 +1,6 @@
 # API
 
-> **Rascunho.** Sessão e conta, solicitações do paciente, resposta à proposta, painel da equipe, agenda do dia, presença e painel de vagas estão implementados; os demais endpoints são a proposta inicial e vão mudar durante a implementação. A referência definitiva será a documentação OpenAPI gerada pelo FastAPI em `/api/v1/docs`.
+> **Rascunho.** Sessão e conta (com a troca de senha), solicitações do paciente, resposta à proposta, painel da equipe, agenda do dia, presença, painel de vagas, indicadores do gestor e a administração de contas estão implementados; os demais endpoints são a proposta inicial e vão mudar durante a implementação. A referência definitiva será a documentação OpenAPI gerada pelo FastAPI em `/api/v1/docs`.
 
 ## Convenções (propostas)
 
@@ -16,7 +16,9 @@
   | `/problemas/proposta-expirada` | `409` | Confirmar ou recusar depois de `expira_em`, mesmo antes de o Worker expirar a proposta ([UC-004](../requirements/use-cases/UC-004-confirmar-proposta.md)) |
   | `/problemas/tolerancia-nao-encerrada` | `409` | Falta registrada antes de `início da vaga + tolerância`, inclusive no limite exato (RN-013) |
   | `/problemas/erro-de-dominio` | `409` | Outra regra de negócio violada, sem `type` mais específico |
-  | `/problemas/operacao-nao-permitida` | `409` | A operação é válida em geral, mas não neste alvo (ex.: suspender a si mesmo, um paciente ou o último ADMIN ativo) |
+  | `/problemas/operacao-nao-permitida` | `409` | A operação é válida em geral, mas não neste alvo (ex.: suspender a si mesmo, um paciente ou o último ADMIN ativo; redefinir a senha de um ADMIN pela API; atribuir fila a quem não é ATENDENTE ou unidade a quem não é GESTOR) |
+  | `/problemas/visao-central-nao-confirmada` | `409` | Gestor sem unidade (criar ou atribuir) sem `confirmar_visao_central: true`: sem unidades, ele passa a ver a central inteira ([ADR-025](../decisions/ADR-025-escopo-por-fila.md)) |
+  | `/problemas/email-ja-cadastrado` | `409` | `POST /admin/usuarios` com e-mail que já tem conta. Só o ADMIN vê este erro, então a mensagem pode ser específica (diferente do registro, AM-005) |
   | `/problemas/nao-elegivel` | `409` | O paciente não cumpre a elegibilidade da fila (RN-017); o `detail` traz o motivo |
   | `/problemas/solicitacao-duplicada` | `409` | Já existe solicitação ativa do paciente na fila (RN-018); traz o campo extra `solicitacao_id` da existente |
   | `/problemas/sem-consentimento` | `403` | Sem consentimento vigente `AGENDAMENTO` para criar a solicitação (RN-009) |
@@ -25,15 +27,18 @@
   | `/problemas/credenciais-invalidas` | `401` | Login com identificador inexistente, senha errada ou conta suspensa; o corpo é idêntico nos três casos |
   | `/problemas/sem-permissao` | `403` | Papel sem permissão para a rota (`exige_papel`) |
   | `/problemas/csrf-invalido` | `403` | Escrita sem o header `X-CSRF-Token` ou com valor diferente do cookie |
-  | `/problemas/muitas-tentativas` | `429` | Limite de tentativas de login ou de registro; traz o header `Retry-After` (em segundos) |
+  | `/problemas/muitas-tentativas` | `429` | Limite de tentativas de login, de registro ou de troca de senha; traz o header `Retry-After` (em segundos) |
+  | `/problemas/troca-de-senha-obrigatoria` | `403` | Conta com senha temporária chamando qualquer rota autenticada que não seja `/me`, `/auth/trocar-senha`, `/auth/logout` ou `/auth/refresh` ([RN-022](../requirements/business-rules.md)) |
+  | `/problemas/consulta-demorada` | `503` | Uma consulta dos indicadores passou de `INDICADORES_TIMEOUT_S` (padrão 5 s). Traz `Retry-After: 30` e uma mensagem neutra; nunca `500` |
   - **No OpenAPI:** o corpo de erro é o schema `Problema` (`type`, `title`, `status`, `detail`, `instance`, `errors`), servido como `application/problem+json`. O `HTTPValidationError` do FastAPI não existe no contrato, porque o `422` real também é Problem Details. Cada rota declara as respostas de erro que pode dar (`401`, `403`, `404`, `409`, `422`…), com o `type` na descrição. Os tipos ficam sob `/problemas/*` (tabela acima).
 - **Códigos de status mais usados:**
   - `401`: sem sessão
-  - `403`: sem permissão para o papel ou o escopo; CSRF inválido
+  - `403`: sem permissão para o papel ou o escopo; CSRF inválido; troca de senha obrigatória
   - `404`: recurso inexistente ou de outro paciente (nunca revelar que existe)
   - `409`: conflito de estado, como vaga já ocupada ou proposta já respondida
   - `422`: validação
-  - `429`: muitas tentativas de login ou de registro (`Retry-After`)
+  - `429`: muitas tentativas de login, de registro ou de troca de senha (`Retry-After`)
+  - `503`: banco indisponível no `/health`; consulta de indicadores acima do tempo máximo (`Retry-After`)
 - **Ações de estado** são sub-recursos com `POST` (`/agendamentos/{id}/confirmar`), não `PATCH` no campo `status`. Assim cada transição tem validação, autorização e auditoria próprias.
 - **Paginação** de listas: `?limit=&offset=`. `limit` de 1 a 100 (padrão 50); `offset` a partir de 0. A resposta é sempre `{total, itens}`, em que `total` conta os itens do filtro antes de `limit` e `offset`. Vale para `GET /filas`, `/solicitacoes`, `/avisos`, `/equipe/filas`, e o painel `/equipe/filas/{fila_id}/solicitacoes`. Exceções: o painel de vagas (`{total, sem_proposta, itens}`, que não pagina), `/avisos/contagem` (`{nao_lidos}`) e a agenda do dia, que segue um array simples.
 - **Enums nomeados:** papéis, riscos, turnos, status, situações da vaga, tipos de evento, tipos e origens de critério e motivos de cancelamento vêm de `app/dominio/vocabulario.py`, a mesma fonte do `CHECK` do banco, e aparecem como enums com nome no OpenAPI. Mudar um valor exige migração e regenerar o snapshot (ver [Contrato OpenAPI](#contrato-openapi)).
@@ -43,7 +48,7 @@
   - **nunca** posição na fila, tamanho da fila, nota, pontos dos critérios, classificação de risco ou estimativa derivada deles;
   - os schemas de entrada do paciente aceitam só as respostas dos critérios com origem `PACIENTE`; os pontos e a nota são calculados no servidor.
 - **O que a equipe vê:** além do que o paciente vê, a posição calculada na consulta, o risco, a nota, as respostas com os pontos e o histórico completo, com motivo. O CPF vai mascarado e o nome, abreviado na lista (ver [proteção de dados](../security/data-protection.md)).
-- **Cache:** as respostas de `/api/v1/filas`, `/api/v1/solicitacoes` e `/api/v1/equipe/` levam `Cache-Control: no-store`, como `/auth/*` e `/me`. A exceção é `/termos/vigente` (público, `Cache-Control: public, max-age=3600`).
+- **Cache:** as respostas de `/api/v1/filas`, `/api/v1/solicitacoes`, `/api/v1/avisos`, `/api/v1/equipe/` e `/api/v1/admin/` levam `Cache-Control: no-store`, como `/auth/*` e `/me`. Em `/admin/` isso importa: a senha temporária sai na resposta. A exceção é `/termos/vigente` (público, `Cache-Control: public, max-age=3600`).
 
 ## Endpoints
 
@@ -53,10 +58,11 @@ Caminhos sob `/api/v1`. Respostas de `/auth/*` e `/me` levam `Cache-Control: no-
 | Método | Rota | Quem | CSRF | Descrição |
 | --- | --- | --- | --- | --- |
 | POST | `/auth/registro` | público | não | Cria a conta de paciente com consentimento obrigatório e inicia a sessão. `201` com `{papel, expira_em}`; campo fora do schema → `422`; duplicidade → `409`; limite por IP → `429` ([UC-001](../requirements/use-cases/UC-001-cadastrar-paciente.md)) |
-| POST | `/auth/login` | público | não | Corpo `{identificador, senha}`. `identificador` com 11 dígitos (com ou sem pontuação) é CPF e vale só para paciente; qualquer outro valor é e-mail e vale só para a equipe. Responde `{papel, expira_em}`, nunca o token. Falha → `401` (`credenciais-invalidas`); bloqueio → `429` |
+| POST | `/auth/login` | público | não | Corpo `{identificador, senha}`. `identificador` com 11 dígitos (com ou sem pontuação) é CPF e vale só para paciente; qualquer outro valor é e-mail e vale só para a equipe. Responde `{papel, expira_em}`, nunca o token; com senha temporária, responde também `trocar_senha: true` (a chave não existe nos demais casos). Falha → `401` (`credenciais-invalidas`); bloqueio → `429` |
 | POST | `/auth/refresh` | cookie `refresh_token` | sim | Renova a sessão com rotação do refresh token. Responde `{papel, expira_em}` |
 | POST | `/auth/logout` | cookie `refresh_token` | sim | Revoga a família da sessão e apaga os cookies. `204`, idempotente: também responde `204` sem sessão |
-| GET | `/me` | sessão | — | `{id, papel, nome, filas}`, sempre com as quatro chaves. Paciente: `nome` preenchido e `filas` `null`. Equipe: `nome` `null`, porque `usuario` não tem nome, e `filas` com os IDs do escopo ([ADR-025](../decisions/ADR-025-escopo-por-fila.md)). Nunca traz posição nem tamanho da fila ([ADR-007](../decisions/ADR-007-paciente-ve-status.md)) |
+| POST | `/auth/trocar-senha` | sessão, mesmo com senha temporária | sim | Corpo `{senha_atual, senha_nova}`; qualquer papel. `204`. A nova senha tem ao menos 10 caracteres e é diferente da atual (`422`). Senha atual errada → `422` no campo `senha_atual` e conta na janela de tentativas (`TROCA_SENHA`, mesmo limite do login, por usuário e por IP, AM-020); excesso → `429`, sem revogar nada. Zera `senha_temporaria`, **revoga as outras sessões** do usuário (a atual continua) e grava a auditoria `TROCAR_SENHA` (sem a senha) |
+| GET | `/me` | sessão, mesmo com senha temporária | — | `{id, papel, nome, filas}`, sempre com as quatro chaves; com senha temporária, mais `trocar_senha: true`. Paciente: `nome` preenchido e `filas` `null`. Equipe: `nome` `null`, porque `usuario` não tem nome, e `filas` com os IDs do escopo ([ADR-025](../decisions/ADR-025-escopo-por-fila.md)). Nunca traz posição nem tamanho da fila ([ADR-007](../decisions/ADR-007-paciente-ve-status.md)) |
 | GET | `/termos/vigente` | público | — | `{versao, texto}` do termo em vigor (`TERMO_VERSAO_ATUAL`), para a tela de cadastro; é a versão que `/auth/registro` aceita ([UC-001](../requirements/use-cases/UC-001-cadastrar-paciente.md)). Única rota com cache: `Cache-Control: public, max-age=3600` |
 
 ### Sessão, cookies e CSRF
@@ -68,8 +74,9 @@ Caminhos sob `/api/v1`. Respostas de `/auth/*` e `/me` levam `Cache-Control: no-
 | `csrf_token` | valor aleatório | não (o frontend lê) | `/` | 7 dias |
 
 - `Secure`, `SameSite` e `Domain` vêm da configuração (`COOKIE_SECURE`, `COOKIE_SAMESITE`, `COOKIE_DOMAIN`).
-- **CSRF (double-submit):** o header `X-CSRF-Token` tem de ser igual ao cookie `csrf_token`. É exigido em todo `POST`, `PUT`, `PATCH` e `DELETE`, menos `/auth/registro` e `/auth/login`. Falha → `403` (`csrf-invalido`). Premissas e risco: AM-002 no [modelo de ameaças](../security/threat-model.md).
-- **A cada requisição**, a dependência `usuario_da_sessao` relê o usuário e a família da sessão. Suspensão, logout e reuso do refresh cortam o acesso na hora ([ADR-028](../decisions/ADR-028-suspensao-de-acesso.md)).
+- **CSRF (double-submit):** o header `X-CSRF-Token` tem de ser igual ao cookie `csrf_token`. É exigido em todo `POST`, `PUT`, `PATCH` e `DELETE`, menos `/auth/registro` e `/auth/login` (inclusive em `/auth/trocar-senha` e em todo `/admin`). Falha → `403` (`csrf-invalido`). Premissas e risco: AM-002 no [modelo de ameaças](../security/threat-model.md).
+- **A cada requisição**, a dependência `usuario_da_sessao_sem_troca` (que `usuario_da_sessao` envolve) relê o usuário e a família da sessão. Suspensão, logout e reuso do refresh cortam o acesso na hora ([ADR-028](../decisions/ADR-028-suspensao-de-acesso.md)).
+- **Troca obrigatória de senha** ([RN-022](../requirements/business-rules.md)): conta criada ou redefinida pelo ADMIN (ou pelo terminal) tem `usuario.senha_temporaria = true`. Até trocar a senha, a pessoa só chama `GET /me`, `POST /auth/trocar-senha`, `POST /auth/logout` e `POST /auth/refresh`; qualquer outra rota autenticada responde `403` `/problemas/troca-de-senha-obrigatoria`. O frontend decide pelo aviso `trocar_senha: true` do login e do `/me`. A regra está na dependência `usuario_da_sessao`, então rota nova nasce protegida (negar por padrão); só `/me` e a troca de senha usam `usuario_da_sessao_sem_troca`. O OpenAPI declara esse `403` em toda rota autenticada.
 - O serviço de tokens aceita o token fora de cookie, mas a API **não lê** `Authorization: Bearer` e não vai ler: o app mobile foi descartado ([ADR-003](../decisions/ADR-003-autenticacao-web.md)).
 
 ### Paciente: filas e solicitações
@@ -126,7 +133,7 @@ Implementadas. Qualquer usuário autenticado vê só os próprios avisos do site
 Escrita exige `X-CSRF-Token`, como nas demais rotas.
 
 ### Equipe (atendente e gestor)
-Implementadas as rotas `/equipe`. Prefixo `/equipe`; `escopo_da_equipe` é aplicado dentro da query e recurso fora do escopo responde `404`. Leitura: ATENDENTE, GESTOR e ADMIN. Escrita: só ATENDENTE. Toda leitura é auditada ([controle de acesso](../security/access-control.md)).
+Implementadas as rotas `/equipe`. Prefixo `/equipe`; `escopo_da_equipe` é aplicado dentro da query e recurso fora do escopo responde `404`. Leitura: ATENDENTE, GESTOR e ADMIN (os indicadores, só GESTOR e ADMIN). Escrita: só ATENDENTE. Toda leitura é auditada ([controle de acesso](../security/access-control.md)).
 
 | Método | Rota | Descrição |
 | --- | --- | --- |
@@ -139,6 +146,7 @@ Implementadas as rotas `/equipe`. Prefixo `/equipe`; `escopo_da_equipe` é aplic
 | GET | `/equipe/filas/{fila_id}/agendamentos?data=AAAA-MM-DD` | Agenda do dia (dia em Recife): `[{id, solicitacao_id, inicio, fim, profissional, paciente_nome, status, presenca_registrada}]`, nome abreviado, sem CPF. Entram `PROPOSTO`, `CONFIRMADO`, `REALIZADO` e `FALTOU`. Leitura auditada (`CONSULTAR_AGENDAMENTOS`) ([UC-008](../requirements/use-cases/UC-008-registrar-comparecimento-ou-falta.md)) |
 | POST | `/equipe/agendamentos/{id}/presenca` | Só ATENDENTE. Corpo `{compareceu: bool}`. Ver abaixo |
 | GET | `/equipe/filas/{fila_id}/vagas?de=AAAA-MM-DD&ate=AAAA-MM-DD` | Painel de vagas: `{total, sem_proposta, itens: [{id, inicio, fim, profissional, situacao}]}`. Período de 1 a 31 dias, inclusivo; fora disso → `422`. Leitura auditada (`CONSULTAR_VAGAS`). Ver abaixo |
+| GET | `/equipe/indicadores?de=&ate=&unidade_id=&fila_id=` | Só GESTOR e ADMIN (atendente → `403`). Indicadores do período, só contagens e razões, sem dado de paciente. Leitura auditada (`CONSULTAR_INDICADORES`). Ver [Indicadores do gestor](#indicadores-do-gestor) |
 
 - **Posição:** só para `NA_FILA`. É `ROW_NUMBER` sobre a fila inteira, calculado antes da paginação, e nunca gravado. A ordenação `prioridade` segue a mesma ordem de `ordenar_fila()` (risco, nota decrescente, chegada, id); `chegada` ordena só pela hora de chegada.
 - **`classificar`:**
@@ -152,28 +160,55 @@ Implementadas as rotas `/equipe`. Prefixo `/equipe`; `escopo_da_equipe` é aplic
 - **`presenca`:** só de `CONFIRMADO` (outro estado → `409`). `true`: a partir do início da vaga (antes → `409` `transicao-invalida`); agendamento `REALIZADO`, solicitação `ATENDIDA`, evento `ATENDIDA`, outbox `ATENDIMENTO_REGISTRADO`. `false`: só depois de `início + tolerancia_atraso_min` da fila (antes ou no limite → `409` `tolerancia-nao-encerrada`); agendamento `FALTOU`, solicitação no fim da fila (RN-014), eventos `FALTOU` e `REENTROU_NA_FILA`, outbox `FALTA_REGISTRADA`. Agendamento fora do escopo → `404`. Responde o detalhe da solicitação da equipe.
 - **`situacao` da vaga**, calculada na consulta por `situacao_da_vaga()` e nunca gravada: `PROPOSTA` e `CONFIRMADA` (agendamento ativo), `BLOQUEADA`, `ENCERRADA` (já começou, sem agendamento ativo), `LIVRE_SEM_PROPOSTA` (livre, mas `calcular_expira_em()` não deixa a janela mínima, RN-016; candidata a encaixe manual, [ADR-021](../decisions/ADR-021-matching-automatico.md)) e `LIVRE`. `sem_proposta` conta as `LIVRE_SEM_PROPOSTA`.
 
+### Indicadores do gestor
+
+`GET /equipe/indicadores?de=AAAA-MM-DD&ate=AAAA-MM-DD&unidade_id=&fila_id=` ([RF-037](../requirements/functional-requirements.md), fórmulas em [RN-021](../requirements/business-rules.md)).
+
+- **Período:** `de` e `ate` são dias em `America/Recife`, inclusivos, de 1 a 366 dias; `ate` antes de `de`, período maior ou data fora de 2000-01-01 a 2100-12-31 → `422`. Não há padrão: os dois são obrigatórios.
+- **Escopo:** `escopo_da_equipe` filtra as filas dentro da consulta (gestor: as filas das suas unidades; gestor sem unidade e ADMIN: todas). `unidade_id` e `fila_id` só encolhem o escopo. Unidade ou fila fora do escopo, inexistente ou sem nenhuma fila no escopo → `404`. Filas inativas entram nas contas.
+- **Resposta** (`IndicadoresSaida`): `de`, `ate`, `unidade_id`, `fila_id`, `totais`, `semanas`, `tempo_de_espera` e `fila_atual`.
+  - `totais` e cada item de `semanas` (um por segunda-feira de Recife que toca o período, mesmo sem dado, com a chave `semana`) trazem as mesmas contagens: `confirmadas`, `recusadas`, `expiradas`, `propostas_encerradas`, `propostas_canceladas_sem_resposta`, `realizadas`, `faltas`, `solicitacoes_criadas`, `desistencias`, `vagas_ofertadas`, `vagas_ocupadas`, `vagas_reaproveitadas`, `vagas_perdidas`, e as razões `taxa_confirmacao`, `taxa_recusa`, `taxa_expiracao`, `taxa_faltas`, `taxa_desistencia`. O total é a soma das semanas.
+  - Razão com denominador 0 é `null`, nunca `0`; as razões vêm arredondadas a 4 casas.
+  - `tempo_de_espera`: `{confirmacoes, mediana_dias, p90_dias}`, em dias com 2 casas; `null` sem dado.
+  - `fila_atual`: `{VERMELHO, AMARELO, VERDE}`, as solicitações `NA_FILA` **agora**, qualquer que seja o período. Só a equipe vê isto; nada disso chega ao paciente ([ADR-007](../decisions/ADR-007-paciente-ve-status.md)).
+- **Custo:** um número fixo de consultas agregadas no banco (sem N+1). Cada consulta roda com `SET LOCAL statement_timeout` (`INDICADORES_TIMEOUT_S`, padrão 5 s) e `jit = off`. Passou do tempo → `503` `/problemas/consulta-demorada` com `Retry-After: 30`, depois de desfazer a transação. O limite de requisições por usuário ficará no Nginx da VM, não na API *(proposta; o Nginx ainda não está configurado no repositório)* ([AM-025](../security/threat-model.md)).
+- **Auditoria:** `CONSULTAR_INDICADORES` com `de`, `ate`, `unidade_id` e `fila_id` ([proteção de dados](../security/data-protection.md)).
+
 ### Equipe: demais rotas *(proposta)*
 | Método | Rota | Descrição |
 | --- | --- | --- |
 | POST | `/agendamentos` | Propõe uma vaga para uma solicitação — fase futura (proposta manual, [ADR-021](../decisions/ADR-021-matching-automatico.md)) |
-| GET | `/indicadores?de=&ate=&unidade_id=` | Confirmação, faltas, tempo até confirmação, vagas reaproveitadas, tamanho de cada fila (gestor: unidades do escopo) |
 
 ### Administração
-> **Decidido (2026-10-19):** toda rota de administração fica sob `/admin/*`, porque `GET /filas` e `GET /filas/{id}` pertencem ao paciente. Os caminhos abaixo são relativos a `/api/v1`, como no resto do documento.
->
-> **Divergência temporária:** `POST /usuarios/{id}/suspender` e `/reativar` já estão implementados em `/api/v1/usuarios/...`, fora do prefixo. A mudança para `/admin/usuarios/...` exige alterar o código e os testes e fica para uma tarefa própria.
+Prefixo `/admin`, só `ADMIN` (`exige_papel("ADMIN")`), todas com `Cache-Control: no-store` e CSRF nas escritas. Os caminhos são relativos a `/api/v1`. Decidido em 2026-10-19: toda rota de administração fica sob `/admin/*`, porque `GET /filas` e `GET /filas/{id}` pertencem ao paciente. As rotas antigas `POST /usuarios/{id}/suspender` e `/reativar` **foram removidas**; só existem sob `/admin/usuarios/...`.
+
+**Implementadas** ([RF-033](../requirements/functional-requirements.md), RF-035, RF-036; [ADR-028](../decisions/ADR-028-suspensao-de-acesso.md)):
+
+| Método | Rota | Descrição |
+| --- | --- | --- |
+| GET | `/admin/usuarios?papel=&situacao=&limit&offset` | `{total, itens}` das contas da equipe (sem pacientes), na ordem de criação. Item: `id`, `email`, `papel`, `situacao`, `senha_temporaria`, `filas` (só ATENDENTE) e `unidades` (só GESTOR). Nunca traz hash nem senha |
+| POST | `/admin/usuarios` | Corpo `{email, papel (ATENDENTE, GESTOR ou ADMIN), unidade_ids?, confirmar_visao_central?}`. Cria a conta com senha temporária forte (16 caracteres aleatórios) e `senha_temporaria = true`. `201` com `{id, senha_temporaria}`: **a senha aparece só nesta resposta**. `unidade_ids` só para GESTOR (outro papel → `422`); GESTOR sem unidade exige `confirmar_visao_central: true` (`409` `visao-central-nao-confirmada`); e-mail repetido → `409` `email-ja-cadastrado`. Auditoria `CRIAR_USUARIO` com papel e unidades |
+| POST | `/admin/usuarios/{id}/redefinir-senha` | Nova senha temporária, devolvida uma vez (`200` `{id, senha_temporaria}`), e **revogação de todas as sessões** do usuário. Só ATENDENTE e GESTOR; ADMIN → `409` `operacao-nao-permitida` (a senha de um admin é recuperada pelo terminal, abaixo). Auditoria `REDEFINIR_SENHA` sem a senha |
+| PUT | `/admin/usuarios/{id}/filas` | Substitui as filas do ATENDENTE (`{fila_ids}`, até 500). Outro papel → `409`; fila inexistente → `422`. Auditoria `ATRIBUIR_FILAS` com antes e depois. `204` |
+| PUT | `/admin/usuarios/{id}/unidades` | Substitui as unidades do GESTOR (`{unidade_ids, confirmar_visao_central?}`). Lista vazia faz o gestor ver a central inteira e exige `confirmar_visao_central: true`. Outro papel → `409`. Auditoria `ATRIBUIR_UNIDADES` (com `visao_central`). `204` |
+| POST | `/admin/usuarios/{id}/suspender` | Corpo `{motivo}` (3 a 500 caracteres). `204`. Regras e erros em [controle de acesso](../security/access-control.md) |
+| POST | `/admin/usuarios/{id}/reativar` | `204`. Conta já ativa → `409` `transicao-invalida` |
+| GET | `/admin/filas?limit&offset` | `{total, itens}` de todas as filas (inclui inativas) com `unidade` `{id, sigla}` e `especialidade` `{id, nome}`, para a tela de atribuição |
+
+- Usuário inexistente → `404`. Toda alteração trava a conta alvo com `FOR UPDATE`.
+- **Senha temporária:** gerada por `secrets.token_urlsafe(12)`, gravada só como hash, nunca em log nem em auditoria, e sem validade (risco aceito, AM-021). A pessoa troca no primeiro acesso ([RN-022](../requirements/business-rules.md)).
+- **Pelo terminal do servidor:** `python -m app.infra.admin redefinir-senha --email <email>` gera a senha temporária de qualquer conta da equipe, inclusive ADMIN, e a imprime uma vez. Roda em qualquer `APP_ENV`, porque quem tem o servidor já tem o banco. Auditoria `REDEFINIR_SENHA` sem ator e com `origem: terminal`. Conta inexistente → mensagem no `stderr` e saída `1`.
+
+**Propostas** (ainda não implementadas):
 
 | Método | Rota | Descrição |
 | --- | --- | --- |
 | GET, POST, PATCH | `/admin/unidades` | Unidades |
 | GET, POST, PATCH | `/admin/especialidades` | Especialidades |
-| GET, POST, PATCH | `/admin/filas` | Filas: descrição para o paciente, elegibilidade, prazo de confirmação e tolerância |
+| POST, PATCH | `/admin/filas` | Filas: descrição para o paciente, elegibilidade, prazo de confirmação e tolerância |
 | GET, POST, PATCH | `/admin/filas/{id}/criterios` | Protocolo da fila: critérios, tipos, pesos e parâmetros |
 | GET, POST, PATCH | `/admin/agendas` | Agendas; criar uma agenda gera as vagas da vigência |
 | POST | `/admin/vagas/{id}/bloquear` e `/admin/vagas/{id}/desbloquear` | Estado administrativo da vaga |
-| GET, POST | `/admin/usuarios` | Contas da equipe |
-| POST | `/admin/usuarios/{id}/suspender` e `/admin/usuarios/{id}/reativar` (hoje em `/usuarios/...`, ver divergência acima) | Suspensão de acesso ([ADR-028](../decisions/ADR-028-suspensao-de-acesso.md)). Suspender recebe `{motivo}` (3 a 500 caracteres). Só ADMIN; ambas respondem `204`. Regras em [controle de acesso](../security/access-control.md) |
-| PUT | `/admin/usuarios/{id}/filas` e `/admin/usuarios/{id}/unidades` | Atribuições de escopo; filas só para ATENDENTE e unidades só para GESTOR |
 | GET | `/admin/auditoria?entidade=&entidade_id=` | Trilha de auditoria |
 
 ### Operação

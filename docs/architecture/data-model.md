@@ -1,6 +1,6 @@
 # Modelo de dados
 
-PostgreSQL. Identificadores `uuid` gerados pelo banco (`gen_random_uuid()`); datas e horas como `timestamptz` ([ADR-008](../decisions/ADR-008-datas-e-fuso.md)). A fonte de verdade são as migrações em `apps/backend/migrations/versions/` (`0002_esquema_do_dominio.py` e `0003_sessao_de_refresh_e_tentativas_de_login.py`); os modelos SQLAlchemy em `app/infra/modelos.py` a espelham, e um teste (`alembic check`) falha se os dois divergirem.
+PostgreSQL. Identificadores `uuid` gerados pelo banco (`gen_random_uuid()`); datas e horas como `timestamptz` ([ADR-008](../decisions/ADR-008-datas-e-fuso.md)). A fonte de verdade são as migrações em `apps/backend/migrations/versions/` (`0002_esquema_do_dominio.py` a `0007_senha_temporaria_e_confirmacao_da_proposta.py`); os modelos SQLAlchemy em `app/infra/modelos.py` a espelham, e um teste (`alembic check`) falha se os dois divergirem.
 
 Convenções:
 
@@ -44,6 +44,7 @@ erDiagram
     text situacao "CHECK ATIVO SUSPENSO; ADR-028"
     timestamptz suspenso_em "obrigatorio se SUSPENSO"
     text motivo_suspensao
+    bool senha_temporaria "default false; migracao 0007; RN-022"
     timestamptz criado_em
   }
   SESSAO_REFRESH {
@@ -60,7 +61,7 @@ erDiagram
   }
   TENTATIVA_LOGIN {
     uuid id PK
-    text tipo "CHECK LOGIN REGISTRO"
+    text tipo "CHECK LOGIN REGISTRO TROCA_SENHA; migracao 0007"
     text identificador_hash "HMAC-SHA256; obrigatorio se LOGIN"
     inet ip
     bool sucesso
@@ -191,6 +192,7 @@ erDiagram
     timestamptz proposto_em
     timestamptz expira_em "RN-008, RN-012"
     timestamptz respondido_em
+    timestamptz confirmado_em "quando foi confirmada; migracao 0007; RN-021"
     text motivo_cancelamento "CHECK lista fechada; so se CANCELADO; migracao 0005"
   }
   NOTIFICACAO {
@@ -292,8 +294,9 @@ ALTER TABLE sessao_refresh ADD CONSTRAINT uq_sessao_refresh_token_hash UNIQUE (t
 CREATE INDEX ix_sessao_refresh_usuario_id ON sessao_refresh (usuario_id);
 CREATE INDEX ix_sessao_refresh_familia_id ON sessao_refresh (familia_id);
 
--- AM-004: tentativa de login precisa de identificador (hash); registro conta só pelo IP
-ALTER TABLE tentativa_login ADD CONSTRAINT ck_tentativa_login_tipo CHECK (tipo IN ('LOGIN', 'REGISTRO'));
+-- AM-004 / AM-020: tentativa de login precisa de identificador (hash); registro conta só pelo IP.
+-- A migração 0007 acrescentou TROCA_SENHA: a troca de senha usa o mesmo limite do login
+ALTER TABLE tentativa_login ADD CONSTRAINT ck_tentativa_login_tipo CHECK (tipo IN ('LOGIN', 'REGISTRO', 'TROCA_SENHA'));
 ALTER TABLE tentativa_login ADD CONSTRAINT ck_tentativa_login_login_identificado
   CHECK (tipo = 'REGISTRO' OR identificador_hash IS NOT NULL);
 CREATE INDEX ix_tentativa_login_identificador_hash_ocorrido_em ON tentativa_login (identificador_hash, ocorrido_em);
@@ -389,9 +392,12 @@ Tipos de evento de `historico_solicitacao.tipo`: `CRIADA`, `CLASSIFICADA`, `ENTR
 - **O gatilho não protege contra o dono das tabelas**, que pode removê-lo. Em produção, o papel do banco usado pela aplicação não deve ser o dono das tabelas nem ter `UPDATE`, `DELETE` ou `TRUNCATE` em `auditoria` e `historico_solicitacao` *(proposta para a implantação)*.
 - **E-mail do usuário é anulável** (migração 0003): o e-mail do paciente é opcional. A `UNIQUE` em `usuario.email` continua e, no Postgres, vários `NULL` não conflitam; só e-mails informados são únicos. A equipe entra por e-mail, então a conta de equipe sempre tem um.
 - **`sessao_refresh`:** cada login abre uma família (`familia_id`); cada renovação cria uma linha nova, revoga a anterior e aponta `substituido_por_id` para a nova. Reapresentar o token substituído dentro de `REFRESH_TOLERANCIA_S` vale uma vez só (`reapresentado_em`); a segunda reapresentação revoga a família. O access token carrega a família (`sid`) e só vale enquanto a família tem uma sessão ativa. Linhas vencidas são apagadas pelo Worker ([proteção de dados](../security/data-protection.md)).
-- **`tentativa_login`:** guarda o CPF ou e-mail só como HMAC-SHA256 com `LOGIN_HASH_KEY`, para o limite de tentativas sem o identificador em claro. Não tem FK para `usuario`.
-- **Usuários não são apagados**, só suspensos ([ADR-028](../decisions/ADR-028-suspensao-de-acesso.md)); a auditoria continua apontando para eles.
-- **Histórico familiar** é só a resposta do paciente a um critério; não há dados de parentes ([ADR-030](../decisions/ADR-030-historico-familiar-como-criterio.md)).
-- **Notificação** pode se referir a uma solicitação, a um agendamento ou a nenhum dos dois (avisos de conta). Cada linha é um aviso por canal: `IN_APP` nasce `ENVIADA` (é o próprio aviso do site); `EMAIL` nasce `PENDENTE` e o `enviar_emails` o leva a `ENVIADA`, `FALHOU` (esgotou `OUTBOX_MAX_TENTATIVAS`) ou `CANCELADA` (lembrete cujo agendamento deixou de estar `CONFIRMADO`, consentimento `LEMBRETE_EMAIL` revogado ou e-mail removido). `tentativas` e `proximo_retry_em` valem só para o e-mail. `outbox_id` é nulo no lembrete, que não vem da outbox.
+- **`tentativa_login`:** guarda o CPF ou e-mail só como HMAC-SHA256 com `LOGIN_HASH_KEY`, para o limite de tentativas sem o identificador em claro. Não tem FK para `usuario`. Na troca de senha (`tipo = 'TROCA_SENHA'`), o identificador é o HMAC do ID do usuário, e a contagem vale por usuário e por IP, com o mesmo limite do login (AM-020).
+- **Migração 0007** (`senha_temporaria`, `confirmado_em`, `TROCA_SENHA`):
+  - `usuario.senha_temporaria` (`boolean`, `NOT NULL`, padrão `false`) liga a troca obrigatória de senha ([RN-022](../requirements/business-rules.md)). Vale `true` para a conta criada ou redefinida pelo admin ou pelo terminal, e volta a `false` na troca. Contas existentes ficam `false`.
+  - `agendamento.confirmado_em` guarda o momento da confirmação. `respondido_em` não serve, porque o cancelamento de uma proposta também o preenche, e os indicadores precisam separar a **confirmação cancelada** (que conta como confirmada) da **proposta cancelada sem resposta** ([RN-021](../requirements/business-rules.md)). É nulo em proposta que nunca foi confirmada.
+  - **Retroalimentação aproximada:** nas linhas que já existiam, `confirmado_em` recebeu o valor de `respondido_em` nos agendamentos `CONFIRMADO`, `REALIZADO` e `FALTOU`. Um agendamento confirmado e cancelado depois **fica sem valor**, porque o banco antigo não guardou o momento da confirmação; ele passa a contar como "proposta cancelada sem resposta". O erro só atinge dados anteriores à 0007; no protótipo, com dados sintéticos, é aceito.
+  - O `downgrade` apaga as linhas `TROCA_SENHA` de `tentativa_login` antes de restaurar o `CHECK`.
+- **Carga com histórico (`seed --historico`): limite de horário da auditoria.** As linhas de `historico_solicitacao` e os horários de `agendamento` (`proposto_em`, `respondido_em`, `confirmado_em`) levam o horário simulado. Já `auditoria.ocorrido_em`, `outbox.criado_em` e `notificacao.criada_em` usam o `now()` do banco: as rotinas de transição compartilhadas com a API não informam a data dessas colunas, e a auditoria é append-only. Resultado: todas as linhas dessas três tabelas geradas pelo seed levam a hora da carga, e a trilha de auditoria da demonstração não acompanha a linha do tempo simulada. Limite conhecido e aceito pela equipe. As linhas de `outbox` do histórico são marcadas `PROCESSADO` na mesma transação da carga, para o Worker não enviar aviso nem e-mail sobre o passado.
 - **Outbox** é gravada na mesma transação da mudança de estado e consumida pelo Worker com `FOR UPDATE SKIP LOCKED`. Evento novo (`tentativas = 0`) está sempre vencido, porque `proximo_retry_em` nasce com o `now()` do banco; só as novas tentativas esperam `proximo_retry_em`. O `payload` leva `solicitacao_id` e, quando há, `agendamento_id`; nos eventos da solicitação leva também `fim_da_fila` (booleano). `ix_outbox_pendente` fica como está.
 - Sem aging ([ADR-024](../decisions/ADR-024-protocolo-por-fila.md)).

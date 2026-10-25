@@ -24,7 +24,7 @@
 | RF-018 | O sistema avisa o paciente no site e por e-mail quando a solicitação ou o agendamento mudam | Sistema | M | UC-003 a UC-006 | RN-011 |
 | RF-019 | Paciente consulta seus avisos e os marca como lidos (`/avisos`, [API](../architecture/api-design.md)) | Paciente | M | — | — |
 | RF-020 | Paciente acompanha o status das solicitações e dos agendamentos, sem posição na fila | Paciente | M | — | RN-007 |
-| RF-021 | Gestor consulta indicadores: confirmação, faltas, tempo até confirmação, vagas reaproveitadas, fila por especialidade | Gestor | M | UC-009 | — |
+| RF-021 | Gestor consulta indicadores: confirmação, faltas, tempo até confirmação, vagas reaproveitadas, fila por especialidade (detalhado no RF-037) | Gestor | M | UC-009 | RN-021 |
 | RF-022 | Admin configura o protocolo de cada fila: critérios, tipos, pesos e faixas, marcados como simulados | Admin | M | UC-010 | RN-006 |
 | RF-023 | Admin consulta a trilha de auditoria de uma solicitação ou agendamento | Admin | M | — | RN-010 |
 | RF-024 | O sistema envia lembrete antes do atendimento confirmado: aviso no site e, com `LEMBRETE_EMAIL`, e-mail, para consultas nas próximas `LEMBRETE_ANTECEDENCIA_HORAS` (padrão 24). Implementado (job `enviar_lembretes`) | Sistema | D | — | RN-009 |
@@ -39,3 +39,5 @@
 | RF-033 | Admin suspende e reativa o acesso de um profissional, com data e motivo; o usuário suspenso não entra e a auditoria continua apontando para ele | Admin | M | UC-010 | — ([ADR-028](../decisions/ADR-028-suspensao-de-acesso.md)) |
 | RF-034 | O cadastro do paciente registra sexo e município, usados só para elegibilidade e direcionamento | Paciente | M | UC-001 | RN-017 |
 | RF-035 | Admin atribui filas a atendentes e unidades a gestores; o sistema valida que só ATENDENTE recebe fila e só GESTOR recebe unidade | Admin | M | UC-010 | — ([ADR-025](../decisions/ADR-025-escopo-por-fila.md)) |
+| RF-036 | Admin cria contas da equipe (atendente, gestor ou admin) com senha temporária mostrada uma única vez e redefine a senha de atendente e gestor (a de admin, pelo terminal do servidor). A pessoa só troca a senha até concluir a troca obrigatória, que revoga as outras sessões. Gestor sem unidade (visão da central inteira) exige confirmação explícita. Tudo auditado, sem a senha | Admin | M | UC-010 | RN-022 ([ADR-025](../decisions/ADR-025-escopo-por-fila.md), [ADR-028](../decisions/ADR-028-suspensao-de-acesso.md)) |
+| RF-037 | Gestor e admin consultam os indicadores do seu escopo num período de até 366 dias: taxas de confirmação, recusa e expiração das propostas, faltas, desistências, vagas ofertadas, ocupadas, reaproveitadas e perdidas, tempo de espera (mediana e p90) e a fila atual por cor de risco, por semana e no total. Só contagens e razões, sem dado de paciente; a leitura é auditada. Detalha o RF-021 | Gestor, Admin | M | UC-009 | RN-021 |

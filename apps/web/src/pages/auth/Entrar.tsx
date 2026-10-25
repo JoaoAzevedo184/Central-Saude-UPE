@@ -10,6 +10,7 @@ import { soDigitos } from '../../shared/mascaras'
 import { CampoSenha } from '../../shared/ui/Campo'
 import { CampoIdentificador } from '../../shared/ui/CampoIdentificador'
 import { papelSchema } from '../../shared/auth/session'
+import { exigeTrocaDeSenha, rotaTrocarSenha } from '../../shared/auth/troca-de-senha'
 import { Botao } from '../../shared/ui/Botao'
 import { Alerta } from '../../shared/ui/Alerta'
 import { LayoutAutenticacao } from './LayoutAutenticacao'
@@ -35,7 +36,11 @@ export function Entrar() {
         senha: dados.senha,
       } })
       const papel = papelSchema.parse(sessao.papel)
-      await limparSessaoAnterior(client)
+      if (!await limparSessaoAnterior(client)) return
+      if (exigeTrocaDeSenha(sessao)) {
+        await navigate(rotaTrocarSenha, { replace: true })
+        return
+      }
       const home = papel === 'PACIENTE' ? '/paciente' : '/equipe'
       const origem = rotaAposLogin(location.state)
       // Origem de outra área (ex.: paciente com /equipe) cai na home do papel, sem "Acesso não permitido".

@@ -9,18 +9,21 @@ import { axe } from 'vitest-axe'
 import { Rotas } from '../../app/Rotas'
 import { criarQueryClient } from '../../app/query-client'
 import documentos from '../../test/fixtures/documentos-sinteticos.json'
+import { http } from '../../shared/api/http'
 
 const sessao = { id: '00000000-0000-4000-8000-000000000001', papel: 'PACIENTE', nome: 'Pessoa Sintética', filas: null }
 const sucesso = { papel: 'PACIENTE', expira_em: '2026-10-21T12:00:00-03:00' }
 const termo = { versao: 'teste-v7', texto: '# Termo sintético\n\nTexto completo do termo de teste.\n\nSua escolha sobre lembretes é opcional.' }
 const servidor = setupServer(
+  mockHttp.get('*/api/v1/solicitacoes', () => HttpResponse.json({ total: 0, itens: [] })),
+  mockHttp.get('*/api/v1/avisos/contagem', () => HttpResponse.json({ nao_lidos: 0 })),
   mockHttp.get('*/api/v1/me', () => HttpResponse.json(sessao)),
   mockHttp.post('*/api/v1/auth/login', () => HttpResponse.json(sucesso)),
   mockHttp.post('*/api/v1/auth/registro', () => HttpResponse.json(sucesso, { status: 201 })),
   mockHttp.get('*/api/v1/termos/vigente', () => HttpResponse.json(termo)),
 )
 beforeAll(() => servidor.listen({ onUnhandledFrame: 'error' }))
-afterEach(() => servidor.resetHandlers())
+afterEach(() => { servidor.resetHandlers(); http.iniciarSessao() })
 afterAll(() => servidor.close())
 
 function Localizacao() {
@@ -69,6 +72,18 @@ async function cadastrarAteTermo(email = '') {
 }
 
 describe('ADR-003 — entrar', () => {
+  it('encaminha senha temporária à rota provisória sem consultar a área do paciente', async () => {
+    servidor.use(mockHttp.post('*/api/v1/auth/login', () => HttpResponse.json({ ...sucesso, trocar_senha: true })))
+    const consultar = vi.fn(() => HttpResponse.json(sessao))
+    servidor.use(mockHttp.get('*/api/v1/me', consultar))
+    const { user } = abrir('/entrar', { origem: '/paciente' })
+    mudar('CPF ou e-mail', documentos.cpf); mudar('Senha', 'Temporaria!123')
+    await user.click(screen.getByRole('button', { name: 'Entrar' }))
+    await screen.findByRole('heading', { name: 'Troca de senha obrigatória' })
+    expect(localizacao().pathname).toBe('/trocar-senha')
+    expect(http.trocaDeSenhaObrigatoria()).toBe(true)
+    expect(consultar).not.toHaveBeenCalled()
+  })
   it('envia CPF sem máscara e senha sem alterações; redireciona o paciente', async () => {
     let recebido: unknown
     servidor.use(mockHttp.post('*/api/v1/auth/login', async ({ request }) => { recebido = await request.json(); return HttpResponse.json(sucesso) }))

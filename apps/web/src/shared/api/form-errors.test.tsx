@@ -11,6 +11,13 @@ function validacao(errors: unknown, status = 422) {
 }
 
 describe('RFC 9457 — validação 422 e React Hook Form', () => {
+  it('associa senha atual incorreta ao campo senha_atual da futura troca de senha', () => {
+    const setError = vi.fn<UseFormSetError<{ senha_atual: string; senha_nova: string }>>()
+    expect(aplicarErrosDeValidacao<{ senha_atual: string; senha_nova: string }>(validacao([
+      { loc: ['body', 'senha_atual'], msg: 'Senha atual incorreta.', type: 'value_error' },
+    ]), setError, ['senha_atual', 'senha_nova'])).toBe(true)
+    expect(setError).toHaveBeenCalledExactlyOnceWith('senha_atual', { type: 'server', message: 'Senha atual incorreta.' }, { shouldFocus: true })
+  })
   it('leva campos simples e índices de arrays ao setError e mantém o primeiro erro', () => {
     const setError = vi.fn<UseFormSetError<Formulario>>()
     expect(aplicarErrosDeValidacao<Formulario>(validacao([

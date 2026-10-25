@@ -5,6 +5,7 @@ import { http } from '../shared/api/http'
 import { encerrarSessaoLocal } from '../shared/auth/session'
 import { avisosOptions } from '../pages/paciente/api'
 import { Botao } from '../shared/ui/Botao'
+import { MensagemNavegacao } from '../shared/ui/MensagemNavegacao'
 
 export function PacienteLayout() {
   const location = useLocation()
@@ -17,17 +18,6 @@ export function PacienteLayout() {
   const botaoMenu = useRef<HTMLButtonElement>(null)
   const conteudo = useRef<HTMLElement>(null)
   const focarAposNavegar = useRef(false)
-  const [contaCriada, setContaCriada] = useState(() => location.state?.mensagem === 'Conta criada.')
-  useEffect(() => {
-    if (location.state?.mensagem !== 'Conta criada.') return
-    const restante = { ...location.state }; delete restante.mensagem
-    void navigate({ pathname: location.pathname, search: location.search, hash: location.hash }, { replace: true, state: restante })
-  }, [location, navigate])
-  useEffect(() => {
-    if (!contaCriada) return
-    const timer = window.setTimeout(() => setContaCriada(false), 6000)
-    return () => window.clearTimeout(timer)
-  }, [contaCriada])
   useEffect(() => {
     if (!focarAposNavegar.current) return
     focarAposNavegar.current = false
@@ -51,7 +41,7 @@ export function PacienteLayout() {
   function navegarPeloMenu(event: MouseEvent<HTMLAnchorElement>) {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
     focarAposNavegar.current = true
-    setMenuAberto(false); setContaCriada(false)
+    setMenuAberto(false)
   }
   return <div className="area-paciente">
     <a className="pular-conteudo" href="#conteudo-paciente">Pular para o conteúdo</a>
@@ -72,7 +62,7 @@ export function PacienteLayout() {
       </nav>
     </div></header>
     <main id="conteudo-paciente" className="paciente-principal" aria-label="Área do paciente" tabIndex={-1} ref={conteudo}>
-      {contaCriada && <p role="status" className="mensagem-sucesso">Conta criada.</p>}<Outlet />
+      <MensagemNavegacao key={location.pathname} /><Outlet />
     </main>
     <footer className="rodape-paciente">CH/UPE · Protótipo acadêmico com dados sintéticos</footer>
   </div>

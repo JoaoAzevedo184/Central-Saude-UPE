@@ -1,4 +1,4 @@
-import { queryOptions } from '@tanstack/react-query'
+import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query'
 import type { components, operations } from '../../shared/api/generated/schema'
 import { http } from '../../shared/api/http'
 
@@ -33,3 +33,24 @@ export const avisosOptions = queryOptions({
   queryFn: ({ signal }) => http.request<components['schemas']['ContagemSaida']>('/avisos/contagem', { signal }),
   refetchOnWindowFocus: 'always',
 })
+
+export type Fila = components['schemas']['FilaSaida']
+export type DetalheFila = components['schemas']['FilaDetalheSaida']
+export type CriterioPaciente = components['schemas']['CriterioPacienteSaida']
+export type NovoPedido = components['schemas']['SolicitacaoEntrada']
+export const filasKey = ['filas-paciente'] as const
+export const limiteFilas = 10
+export const filasOptions = infiniteQueryOptions({
+  queryKey: filasKey,
+  initialPageParam: 0,
+  queryFn: ({ pageParam, signal }) => http.request<components['schemas']['PaginaFilas']>(`/filas?limit=${limiteFilas}&offset=${pageParam}`, { signal }),
+  getNextPageParam: (ultima, _paginas, offset) => ultima.itens.length && offset + ultima.itens.length < ultima.total ? offset + ultima.itens.length : undefined,
+})
+export const filaOptions = (id: string) => queryOptions({
+  queryKey: ['fila-paciente', id],
+  queryFn: ({ signal }) => http.request<DetalheFila>(`/filas/${id}`, { signal }),
+  enabled: Boolean(id),
+})
+export function criarPedido(dados: NovoPedido, signal: AbortSignal) {
+  return http.request<DetalhePedido>('/solicitacoes', { method: 'POST', body: dados, signal })
+}

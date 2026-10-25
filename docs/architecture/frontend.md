@@ -1,6 +1,6 @@
 # Frontend
 
-Implementada em `apps/web`, conforme a autorização de 2026-10-21 para a base do [ADR-001](../decisions/ADR-001-stack.md). Inclui Entrar/Criar conta e, na entrega de 2026-10-24, o layout do paciente e Meus atendimentos com resposta à proposta de vaga. As telas completas de novo pedido, detalhe e avisos continuam pendentes.
+Implementada em `apps/web`, conforme a autorização de 2026-10-21 para a base do [ADR-001](../decisions/ADR-001-stack.md). Inclui Entrar/Criar conta e, na entrega de 2026-10-24, o layout do paciente e Meus atendimentos com resposta à proposta de vaga. A tela de novo pedido foi implementada em 2026-10-25; detalhe e avisos continuam pendentes.
 
 ## Organização e dependências
 
@@ -11,7 +11,7 @@ React e TypeScript com Vite; React Router no modo declarativo; TanStack Query pa
 - `src/shared/api`: HTTP, CSRF, Problem Details e tipos gerados.
 - `src/shared/auth`: consulta da sessão e guarda por papel.
 - `src/pages/auth`: Entrar, CriarConta, etapas, termo, layout público e validação.
-- `src/pages/paciente`: consultas tipadas, MeusAtendimentos, CartaoPedido e PropostaVaga.
+- `src/pages/paciente`: consultas tipadas, MeusAtendimentos, CartaoPedido, PropostaVaga e o wizard NovaSolicitacao.
 - `src/shared/ui`: campos, botão, alerta, indicador de etapas, cartão, selo de status, diálogo, abas, paginação e estado vazio.
 - `src/shared/mascaras.ts`: funções pequenas de formatação, sem biblioteca de máscaras.
 - `src/shared/datas.ts`: datas civis do pedido e horários em `America/Recife`, incluindo prazo e aviso de menos de 24 horas.
@@ -43,7 +43,7 @@ Cada operação coordenada tem limite de **15 segundos**, centralizado em `limit
 
 `trocar_senha === true` no login ou em `/me` encaminha para `/trocar-senha`, uma rota provisória com título e explicação, sem formulário. O campo gerado é opcional (`true | null`): ausência ou `null` preservam o fluxo habitual; `false` não pertence ao contrato. O payload de `/me` mantém o campo tipado ao validar o papel. O HTTP também mantém em memória o bloqueio informado no login ou pelo Problem Details `403 /problemas/troca-de-senha-obrigatoria`. Esse `403`, inclusive se vier do refresh, encaminha ao fluxo de troca sem expirar a sessão, limpar o cache ou iniciar outra renovação. A sessão consultada permanece em memória ao desmontar a área protegida; sua limpeza ocorre explicitamente na saída, expiração ou nova entrada. `422` de `/auth/trocar-senha` não renova a sessão, e o adaptador de validação associa `errors[].loc = ['body', 'senha_atual']` ao campo `senha_atual`.
 
-**Contrato atualizado (24/10/2026):** o OpenAPI da Parte 1 (`be32204`) foi incorporado e os DTOs foram regenerados com `npm run api:generate`, sem edição manual. O login usa `LoginSaida`; cadastro e refresh continuam com `SessaoSaida`. `/me` usa `EuSaida`, e a decisão de troca recebe os DTOs gerados em vez do adaptador provisório baseado em `unknown`. `TrocaSenhaEntrada` tipa os dois campos da futura tela nos testes do HTTP e do adaptador de formulário. O tratamento de bloqueio compara `ApiError`, status 403 e o URI exato do Problem Details. Os tipos também incluem as rotas `/admin/*` e removem as antigas rotas de suspensão e reativação; não há UI administrativa nem rota de indicadores nesta etapa. A rota de troca de senha permanece provisória e o E2E real continua pendente.
+**Contrato atualizado (24/10/2026):** o OpenAPI da Parte 1 (`be32204`) foi incorporado e os DTOs foram regenerados com `npm run api:generate`, sem edição manual. O login usa `LoginSaida`; cadastro e refresh continuam com `SessaoSaida`. `/me` usa `EuSaida`, e a decisão de troca recebe os DTOs gerados em vez do adaptador provisório baseado em `unknown`. `TrocaSenhaEntrada` tipa os dois campos da futura tela nos testes do HTTP e do adaptador de formulário. O tratamento de bloqueio compara `ApiError`, status 403 e o URI exato do Problem Details. Os tipos também incluem as rotas `/admin/*` e removem as antigas rotas de suspensão e reativação; não há UI administrativa nesta etapa. A API `GET /api/v1/equipe/indicadores` já existe no backend; a tela de indicadores está fora desta entrega, e seu consumo fica para a tarefa específica da tela de gestor/equipe. A rota de troca de senha permanece provisória e o E2E real continua pendente.
 
 | Rota | Acesso | Conteúdo atual |
 | --- | --- | --- |
@@ -52,7 +52,7 @@ Cada operação coordenada tem limite de **15 segundos**, centralizado em `limit
 | `/criar-conta` | Público | Cadastro do paciente em três etapas |
 | `/trocar-senha` | Mensagem pública, sem dados de conta | Provisória: informa troca obrigatória, sem formulário |
 | `/paciente` | PACIENTE | Meus atendimentos, propostas em destaque, abas e paginação |
-| `/paciente/novo` | PACIENTE | Provisória: apenas o título Novo pedido |
+| `/paciente/novo` | PACIENTE | Novo pedido em três etapas: Atendimento, Informações e Revisar |
 | `/paciente/solicitacoes/:id` | PACIENTE | Provisória: apenas o título Detalhes do pedido |
 | `/paciente/avisos` | PACIENTE | Provisória: apenas o título Avisos |
 | `/equipe` | ATENDENTE, GESTOR, ADMIN | Layout vazio |
@@ -62,7 +62,7 @@ Sem sessão, a guarda redireciona para `/entrar` e guarda a origem no mesmo form
 
 O botão Sair chama `POST /auth/logout` pelo cliente HTTP com CSRF e captura a época de origem. Tanto no sucesso quanto na falha, cancela consultas pendentes, limpa o cache e navega para `/entrar`, desde que a época ainda seja a mesma; a limpeza confere novamente a época após aguardar cancelamentos, e o chamador confere a época de encerramento antes de navegar. Uma saída atrasada nunca limpa nem redireciona a sessão nova, inclusive quando ela exige troca de senha. Um bloqueio associado ao QueryClient, somente em memória, impede que voltar à rota reabra a sessão nesta instância após a saída; login ou cadastro bem-sucedido libera uma nova sessão. O cliente não lê nem apaga cookies `httpOnly` diretamente.
 
-A mensagem “Conta criada.” é consumida de `location.state` com navegação `replace`, aparece uma vez e desaparece após seis segundos ou ao usar a navegação do cabeçalho.
+`MensagemNavegacao` consome uma mensagem textual curta de `location.state` com navegação `replace`, inclusive quando o layout permanece montado. A mensagem recebe foco, aparece uma vez e desaparece após seis segundos ou outra navegação; voltar/avançar e recarregar não a reproduzem. Esse mecanismo atende “Conta criada.” e “Pedido enviado com sucesso.” sem catálogo de textos no layout.
 
 Os [comandos de instalação, geração e validação](../../apps/web/README.md) ficam junto do pacote.
 
@@ -89,3 +89,19 @@ Confirmação e recusa abrem um diálogo antes do POST. As escritas usam o clien
 O contador usa `GET /avisos/contagem` e é revalidado ao retornar à aba. Lista, busca complementar e contador têm espera e erro com nova tentativa. O menu do celular usa um botão de expansão e navegação comum, com `aria-expanded`, controle por teclado e Esc. O diálogo usa `HTMLDialogElement.showModal()`, título acessível, foco inicial em Voltar, contenção do foco, Esc e restauração ao acionador. Abas têm semântica própria e navegação por setas, Home e End. Os selos apresentam ícone e texto. Nenhum componente do paciente exibe posição, nota, tamanho de fila ou risco, conforme ADR-007.
 
 Fechar o menu sem navegar devolve o foco ao botão Menu, inclusive Esc com o foco ainda no acionador. Ao seguir um link do cabeçalho na mesma aba, o layout fecha o menu e foca seu `main[tabIndex=-1]` depois da mudança de rota, sem temporizadores. Abrir um link em outra aba mantém o comportamento nativo.
+
+## Nova solicitação (UC-002) — 25/10/2026
+
+`/paciente/novo` usa o mesmo layout, guarda PACIENTE e coordenação de sessão. O formulário React Hook Form fica somente em memória; não grava rascunho, storage nem dados na URL. `IndicadorEtapas` recebe um rótulo contextual, mantendo “Etapas do cadastro” como padrão. `CampoSelecao` compartilha os rótulos e associações de ajuda/erro dos controles de turno e perguntas.
+
+1. **Atendimento:** `GET /filas?limit=10&offset=…`, com carregamento incremental, deduplicação por ID e parada no total ou em página vazia. O retry de uma página adicional repete somente aquela página. Unidade e especialidade são as da fila, sem seletores independentes. As opções inelegíveis têm texto focável com o motivo e não oferecem controle selecionável. `GET /filas/{fila_id}` usa chave própria e sinal de cancelamento; um detalhe atrasado não substitui a seleção atual.
+2. **Informações:** origem do encaminhamento obrigatória, com trim nas extremidades e 2–200 caracteres; turno MANHA/TARDE/QUALQUER (padrão QUALQUER); perguntas de origem PACIENTE fornecidas no detalhe. As perguntas são opcionais, conforme divergência aceita no UC-002. SIM_NAO começa sem resposta; NUMERO exige somente número finito quando preenchido; OPCAO usa literalmente `opcoes`. Vazio é omitido; `false` e `0` são enviados. Até 50 respostas, sem mínimo/máximo numérico inventado. Trocar atendimento descarta respostas antigas e preserva origem/turno.
+3. **Revisar:** resumo legível e único `POST /solicitacoes`, via HTTP compartilhado com CSRF, payload `SolicitacaoEntrada` e resposta `201 SolicitacaoDetalhe`. A trava imediata e o estado de envio impedem duplo submit. Mudança de etapa não escreve no backend.
+
+Após 201, cancela leituras antigas e invalida apenas `pedidosKey`, navega para `/paciente` e informa “Pedido enviado com sucesso.”. O estado inicial contratual é EM_ANALISE (“Pedido em análise”). A criação grava outbox; os avisos são materializados posteriormente pelo Worker, portanto a tela não invalida sua contagem no POST.
+
+O 409 `solicitacao-duplicada` oferece Meus atendimentos sem depender da extensão não tipada `solicitacao_id`. O 409 `nao-elegivel` retorna à escolha, bloqueia o envio e revalida lista/detalhe; falha na reconciliação exige nova tentativa. O 422 usa o adaptador compartilhado e mapeia os índices compactos enviados para os campos originais, inclusive `criterio_id`; monta a etapa antes de aplicar erro e foco. Erros sem localização ficam globais, sem inferência por `detail`. O 403 comum mantém sessão; o type de troca obrigatória segue `/trocar-senha`. Sem consentimento, bloqueia o envio: não existe operação contratada para renová-lo nesta tela. Opções sem rótulo separado e renovação de consentimento ficam sinalizadas com `TODO(api)`.
+
+Não há retry automático do POST. Em falha de transporte, a tela explica que não conseguiu confirmar o envio e oferece Meus atendimentos, pois o servidor pode ter criado o pedido. Não identifica automaticamente um pedido semelhante como resultado daquela tentativa. Cancelamento ao desmontar e verificação da época antes/depois de operações assíncronas impedem efeitos de respostas antigas na sessão nova. Refetch de `/me` preserva formulário e envio enquanto a sessão conhecida continua válida.
+
+Os testes de UC-002 cobrem contrato, paginação, corridas, respostas opcionais, erros, CSRF, sessão, foco, teclado, ADR-007 e ausência de storage. A inspeção real com Chromium/axe e as capturas em 360×640, 360×800 e 1440×1024 ficam em `/tmp/nova-solicitacao-e2e/`. O E2E criou a conta sintética pela interface, saiu e entrou novamente, percorreu as três etapas e criou o pedido pela interface com POST 201. O cartão apareceu na lista; GET oficial do detalhe confirmou EM_ANALISE, fila/unidade, origem, turno e respostas false/0. Sem mocks/interceptações e sem Compose no worktree.

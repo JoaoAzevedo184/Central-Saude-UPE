@@ -1,6 +1,6 @@
 # Frontend — CH/UPE
 
-React + TypeScript + Vite, com Entrar, Criar conta e Meus atendimentos na área do paciente. Usa somente dados sintéticos. Arquitetura e limites: [frontend](../../docs/architecture/frontend.md).
+React + TypeScript + Vite, com Entrar, Criar conta, Meus atendimentos e Novo pedido em três etapas na área do paciente. Usa somente dados sintéticos. Arquitetura e limites: [frontend](../../docs/architecture/frontend.md).
 
 ## Executar
 
@@ -13,7 +13,7 @@ npm run dev
 
 Abra `http://127.0.0.1:5173`. O Vite lê o `.env` da raiz e encaminha `/api` ao `WEB_API_PROXY_TARGET` (padrão `http://127.0.0.1:8000`), sem reescrever o caminho. Ajuste o destino se a porta da API for diferente. Não coloque segredos em variáveis `VITE_*`: elas ficam disponíveis no navegador. No desenvolvimento por HTTP, a API precisa usar `COOKIE_SECURE=false` e `COOKIE_DOMAIN` vazio, como no `.env.example`.
 
-Execute banco e API no checkout principal, seguindo o README da raiz. Não suba Compose em worktrees. Não é necessário iniciar a API para conferir lint, testes ou build. As rotas `/paciente` e `/equipe` exigem uma sessão real da API. `/paciente` entrega Meus atendimentos, navegação e Sair; `/equipe` continua com layout vazio. `/paciente/novo`, `/paciente/solicitacoes/:id` e `/paciente/avisos` são provisórias, apenas com título. Após cadastro bem-sucedido, “Conta criada.” aparece uma vez e desaparece após seis segundos ou ao usar a navegação do cabeçalho. Não há login simulado na aplicação.
+Execute banco e API no checkout principal, seguindo o README da raiz. Não suba Compose em worktrees. Não é necessário iniciar a API para conferir lint, testes ou build. As rotas `/paciente` e `/equipe` exigem uma sessão real da API. `/paciente` entrega Meus atendimentos, navegação e Sair; `/equipe` continua com layout vazio. `/paciente/novo` permite criar um pedido em três etapas. `/paciente/solicitacoes/:id` e `/paciente/avisos` são provisórias, apenas com título. Após cadastro bem-sucedido, “Conta criada.” aparece uma vez e desaparece após seis segundos ou ao usar a navegação do cabeçalho. Não há login simulado na aplicação.
 
 Falha de refresh em qualquer consulta limpa a sessão e o cache, cancela consultas pendentes e leva a `/entrar`, guardando a rota de origem em `location.state.origem`. A tela de login usa `rotaAposLogin(location.state)` para voltar a uma origem interna validada; sem ela, vai a `/paciente` ou `/equipe` conforme o papel. O cliente HTTP próprio mantém `credentials: 'same-origin'` e usa os tipos gerados do backend. `ApiError.message` oferece a mensagem amigável por type; formulários podem chamar `aplicarErrosDeValidacao(error, setError, ['campo'])` para os erros 422, exibindo também `errors.root?.server?.message` para erros globais.
 
@@ -34,7 +34,7 @@ npm run api:generate -- http://127.0.0.1:8000/api/v1/openapi.json
 
 O build usa o arquivo gerado e não depende de Python, rede ou API em execução. Gere os tipos novamente após mudanças de contrato. Referência da ferramenta: [OpenAPI TypeScript CLI](https://openapi-ts.dev/cli).
 
-**Atualização de autenticação — 24/10/2026:** o contrato da Parte 1 (`be32204`) inclui `trocar_senha` e `POST /auth/trocar-senha`; os tipos foram regenerados pela ferramenta. Login usa `LoginSaida`, `/me` usa `EuSaida`, ambos com `trocar_senha?: true | null`. Ausência ou `null` seguem o fluxo habitual; `true` e o `403 /problemas/troca-de-senha-obrigatoria` encaminham à rota provisória `/trocar-senha`, mantendo a sessão, sem formulário. O payload `TrocaSenhaEntrada` e a associação do erro 422 a `senha_atual` estão cobertos nos testes, sem refresh. A geração inclui `/admin/*` e remove as rotas administrativas antigas; não há telas administrativas nem rota de indicadores nesta entrega.
+**Atualização de autenticação — 24/10/2026:** o contrato da Parte 1 (`be32204`) inclui `trocar_senha` e `POST /auth/trocar-senha`; os tipos foram regenerados pela ferramenta. Login usa `LoginSaida`, `/me` usa `EuSaida`, ambos com `trocar_senha?: true | null`. Ausência ou `null` seguem o fluxo habitual; `true` e o `403 /problemas/troca-de-senha-obrigatoria` encaminham à rota provisória `/trocar-senha`, mantendo a sessão, sem formulário. O payload `TrocaSenhaEntrada` e a associação do erro 422 a `senha_atual` estão cobertos nos testes, sem refresh. A geração inclui `/admin/*` e remove as rotas administrativas antigas; não há telas administrativas nesta entrega. A API `GET /api/v1/equipe/indicadores` já existe no backend; a tela de indicadores e seu consumo ficam para a tarefa específica da tela de gestor/equipe.
 
 ## Validar
 
@@ -121,3 +121,13 @@ Essas reproduções usam somente dados sintéticos interceptados. **E2E real: pe
 ## Validação do contrato da Parte 1 — 24/10/2026
 
 Após a regeneração, `npm test` passou com **211 testes em 9 arquivos**; lint, build e check de geração também passaram. A cobertura inclui login e `/me` com troca obrigatória, campo ausente ou `null`, revalidação descobrindo o bloqueio, 403 sem refresh/limpeza de sessão e 422 associado a `senha_atual` com CSRF. Os testes de B1/B2, I1/I2 e timeout de autenticação continuam passando. O catálogo de mensagens inclui os três Problem Details novos. **E2E real: PENDENTE.**
+
+## Novo pedido — 25/10/2026
+
+A [arquitetura do fluxo UC-002](../../docs/architecture/frontend.md#nova-solicitação-uc-002--25102026) descreve o contrato e os estados de `/paciente/novo`. As etapas são Atendimento (lista incremental e elegibilidade), Informações (origem, turno e perguntas opcionais) e Revisar (resumo e envio). A unidade/especialidade vem da fila escolhida. Só a etapa final envia `POST /solicitacoes` com CSRF. Sucesso 201 retorna a Meus atendimentos com mensagem única, consumida do Router mesmo com o layout montado.
+
+Não há persistência do formulário. Ausência de resposta, false e zero são distintos; códigos das opções são literais. A tela trata 422 por campo quando possível, ambos os conflitos 409 reais e os 403 por type. Falha de rede no POST orienta conferir a lista antes de tentar de novo, sem retry automático. Detalhes de fila atrasados e respostas de uma sessão antiga são descartados. Consentimento novo, anexos, busca, detalhe completo e seleção independente de unidade/profissional continuam fora do escopo.
+
+Conferência real: login, três etapas, POST 201 pela interface, mensagem, cartão e consulta oficial de confirmação; sem mocks/interceptações. Chromium/axe passou nas etapas, erro e sucesso. Capturas e relatório estão em `/tmp/nova-solicitacao-e2e/`, fora do repositório. Nenhum Docker Compose foi executado no worktree.
+
+Validação final da tela: `npm run lint`, `npm test` (**255 testes em 10 arquivos**, incluindo 44 novos), `npm run build`, `npm run api:generate -- --check` e `git diff --check` passaram. O build mantém os dois avisos anteriores de comentários de otimização do Zod. Evidência final do navegador: `/tmp/nova-solicitacao-e2e/final/relatorio.json`, com zero violações axe nos cinco estados, zero escritas em storage, POST 201 com CSRF e conferência oficial do pedido. Alvos de seleção de 44 px, controles/botões de 52 px e nenhum scroll horizontal nas três resoluções.

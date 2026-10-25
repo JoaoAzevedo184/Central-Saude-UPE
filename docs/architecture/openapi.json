@@ -892,6 +892,80 @@
         "title": "FilasEntrada",
         "type": "object"
       },
+      "IndicadoresSaida": {
+        "properties": {
+          "ate": {
+            "format": "date",
+            "title": "Ate",
+            "type": "string"
+          },
+          "de": {
+            "format": "date",
+            "title": "De",
+            "type": "string"
+          },
+          "fila_atual": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "Solicitações NA_FILA agora, por cor de risco. Não depende do período.",
+            "propertyNames": {
+              "$ref": "#/components/schemas/ClassificacaoRisco"
+            },
+            "title": "Fila Atual",
+            "type": "object"
+          },
+          "fila_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fila Id"
+          },
+          "semanas": {
+            "items": {
+              "$ref": "#/components/schemas/Semana"
+            },
+            "title": "Semanas",
+            "type": "array"
+          },
+          "tempo_de_espera": {
+            "$ref": "#/components/schemas/TempoDeEspera"
+          },
+          "totais": {
+            "$ref": "#/components/schemas/Resumo"
+          },
+          "unidade_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unidade Id"
+          }
+        },
+        "required": [
+          "de",
+          "ate",
+          "unidade_id",
+          "fila_id",
+          "totais",
+          "semanas",
+          "tempo_de_espera",
+          "fila_atual"
+        ],
+        "title": "IndicadoresSaida",
+        "type": "object"
+      },
       "ItemPainel": {
         "properties": {
           "classificacao_risco": {
@@ -1533,6 +1607,308 @@
         "title": "RespostasEntrada",
         "type": "object"
       },
+      "Resumo": {
+        "description": "Contagens e razões de um recorte de tempo (o período todo ou uma semana).\n\nUma razão é `null` quando o denominador é 0. Cada família usa a própria âncora de tempo,\ndescrita nos campos.",
+        "properties": {
+          "confirmadas": {
+            "description": "Propostas feitas no recorte e confirmadas (`proposto_em`).",
+            "title": "Confirmadas",
+            "type": "integer"
+          },
+          "desistencias": {
+            "description": "Dessas solicitações, as que o paciente cancelou (estão CANCELADA com motivo).",
+            "title": "Desistencias",
+            "type": "integer"
+          },
+          "expiradas": {
+            "description": "Propostas feitas no recorte e expiradas sem resposta.",
+            "title": "Expiradas",
+            "type": "integer"
+          },
+          "faltas": {
+            "description": "Faltas registradas com vaga no recorte (`vaga.inicio`).",
+            "title": "Faltas",
+            "type": "integer"
+          },
+          "propostas_canceladas_sem_resposta": {
+            "description": "Propostas canceladas por outro motivo, sem resposta. Fora das taxas.",
+            "title": "Propostas Canceladas Sem Resposta",
+            "type": "integer"
+          },
+          "propostas_encerradas": {
+            "description": "Confirmadas + recusadas + expiradas: denominador das taxas.",
+            "title": "Propostas Encerradas",
+            "type": "integer"
+          },
+          "realizadas": {
+            "description": "Atendimentos realizados com vaga no recorte (`vaga.inicio`).",
+            "title": "Realizadas",
+            "type": "integer"
+          },
+          "recusadas": {
+            "description": "Propostas feitas no recorte e recusadas pelo paciente.",
+            "title": "Recusadas",
+            "type": "integer"
+          },
+          "solicitacoes_criadas": {
+            "description": "Solicitações criadas no recorte (`criada_em`).",
+            "title": "Solicitacoes Criadas",
+            "type": "integer"
+          },
+          "taxa_confirmacao": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Taxa Confirmacao"
+          },
+          "taxa_desistencia": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Taxa Desistencia"
+          },
+          "taxa_expiracao": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Taxa Expiracao"
+          },
+          "taxa_faltas": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Faltas ÷ (realizadas + faltas).",
+            "title": "Taxa Faltas"
+          },
+          "taxa_recusa": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Taxa Recusa"
+          },
+          "vagas_ocupadas": {
+            "description": "Vagas ofertadas com agendamento CONFIRMADO, REALIZADO ou FALTOU. Inclui CONFIRMADO de vaga futura: nem toda ocupada já foi atendida.",
+            "title": "Vagas Ocupadas",
+            "type": "integer"
+          },
+          "vagas_ofertadas": {
+            "description": "Vagas ATIVAS com início no recorte.",
+            "title": "Vagas Ofertadas",
+            "type": "integer"
+          },
+          "vagas_perdidas": {
+            "description": "Vagas ofertadas já iniciadas sem agendamento CONFIRMADO, REALIZADO ou FALTOU.",
+            "title": "Vagas Perdidas",
+            "type": "integer"
+          },
+          "vagas_reaproveitadas": {
+            "description": "Vagas com proposta desfeita que outra solicitação confirmou depois.",
+            "title": "Vagas Reaproveitadas",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "confirmadas",
+          "recusadas",
+          "expiradas",
+          "propostas_encerradas",
+          "propostas_canceladas_sem_resposta",
+          "taxa_confirmacao",
+          "taxa_recusa",
+          "taxa_expiracao",
+          "realizadas",
+          "faltas",
+          "taxa_faltas",
+          "solicitacoes_criadas",
+          "desistencias",
+          "taxa_desistencia",
+          "vagas_ofertadas",
+          "vagas_ocupadas",
+          "vagas_reaproveitadas",
+          "vagas_perdidas"
+        ],
+        "title": "Resumo",
+        "type": "object"
+      },
+      "Semana": {
+        "properties": {
+          "confirmadas": {
+            "description": "Propostas feitas no recorte e confirmadas (`proposto_em`).",
+            "title": "Confirmadas",
+            "type": "integer"
+          },
+          "desistencias": {
+            "description": "Dessas solicitações, as que o paciente cancelou (estão CANCELADA com motivo).",
+            "title": "Desistencias",
+            "type": "integer"
+          },
+          "expiradas": {
+            "description": "Propostas feitas no recorte e expiradas sem resposta.",
+            "title": "Expiradas",
+            "type": "integer"
+          },
+          "faltas": {
+            "description": "Faltas registradas com vaga no recorte (`vaga.inicio`).",
+            "title": "Faltas",
+            "type": "integer"
+          },
+          "propostas_canceladas_sem_resposta": {
+            "description": "Propostas canceladas por outro motivo, sem resposta. Fora das taxas.",
+            "title": "Propostas Canceladas Sem Resposta",
+            "type": "integer"
+          },
+          "propostas_encerradas": {
+            "description": "Confirmadas + recusadas + expiradas: denominador das taxas.",
+            "title": "Propostas Encerradas",
+            "type": "integer"
+          },
+          "realizadas": {
+            "description": "Atendimentos realizados com vaga no recorte (`vaga.inicio`).",
+            "title": "Realizadas",
+            "type": "integer"
+          },
+          "recusadas": {
+            "description": "Propostas feitas no recorte e recusadas pelo paciente.",
+            "title": "Recusadas",
+            "type": "integer"
+          },
+          "semana": {
+            "description": "Segunda-feira da semana, em Recife.",
+            "format": "date",
+            "title": "Semana",
+            "type": "string"
+          },
+          "solicitacoes_criadas": {
+            "description": "Solicitações criadas no recorte (`criada_em`).",
+            "title": "Solicitacoes Criadas",
+            "type": "integer"
+          },
+          "taxa_confirmacao": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Taxa Confirmacao"
+          },
+          "taxa_desistencia": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Taxa Desistencia"
+          },
+          "taxa_expiracao": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Taxa Expiracao"
+          },
+          "taxa_faltas": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Faltas ÷ (realizadas + faltas).",
+            "title": "Taxa Faltas"
+          },
+          "taxa_recusa": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Taxa Recusa"
+          },
+          "vagas_ocupadas": {
+            "description": "Vagas ofertadas com agendamento CONFIRMADO, REALIZADO ou FALTOU. Inclui CONFIRMADO de vaga futura: nem toda ocupada já foi atendida.",
+            "title": "Vagas Ocupadas",
+            "type": "integer"
+          },
+          "vagas_ofertadas": {
+            "description": "Vagas ATIVAS com início no recorte.",
+            "title": "Vagas Ofertadas",
+            "type": "integer"
+          },
+          "vagas_perdidas": {
+            "description": "Vagas ofertadas já iniciadas sem agendamento CONFIRMADO, REALIZADO ou FALTOU.",
+            "title": "Vagas Perdidas",
+            "type": "integer"
+          },
+          "vagas_reaproveitadas": {
+            "description": "Vagas com proposta desfeita que outra solicitação confirmou depois.",
+            "title": "Vagas Reaproveitadas",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "confirmadas",
+          "recusadas",
+          "expiradas",
+          "propostas_encerradas",
+          "propostas_canceladas_sem_resposta",
+          "taxa_confirmacao",
+          "taxa_recusa",
+          "taxa_expiracao",
+          "realizadas",
+          "faltas",
+          "taxa_faltas",
+          "solicitacoes_criadas",
+          "desistencias",
+          "taxa_desistencia",
+          "vagas_ofertadas",
+          "vagas_ocupadas",
+          "vagas_reaproveitadas",
+          "vagas_perdidas",
+          "semana"
+        ],
+        "title": "Semana",
+        "type": "object"
+      },
       "SenhaTemporariaSaida": {
         "description": "A senha aparece só aqui, uma vez. Não há como lê-la depois.",
         "properties": {
@@ -1881,6 +2257,44 @@
           "motivo"
         ],
         "title": "SuspensaoEntrada",
+        "type": "object"
+      },
+      "TempoDeEspera": {
+        "description": "Da entrada na fila até a primeira confirmação, em dias. Só solicitações cuja primeira\nconfirmação cai no período.",
+        "properties": {
+          "confirmacoes": {
+            "title": "Confirmacoes",
+            "type": "integer"
+          },
+          "mediana_dias": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mediana Dias"
+          },
+          "p90_dias": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P90 Dias"
+          }
+        },
+        "required": [
+          "confirmacoes",
+          "mediana_dias",
+          "p90_dias"
+        ],
+        "title": "TempoDeEspera",
         "type": "object"
       },
       "TermoSaida": {
@@ -4262,6 +4676,129 @@
           }
         ],
         "summary": "Painel De Vagas",
+        "tags": [
+          "equipe"
+        ]
+      }
+    },
+    "/api/v1/equipe/indicadores": {
+      "get": {
+        "description": "Indicadores de `de` a `ate` (dias em Recife, inclusivos, até 366 dias), com totais,\nsérie semanal e a fila atual. `unidade_id` e `fila_id` restringem o escopo do usuário.",
+        "operationId": "indicadores_api_v1_equipe_indicadores_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "de",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "De",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ate",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "Ate",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "unidade_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Unidade Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fila_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fila Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndicadoresSaida"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unauthorized: `/problemas/nao-autenticado`"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/troca-de-senha-obrigatoria`"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "cookieSessao": []
+          }
+        ],
+        "summary": "Indicadores",
         "tags": [
           "equipe"
         ]

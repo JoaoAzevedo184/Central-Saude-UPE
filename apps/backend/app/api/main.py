@@ -12,7 +12,7 @@ from starlette.exceptions import HTTPException
 
 from app.api.deps import csrf_valido
 from app.api.problemas import MEDIA_TYPE, REF_PROBLEMA, Problema
-from app.api.rotas import admin, auth, avisos, equipe, health, solicitacoes, termos
+from app.api.rotas import admin, auth, avisos, equipe, health, indicadores, solicitacoes, termos
 from app.config import get_settings
 from app.dominio.erros import ErroDeDominio
 from app.logging import configurar_logging, resumo_do_erro
@@ -34,6 +34,7 @@ api_v1.include_router(auth.router)
 api_v1.include_router(admin.router)
 api_v1.include_router(solicitacoes.router)
 api_v1.include_router(equipe.router)
+api_v1.include_router(indicadores.router)
 api_v1.include_router(avisos.router)
 api_v1.include_router(termos.router)
 app.include_router(api_v1)

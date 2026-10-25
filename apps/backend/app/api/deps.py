@@ -74,14 +74,15 @@ def csrf_valido(request: Request) -> bool:
     return bool(cookie) and hmac.compare_digest(cookie.encode(), header.encode())
 
 
-def usuario_da_sessao(
+def usuario_da_sessao_sem_troca(
     request: Request,
     session: Annotated[Session, Depends(get_session)],
     relogio: Annotated[Relogio, Depends(get_relogio)],
     _cookie: Annotated[str | None, Security(esquema_acesso)] = None,
 ) -> Usuario:
-    """Usuário do access token, carregado do banco a cada requisição.
+    """Usuário do access token, carregado do banco a cada requisição, sem exigir a troca de senha.
 
+    Só `/me` e `/auth/trocar-senha` o usam direto; o resto passa por `usuario_da_sessao`.
     Suspenso (ADR-028) ou família de sessão revogada (logout, reuso do refresh) não passam:
     o acesso cai na hora, sem esperar o access token vencer.
     """
@@ -95,6 +96,20 @@ def usuario_da_sessao(
         or not familia_ativa(session, lido[1])
     ):
         raise Problema(401, "/problemas/nao-autenticado", "Sessão inválida ou expirada.")
+    return usuario
+
+
+def usuario_da_sessao(
+    usuario: Annotated[Usuario, Depends(usuario_da_sessao_sem_troca)],
+) -> Usuario:
+    """Usuário da sessão. Com senha temporária (criada ou redefinida pelo admin), toda rota
+    que não seja a troca de senha, `/me`, logout ou refresh responde 403: negar por padrão."""
+    if usuario.senha_temporaria:
+        raise Problema(
+            403,
+            "/problemas/troca-de-senha-obrigatoria",
+            "Troque a senha temporária para continuar.",
+        )
     return usuario
 
 

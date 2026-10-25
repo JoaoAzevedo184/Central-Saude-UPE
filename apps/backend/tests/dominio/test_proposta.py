@@ -143,6 +143,14 @@ def test_uc004_confirmar_dentro_do_prazo():
     a = confirmar(proposto(), AGORA)
 
     assert a.status == "CONFIRMADO" and a.respondido_em == AGORA
+    assert a.confirmado_em == AGORA
+
+
+def test_uc009_so_a_confirmacao_preenche_confirmado_em():
+    recusada = recusar(proposto(), AGORA)
+    cancelada = cancelar_pelo_paciente(proposto(), AGORA + timedelta(days=1), AGORA)
+
+    assert recusada.confirmado_em is None and cancelada.confirmado_em is None
 
 
 def test_uc004_confirmar_no_instante_do_prazo_ja_esta_expirado():

@@ -111,7 +111,7 @@ P_DESISTE_NA_FILA = 0.22  # quem espera semanas desiste de parte dos pedidos
 P_CANCELA_CONFIRMADA = 0.06
 P_VERMELHO, P_AMARELO = 0.04, 0.10
 VAGAS_ABERTAS_NO_FIM = 8  # desistências de cardiologia que liberam vaga para o roteiro final
-ULTIMO_LOTE = {"VERMELHO": 3, "AMARELO": 2}  # por fila, na última hora (ver `_ultimo_lote`)
+ULTIMO_LOTE = {"VERMELHO": 3, "AMARELO": 2}  # por fila, 2 h antes do fim (`_ultimo_lote`)
 PRIMEIROS_NOMES = (
     "Ana", "Bruno", "Carla", "Davi", "Elisa", "Fábio", "Gabriela", "Hugo", "Iara", "João",
     "Karina", "Lucas", "Marta", "Nelson", "Olívia", "Paulo", "Quitéria", "Rafael", "Sara",

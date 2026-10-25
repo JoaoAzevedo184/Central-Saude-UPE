@@ -152,7 +152,7 @@ def totais(resposta):
 # --- acesso ---------------------------------------------------------------------------------
 
 
-def test_rf036_so_gestor_e_admin_leem(api, sessao, mundo):
+def test_rf037_so_gestor_e_admin_leem(api, sessao, mundo):
     assert consultar(api).status_code == 401
     for papel, esperado in (("ATENDENTE", 403), ("GESTOR", 200), ("ADMIN", 200)):
         cliente = novo_cliente()
@@ -172,11 +172,11 @@ def test_rf036_so_gestor_e_admin_leem(api, sessao, mundo):
         {"de": "ontem", "ate": "2026-10-18"},
     ],
 )
-def test_rf036_periodo_invalido_responde_422(api, gestor, params):
+def test_rf037_periodo_invalido_responde_422(api, gestor, params):
     assert api.get(URL, params=params).status_code == 422
 
 
-def test_rf036_periodo_de_366_dias_vale(api, gestor):
+def test_rf037_periodo_de_366_dias_vale(api, gestor):
     assert api.get(URL, params={"de": "2025-10-19", "ate": "2026-10-19"}).status_code == 200
 
 
@@ -404,7 +404,7 @@ def test_am007_leitura_e_auditada_so_com_periodo_e_filtros(api, sessao, mundo, g
         assert set(a.dados_depois) == {"de", "ate", "unidade_id", "fila_id"}
 
 
-def test_rf036_negada_nao_audita(api, sessao, mundo):
+def test_rf037_negada_nao_audita(api, sessao, mundo):
     entrar(api, criar_equipe(sessao, "ATENDENTE", filas=[mundo.fila]).email)
     consultar(api)
     assert sessao.scalar(select(Auditoria).where(Auditoria.acao == "CONSULTAR_INDICADORES")) is None

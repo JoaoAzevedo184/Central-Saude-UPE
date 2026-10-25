@@ -125,7 +125,7 @@ def test_rf035_rotas_antigas_de_suspensao_respondem_404(api, admin, metodo, cami
 # --- criar conta e senha temporária -------------------------------------------------------
 
 
-def test_rf035_cria_conta_com_senha_temporaria_devolvida_uma_vez(api, sessao, admin, caplog):
+def test_rf036_cria_conta_com_senha_temporaria_devolvida_uma_vez(api, sessao, admin, caplog):
     caplog.set_level(logging.DEBUG)
 
     resposta = criar(api, email="Nova.Atendente@Exemplo.com", papel="ATENDENTE")
@@ -149,13 +149,13 @@ def test_rf035_cria_conta_com_senha_temporaria_devolvida_uma_vez(api, sessao, ad
     assert auditorias(sessao, "CRIAR_USUARIO")[0].ator_usuario_id == admin.id
 
 
-def test_rf035_resposta_da_senha_nao_fica_em_cache(api, admin):
+def test_rf036_resposta_da_senha_nao_fica_em_cache(api, admin):
     resposta = criar(api)
 
     assert resposta.headers["cache-control"] == "no-store"
 
 
-def test_rf035_login_de_senha_temporaria_traz_trocar_senha(api, sessao, admin):
+def test_rf036_login_de_senha_temporaria_traz_trocar_senha(api, sessao, admin):
     senha = criar(api, email="temp.login@exemplo.com").json()["senha_temporaria"]
 
     resposta = login(novo_cliente(), "temp.login@exemplo.com", senha)
@@ -164,7 +164,7 @@ def test_rf035_login_de_senha_temporaria_traz_trocar_senha(api, sessao, admin):
     assert resposta.json()["trocar_senha"] is True
 
 
-def test_rf035_login_comum_nao_traz_trocar_senha(api, sessao):
+def test_rf036_login_comum_nao_traz_trocar_senha(api, sessao):
     criar_usuario(sessao, "GESTOR", email="gestor.sem.troca@exemplo.com")
 
     resposta = login(api, "gestor.sem.troca@exemplo.com")
@@ -172,7 +172,7 @@ def test_rf035_login_comum_nao_traz_trocar_senha(api, sessao):
     assert "trocar_senha" not in resposta.json()
 
 
-def test_rf035_email_duplicado_retorna_409(api, admin):
+def test_rf036_email_duplicado_retorna_409(api, admin):
     assert criar(api, email="dup@exemplo.com").status_code == 201
 
     resposta = criar(api, email="DUP@exemplo.com")
@@ -192,11 +192,11 @@ def test_rf035_email_duplicado_retorna_409(api, admin):
         {"papel": "ADMIN", "unidade_ids": [str(uuid4())]},
     ],
 )
-def test_rf035_criacao_invalida_retorna_422(api, admin, corpo):
+def test_rf036_criacao_invalida_retorna_422(api, admin, corpo):
     assert criar(api, **corpo).status_code == 422
 
 
-def test_rf035_gestor_sem_unidade_exige_confirmar_a_visao_central(api, sessao, admin, mundo):
+def test_rf036_gestor_sem_unidade_exige_confirmar_a_visao_central(api, sessao, admin, mundo):
     sem_nada = criar(api, papel="GESTOR")
     confirmado = criar(api, papel="GESTOR", confirmar_visao_central=True)
     com_unidade = criar(api, papel="GESTOR", unidade_ids=[str(mundo.unidade)])
@@ -214,7 +214,7 @@ def test_rf035_gestor_sem_unidade_exige_confirmar_a_visao_central(api, sessao, a
     assert contar(sessao, Usuario, Usuario.papel == "GESTOR") == 2  # a 409 não criou nada
 
 
-def test_rf035_gestor_com_unidade_inexistente_retorna_422(api, admin):
+def test_rf036_gestor_com_unidade_inexistente_retorna_422(api, admin):
     assert criar(api, papel="GESTOR", unidade_ids=[str(uuid4())]).status_code == 422
 
 
@@ -231,7 +231,7 @@ def temporario(api, sessao, admin):
     return cliente, senha
 
 
-def test_rf035_senha_temporaria_bloqueia_as_outras_rotas(temporario):
+def test_rf036_senha_temporaria_bloqueia_as_outras_rotas(temporario):
     cliente, _ = temporario
     chamadas = [
         cliente.get(f"{ADMIN}/usuarios"),
@@ -247,7 +247,7 @@ def test_rf035_senha_temporaria_bloqueia_as_outras_rotas(temporario):
         assert resposta.json()["type"] == TROCA_OBRIGATORIA
 
 
-def test_rf035_senha_temporaria_ainda_acessa_me_refresh_e_logout(temporario):
+def test_rf036_senha_temporaria_ainda_acessa_me_refresh_e_logout(temporario):
     cliente, _ = temporario
 
     assert cliente.get("/api/v1/me").status_code == 200
@@ -255,7 +255,7 @@ def test_rf035_senha_temporaria_ainda_acessa_me_refresh_e_logout(temporario):
     assert cliente.post("/api/v1/auth/logout", headers=com_csrf(cliente)).status_code == 204
 
 
-def test_rf035_troca_de_senha_libera_o_acesso_e_revoga_as_outras_sessoes(
+def test_rf036_troca_de_senha_libera_o_acesso_e_revoga_as_outras_sessoes(
     temporario, sessao, caplog
 ):
     cliente, temp = temporario
@@ -291,14 +291,14 @@ def test_rf035_troca_de_senha_libera_o_acesso_e_revoga_as_outras_sessoes(
         {"senha_atual": SENHA, "senha_nova": "uma-senha-nova-forte", "papel": "ADMIN"},
     ],
 )
-def test_rf035_troca_invalida_retorna_422_e_nao_muda_nada(api, sessao, admin, corpo):
+def test_rf036_troca_invalida_retorna_422_e_nao_muda_nada(api, sessao, admin, corpo):
     resposta = api.post("/api/v1/auth/trocar-senha", json=corpo, headers=com_csrf(api))
 
     assert resposta.status_code == 422
     assert login(novo_cliente(), "admin.adm@exemplo.com").status_code == 200
 
 
-def test_rf035_trocar_senha_exige_sessao_e_csrf(api, admin):
+def test_rf036_trocar_senha_exige_sessao_e_csrf(api, admin):
     corpo = {"senha_atual": SENHA, "senha_nova": "uma-senha-nova-forte"}
 
     sem_csrf = api.post("/api/v1/auth/trocar-senha", json=corpo)
@@ -344,7 +344,7 @@ def test_am020_erros_na_troca_de_senha_bloqueiam_sem_revogar_nada(
 # --- redefinir senha ----------------------------------------------------------------------
 
 
-def test_rf035_redefinir_senha_revoga_sessoes_e_exige_nova_troca(api, sessao, admin, caplog):
+def test_rf036_redefinir_senha_revoga_sessoes_e_exige_nova_troca(api, sessao, admin, caplog):
     alvo = criar_usuario(sessao, "ATENDENTE", email="redef@exemplo.com")
     navegador = novo_cliente()
     assert login(navegador, "redef@exemplo.com").status_code == 200
@@ -366,7 +366,7 @@ def test_rf035_redefinir_senha_revoga_sessoes_e_exige_nova_troca(api, sessao, ad
     assert senha not in dump and alvo.senha_hash not in dump
 
 
-def test_rf035_redefinir_senha_so_de_atendente_e_gestor(api, sessao, admin):
+def test_rf036_redefinir_senha_so_de_atendente_e_gestor(api, sessao, admin):
     paciente = criar_paciente(sessao)
     outro_admin = criar_usuario(sessao, "ADMIN")
     gestor = criar_usuario(sessao, "GESTOR")
@@ -385,7 +385,7 @@ def test_rf035_redefinir_senha_so_de_atendente_e_gestor(api, sessao, admin):
     assert outro_admin.senha_temporaria is False
 
 
-def test_rf035_me_traz_trocar_senha_so_com_senha_temporaria(api, sessao, temporario):
+def test_rf036_me_traz_trocar_senha_so_com_senha_temporaria(api, sessao, temporario):
     cliente, _ = temporario
     comum = criar_usuario(sessao, "GESTOR", email="me.comum@exemplo.com")
     login(novo := novo_cliente(), "me.comum@exemplo.com")
@@ -561,7 +561,7 @@ def test_am020_trocar_senha_de_conta_suspensa_durante_a_sessao_retorna_401(api, 
     assert resposta.status_code == 401
 
 
-def test_rf035_auditoria_nunca_guarda_senha_nem_hash(api, sessao, admin):
+def test_rf036_auditoria_nunca_guarda_senha_nem_hash(api, sessao, admin):
     alvo = criar_usuario(sessao, "ATENDENTE", email="aud.senha@exemplo.com")
     criada = criar(api).json()["senha_temporaria"]
     redefinida = api.post(

@@ -75,4 +75,12 @@ with motor.connect() as c:
     exit 0
 fi
 
-exec uv run pytest "$@"
+# Uma execução por worktree por vez: o conftest recria o banco de teste (DROP ... WITH (FORCE)),
+# então duas execuções simultâneas derrubam as conexões uma da outra. A segunda espera a primeira.
+trava="${TMPDIR:-/tmp}/testar-$(printf '%s' "$raiz" | cksum | cut -d' ' -f1).lock"
+exec 9>"$trava"
+if ! flock -n 9; then
+    echo "Outra execução de testes neste worktree está em andamento; aguardando..." >&2
+    flock 9
+fi
+uv run pytest "$@"

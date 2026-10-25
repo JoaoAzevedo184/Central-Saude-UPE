@@ -36,6 +36,12 @@ class OperacaoNaoPermitida(ErroDeDominio):
     tipo = "/problemas/operacao-nao-permitida"
 
 
+class VisaoCentralNaoConfirmada(ErroDeDominio):
+    """Gestor sem unidade vê a central inteira (ADR-025): o admin precisa confirmar. 409."""
+
+    tipo = "/problemas/visao-central-nao-confirmada"
+
+
 class NaoElegivel(ErroDeDominio):
     """O paciente não cumpre a elegibilidade da fila (RN-017). 409."""
 

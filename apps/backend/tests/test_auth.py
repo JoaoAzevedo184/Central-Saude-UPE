@@ -366,7 +366,7 @@ def test_adr003_logout_sem_sessao_e_idempotente(api):
 
 @pytest.mark.parametrize(
     "caminho",
-    ["/api/v1/auth/refresh", "/api/v1/auth/logout", f"/api/v1/usuarios/{uuid4()}/suspender"],
+    ["/api/v1/auth/refresh", "/api/v1/auth/logout", f"/api/v1/admin/usuarios/{uuid4()}/suspender"],
 )
 def test_am002_escrita_sem_header_csrf_retorna_403(api, sessao, caminho):
     criar_usuario(sessao, "ADMIN", email="admin.csrf@exemplo.com")
@@ -424,7 +424,9 @@ def admin(api, sessao):
 
 def suspender(api, usuario_id, motivo="Férias (dado sintético)"):
     return api.post(
-        f"/api/v1/usuarios/{usuario_id}/suspender", json={"motivo": motivo}, headers=com_csrf(api)
+        f"/api/v1/admin/usuarios/{usuario_id}/suspender",
+        json={"motivo": motivo},
+        headers=com_csrf(api),
     )
 
 
@@ -458,7 +460,7 @@ def test_adr028_reativar_devolve_o_acesso_e_audita(api, sessao, admin):
     atendente = criar_usuario(sessao, "ATENDENTE", email="atendente.w@exemplo.com")
     suspender(api, atendente.id)
 
-    resposta = api.post(f"/api/v1/usuarios/{atendente.id}/reativar", headers=com_csrf(api))
+    resposta = api.post(f"/api/v1/admin/usuarios/{atendente.id}/reativar", headers=com_csrf(api))
 
     assert resposta.status_code == 204
     assert login(novo_cliente(), "atendente.w@exemplo.com").status_code == 200
@@ -487,7 +489,7 @@ def test_adr028_nao_suspende_paciente(api, sessao, admin):
 
 def test_adr028_usuario_inexistente_retorna_404(api, admin):
     assert suspender(api, uuid4()).status_code == 404
-    reativar = api.post(f"/api/v1/usuarios/{uuid4()}/reativar", headers=com_csrf(api))
+    reativar = api.post(f"/api/v1/admin/usuarios/{uuid4()}/reativar", headers=com_csrf(api))
     assert reativar.status_code == 404
 
 
@@ -510,7 +512,9 @@ def test_adr028_so_admin_suspende(api, sessao, papel):
 def test_adr028_suspender_sem_sessao_retorna_401(api, sessao):
     alvo = criar_usuario(sessao, "ATENDENTE")
 
-    resposta = postar_com_cookies(api, f"/api/v1/usuarios/{alvo.id}/suspender", csrf_token="abc")
+    resposta = postar_com_cookies(
+        api, f"/api/v1/admin/usuarios/{alvo.id}/suspender", csrf_token="abc"
+    )
 
     assert resposta.status_code == 401
 
@@ -785,12 +789,25 @@ def test_uc001_termo_configurado_tem_arquivo_de_texto():
     assert (PASTA_TERMOS / f"{get_settings().termo_versao_atual}.md").is_file()
 
 
-PALAVRAS_DE_EXISTENCIA = ("já cadastrad", "já existe", "já está", "já tem", "já possui", "duplicad", "em uso")
+PALAVRAS_DE_EXISTENCIA = (
+    "já cadastrad",
+    "já existe",
+    "já está",
+    "já tem",
+    "já possui",
+    "duplicad",
+    "em uso",
+)
 
 
 @pytest.mark.parametrize(
     "mudanca",
-    [{"email": "sem-arroba"}, {"senha": "curta"}, {"cns": "123456789019999"}, {"aceite_termo": False}],
+    [
+        {"email": "sem-arroba"},
+        {"senha": "curta"},
+        {"cns": "123456789019999"},
+        {"aceite_termo": False},
+    ],
 )
 def test_am005_422_do_registro_nao_revela_existencia_de_cpf_cns_ou_email(api, sessao, mudanca):
     assert registrar(api).status_code == 201  # CPF, CNS e e-mail de dados_registro() já existem
@@ -811,6 +828,7 @@ def test_am005_422_do_registro_nao_revela_existencia_de_cpf_cns_ou_email(api, se
     for resposta in (existente, inedito):
         texto = resposta.text.lower()
         assert not any(palavra in texto for palavra in PALAVRAS_DE_EXISTENCIA)
+
     # a validação não depende do que existe no banco: mesmos campos acusados, mesmas mensagens
     def erros(resposta):
         return sorted((tuple(e["loc"]), e["msg"]) for e in resposta.json()["errors"])
@@ -831,4 +849,7 @@ def test_am005_422_do_login_nao_revela_existencia_de_cpf_ou_email(api, sessao):
     assert {r.status_code for r in respostas} == {422}
     for resposta in respostas:
         assert not any(p in resposta.text.lower() for p in PALAVRAS_DE_EXISTENCIA)
-    assert len({tuple((tuple(e["loc"]), e["msg"]) for e in r.json()["errors"]) for r in respostas}) == 1
+    assert (
+        len({tuple((tuple(e["loc"]), e["msg"]) for e in r.json()["errors"]) for r in respostas})
+        == 1
+    )

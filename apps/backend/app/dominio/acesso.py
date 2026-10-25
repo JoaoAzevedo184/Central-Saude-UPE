@@ -4,7 +4,12 @@ from collections.abc import Mapping
 from datetime import datetime, timedelta
 from uuid import UUID
 
-from app.dominio.erros import OperacaoNaoPermitida, TransicaoInvalida
+from app.dominio.erros import (
+    EntradaInvalida,
+    OperacaoNaoPermitida,
+    TransicaoInvalida,
+    VisaoCentralNaoConfirmada,
+)
 
 PAPEIS_EQUIPE = frozenset({"ATENDENTE", "GESTOR", "ADMIN"})
 
@@ -83,6 +88,60 @@ def verificar_suspensao(
 def verificar_reativacao(alvo_situacao: str) -> None:
     if alvo_situacao != "SUSPENSO":
         raise TransicaoInvalida("A conta já está ativa.")
+
+
+SENHA_MINIMA = 10
+
+
+def verificar_atribuicao_de_filas(papel: str) -> None:
+    """Só ATENDENTE recebe fila (RF-035)."""
+    if papel != "ATENDENTE":
+        raise OperacaoNaoPermitida("Só atendentes recebem filas.")
+
+
+def verificar_atribuicao_de_unidades(
+    papel: str, unidade_ids: frozenset[UUID], confirmar_visao_central: bool
+) -> None:
+    """Só GESTOR recebe unidade (RF-035). Sem nenhuma unidade o gestor passa a ver a central
+    inteira (ADR-025): isso exige confirmação explícita, nunca acontece por omissão."""
+    if papel != "GESTOR":
+        raise OperacaoNaoPermitida("Só gestores recebem unidades.")
+    if not unidade_ids and not confirmar_visao_central:
+        raise VisaoCentralNaoConfirmada(
+            "Sem unidades, o gestor vê a central inteira. "
+            "Envie confirmar_visao_central=true para confirmar."
+        )
+
+
+def verificar_criacao_de_usuario(
+    papel: str, unidade_ids: frozenset[UUID] | None, confirmar_visao_central: bool
+) -> None:
+    """Contas criadas pelo admin: ATENDENTE, GESTOR ou ADMIN. `unidade_ids` só vale para GESTOR
+    (outro papel → 422); GESTOR segue a mesma regra de `verificar_atribuicao_de_unidades`."""
+    if papel not in PAPEIS_EQUIPE:
+        raise EntradaInvalida("Papel inválido para a equipe.")
+    if papel != "GESTOR":
+        if unidade_ids is not None:
+            raise EntradaInvalida("Só gestores recebem unidades.")
+        return
+    verificar_atribuicao_de_unidades(papel, unidade_ids or frozenset(), confirmar_visao_central)
+
+
+def verificar_troca_de_senha(senha_atual: str, senha_nova: str) -> None:
+    """Nova senha com ao menos `SENHA_MINIMA` caracteres e diferente da atual (422)."""
+    if len(senha_nova) < SENHA_MINIMA:
+        raise EntradaInvalida(f"A nova senha precisa ter ao menos {SENHA_MINIMA} caracteres.")
+    if senha_nova == senha_atual:
+        raise EntradaInvalida("A nova senha precisa ser diferente da atual.")
+
+
+def verificar_redefinicao_de_senha(alvo_papel: str) -> None:
+    """O admin redefine só ATENDENTE e GESTOR. Recuperar um ADMIN é pelo terminal
+    (`python -m app.infra.admin redefinir-senha`), que não depende de outro admin logado."""
+    if alvo_papel not in ("ATENDENTE", "GESTOR"):
+        raise OperacaoNaoPermitida(
+            "A senha de administrador só é redefinida pelo terminal do servidor."
+        )
 
 
 def normalizar_identificador(valor: str) -> tuple[str, str]:

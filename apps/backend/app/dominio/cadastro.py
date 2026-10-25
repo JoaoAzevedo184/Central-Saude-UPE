@@ -1,10 +1,12 @@
 """Validação dos documentos e da data de nascimento no cadastro do paciente (UC-001)."""
 
+import re
 from datetime import date
 
 from app.dominio.fila.elegibilidade import idade_em_anos
 
 IDADE_MAXIMA = 130
+EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 def cpf_com_digitos(base: str) -> str:

@@ -12,7 +12,7 @@ from starlette.exceptions import HTTPException
 
 from app.api.deps import csrf_valido
 from app.api.problemas import MEDIA_TYPE, REF_PROBLEMA, Problema
-from app.api.rotas import auth, avisos, equipe, health, solicitacoes, termos, usuarios
+from app.api.rotas import admin, auth, avisos, equipe, health, solicitacoes, termos
 from app.config import get_settings
 from app.dominio.erros import ErroDeDominio
 from app.logging import configurar_logging, resumo_do_erro
@@ -31,7 +31,7 @@ app = FastAPI(
 api_v1 = APIRouter(prefix="/api/v1")
 api_v1.include_router(health.router)
 api_v1.include_router(auth.router)
-api_v1.include_router(usuarios.router)
+api_v1.include_router(admin.router)
 api_v1.include_router(solicitacoes.router)
 api_v1.include_router(equipe.router)
 api_v1.include_router(avisos.router)
@@ -86,6 +86,7 @@ PREFIXOS_SEM_CACHE = (
     "/api/v1/solicitacoes",
     "/api/v1/equipe/",
     "/api/v1/avisos",
+    "/api/v1/admin/",  # senha temporária na resposta
 )
 
 
@@ -125,6 +126,22 @@ async def _inesperado(
 
 
 ESQUEMA_CSRF = "csrfToken"
+TIPO_TROCA_OBRIGATORIA = "/problemas/troca-de-senha-obrigatoria"
+# Rotas autenticadas que não exigem a troca de senha (`usuario_da_sessao_sem_troca`).
+ROTAS_SEM_TROCA_OBRIGATORIA = frozenset({"/api/v1/me", "/api/v1/auth/trocar-senha"})
+
+
+def _declarar_troca_obrigatoria(caminho: str, operacao: dict[str, Any]) -> None:
+    """Toda rota com `cookieSessao` pode responder 403 de troca obrigatória (ver `deps`)."""
+    if caminho in ROTAS_SEM_TROCA_OBRIGATORIA or not any(
+        "cookieSessao" in e for e in operacao.get("security", [])
+    ):
+        return
+    respostas = operacao["responses"]
+    tipo = f"`{TIPO_TROCA_OBRIGATORIA}`"
+    atual = respostas.setdefault("403", {"description": "Forbidden"})
+    if tipo not in atual["description"]:
+        atual["description"] += (", " if ":" in atual["description"] else ": ") + tipo
 
 
 def _openapi() -> dict[str, Any]:
@@ -133,6 +150,7 @@ def _openapi() -> dict[str, Any]:
     - Erros (>= 400) são `application/problem+json` com o schema `Problema`; o
       `HTTPValidationError` do FastAPI sai, porque o 422 real também é Problem Details.
     - Rotas de escrita (menos `ROTAS_SEM_CSRF`) exigem o header CSRF, além do cookie.
+    - Toda rota autenticada (menos `/me` e a troca de senha) declara o 403 de troca obrigatória.
     """
     if app.openapi_schema:
         return app.openapi_schema
@@ -158,6 +176,7 @@ def _openapi() -> dict[str, Any]:
     }
     for caminho, operacoes in esquema["paths"].items():
         for metodo, operacao in operacoes.items():
+            _declarar_troca_obrigatoria(caminho, operacao)
             for status, resposta in operacao["responses"].items():
                 if int(status) >= 400:
                     resposta["content"] = {MEDIA_TYPE: {"schema": REF_PROBLEMA}}

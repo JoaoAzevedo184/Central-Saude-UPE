@@ -46,7 +46,9 @@ _TETO_AVISADO: set[UUID] = set()
 
 
 def para_dominio_agendamento(a: Agendamento) -> AgendamentoDominio:
-    return AgendamentoDominio(a.id, a.status, a.expira_em, a.respondido_em, a.motivo_cancelamento)
+    return AgendamentoDominio(
+        a.id, a.status, a.expira_em, a.respondido_em, a.motivo_cancelamento, a.confirmado_em
+    )
 
 
 def vaga_ocupada(vaga_id: Any) -> ColumnElement[bool]:
@@ -64,7 +66,7 @@ def aplicar_agendamento(
     ip: str | None,
 ) -> None:
     """Aplica a transição do domínio e grava a auditoria do agendamento (RN-010)."""
-    campos = ("status", "respondido_em", "motivo_cancelamento")
+    campos = ("status", "respondido_em", "motivo_cancelamento", "confirmado_em")
     antes = {c: getattr(modelo, c) for c in campos}
     for campo in campos:
         setattr(modelo, campo, getattr(novo, campo))

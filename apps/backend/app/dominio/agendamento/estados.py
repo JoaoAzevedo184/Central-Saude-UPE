@@ -15,6 +15,7 @@ class Agendamento:
     expira_em: datetime
     respondido_em: datetime | None = None
     motivo_cancelamento: str | None = None
+    confirmado_em: datetime | None = None
 
 
 def _exigir_proposta_no_prazo(agendamento: Agendamento, agora: datetime) -> None:
@@ -30,7 +31,7 @@ def _exigir_proposta_no_prazo(agendamento: Agendamento, agora: datetime) -> None
 def confirmar(agendamento: Agendamento, agora: datetime) -> Agendamento:
     """PROPOSTO → CONFIRMADO, só antes de `expira_em` (UC-004)."""
     _exigir_proposta_no_prazo(agendamento, agora)
-    return replace(agendamento, status="CONFIRMADO", respondido_em=agora)
+    return replace(agendamento, status="CONFIRMADO", respondido_em=agora, confirmado_em=agora)
 
 
 def recusar(agendamento: Agendamento, agora: datetime) -> Agendamento:

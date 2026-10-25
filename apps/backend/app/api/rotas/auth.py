@@ -24,18 +24,20 @@ from app.api.deps import (
     get_relogio,
     get_session,
     ip_do_cliente,
-    usuario_da_sessao,
+    usuario_da_sessao_sem_troca,
 )
 from app.api.problemas import CSRF, NAO_AUTENTICADO, erros
 from app.api.tipos import Papel
 from app.config import get_settings
 from app.dominio.acesso import (
+    SENHA_MINIMA,
     normalizar_identificador,
     pode_autenticar,
     refresh_na_tolerancia,
     tentativas_esgotadas,
+    verificar_troca_de_senha,
 )
-from app.dominio.cadastro import cns_valido, cpf_valido, erro_data_nascimento
+from app.dominio.cadastro import EMAIL, cns_valido, cpf_valido, erro_data_nascimento
 from app.dominio.relogio import Relogio
 from app.infra.acesso import carregar_escopo
 from app.infra.autenticacao import (
@@ -47,6 +49,7 @@ from app.infra.autenticacao import (
     familia_ativa,
     hash_identificador,
     hash_senha,
+    ler_access_token,
     precisa_rehash,
     registrar_tentativa,
     registros_do_ip,
@@ -63,7 +66,6 @@ RelogioDep = Annotated[Relogio, Depends(get_relogio)]
 
 PATH_ACCESS = "/api/v1"
 PATH_REFRESH = "/api/v1/auth"
-EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 MENSAGEM_DUPLICADO = (
     "Não foi possível concluir o cadastro. Se você já tem conta, entre com seu CPF."
 )
@@ -100,7 +102,7 @@ class RegistroEntrada(BaseModel):
     municipio: str = Field(min_length=2, max_length=100)
     telefone: str = Field(min_length=10, max_length=20)
     email: str | None = Field(default=None, max_length=254)
-    senha: SecretStr = Field(min_length=10, max_length=256)
+    senha: SecretStr = Field(min_length=SENHA_MINIMA, max_length=256)
     aceite_termo: Literal[True]
     versao_termo: str = Field(min_length=1, max_length=20)
     aceite_lembrete_email: bool = False
@@ -166,6 +168,20 @@ class SessaoSaida(BaseModel):
     expira_em: datetime
 
 
+class LoginSaida(SessaoSaida):
+    """`trocar_senha` só aparece (`true`) para conta com senha temporária: o frontend deve levar
+    a pessoa à troca, porque o resto da API responde 403 até lá."""
+
+    trocar_senha: Literal[True] | None = None
+
+
+class TrocaSenhaEntrada(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    senha_atual: SecretStr = Field(min_length=1, max_length=256)
+    senha_nova: SecretStr = Field(min_length=1, max_length=256)
+
+
 class EuSaida(BaseModel):
     """Para o paciente, nunca posição nem tamanho da fila (ADR-007).
 
@@ -177,6 +193,8 @@ class EuSaida(BaseModel):
     papel: Papel
     nome: str | None
     filas: list[UUID] | None
+    # Opcional: só aparece (`true`) com senha temporária; sem ele a resposta não muda.
+    trocar_senha: Literal[True] | None = None
 
 
 def _cookie(response: Response, nome: str, valor: str, path: str, max_age: int, httponly: bool):
@@ -310,6 +328,7 @@ def registrar(
 
 @router.post(
     "/auth/login",
+    response_model_exclude_none=True,
     responses=erros((401, "credenciais-invalidas"), (429, "muitas-tentativas"), 422),
 )
 def login(
@@ -318,7 +337,7 @@ def login(
     response: Response,
     session: SessionDep,
     relogio: RelogioDep,
-) -> SessaoSaida:
+) -> LoginSaida:
     """CPF (paciente) ou e-mail (equipe). Inexistente, senha errada e suspenso respondem igual."""
     settings = get_settings()
     agora = relogio.agora()
@@ -353,7 +372,85 @@ def login(
     corpo, _ = _iniciar_sessao(session, response, usuario, agora, ip)
     session.commit()
     logger.info("login: usuario=%s", usuario.id)
-    return corpo
+    return LoginSaida(**corpo.model_dump(), trocar_senha=True if usuario.senha_temporaria else None)
+
+
+@router.post(
+    "/auth/trocar-senha",
+    status_code=204,
+    responses=erros(NAO_AUTENTICADO, CSRF, 422, (429, "muitas-tentativas")),
+)
+def trocar_senha(
+    dados: TrocaSenhaEntrada,
+    request: Request,
+    usuario: Annotated[Usuario, Depends(usuario_da_sessao_sem_troca)],
+    session: SessionDep,
+    relogio: RelogioDep,
+) -> Response:
+    """Qualquer usuário autenticado. Zera `senha_temporaria` e revoga as outras sessões; a
+    atual continua. Senha atual errada conta no limite do login (AM-020), por usuário e por IP,
+    e o excesso responde 429 sem revogar nada."""
+    settings = get_settings()
+    agora = relogio.agora()
+    ip = ip_do_cliente(request)
+    # Serializa por usuário e relê o estado: tentativas paralelas esperam a anterior gravar a
+    # falha (o limite vale no total, não por lote) e uma redefinição, troca ou suspensão
+    # concorrente já commitada é vista antes de conferir e gravar a senha.
+    usuario = session.scalar(
+        select(Usuario)
+        .where(Usuario.id == usuario.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if usuario is None or not pode_autenticar(usuario.situacao):
+        raise _nao_autenticado()
+    identificador_hash = hash_identificador(str(usuario.id))
+    desde = agora - timedelta(minutes=settings.login_janela_min)
+    falhas = falhas_de_login(session, desde, ip, identificador_hash, "TROCA_SENHA")
+    if tentativas_esgotadas(falhas, settings.login_max_tentativas):
+        raise _muitas_tentativas()
+
+    atual = dados.senha_atual.get_secret_value()
+    nova = dados.senha_nova.get_secret_value()
+    if not conferir_senha(usuario.senha_hash, atual):
+        registrar_tentativa(session, "TROCA_SENHA", agora, ip, False, identificador_hash)
+        session.commit()
+        raise RequestValidationError(
+            [
+                {
+                    "loc": ("body", "senha_atual"),
+                    "msg": "Senha atual incorreta.",
+                    "type": "value_error",
+                }
+            ]
+        )
+    verificar_troca_de_senha(atual, nova)
+
+    token = request.cookies.get(COOKIE_ACCESS)
+    lido = ler_access_token(token or "", agora, settings.jwt_secret_key.get_secret_value())
+    if lido is None:
+        raise _nao_autenticado()
+    usuario.senha_hash = hash_senha(nova)
+    usuario.senha_temporaria = False
+    registrar_tentativa(session, "TROCA_SENHA", agora, ip, True, identificador_hash)
+    revogar_sessoes(
+        session,
+        agora,
+        SessaoRefresh.usuario_id == usuario.id,
+        SessaoRefresh.familia_id != lido[1],
+    )
+    session.add(
+        Auditoria(
+            ator_usuario_id=usuario.id,
+            acao="TROCAR_SENHA",
+            entidade="usuario",
+            entidade_id=usuario.id,
+            ip=ip,
+        )
+    )
+    session.commit()
+    logger.info("troca de senha: usuario=%s", usuario.id)
+    return Response(status_code=204)
 
 
 @router.post("/auth/refresh", responses=erros(NAO_AUTENTICADO, CSRF))
@@ -435,12 +532,19 @@ def logout(
     return response
 
 
-@router.get("/me", responses=erros(NAO_AUTENTICADO))
-def eu(usuario: Annotated[Usuario, Depends(usuario_da_sessao)], session: SessionDep) -> EuSaida:
+def _eu(usuario: Usuario, nome: str | None, filas: list[UUID] | None) -> EuSaida:
+    extra = {"trocar_senha": True} if usuario.senha_temporaria else {}
+    return EuSaida(id=usuario.id, papel=usuario.papel, nome=nome, filas=filas, **extra)
+
+
+@router.get("/me", response_model_exclude_unset=True, responses=erros(NAO_AUTENTICADO))
+def eu(
+    usuario: Annotated[Usuario, Depends(usuario_da_sessao_sem_troca)], session: SessionDep
+) -> EuSaida:
     """Dados do usuário logado. A equipe recebe também as filas do seu escopo (ADR-025)."""
     if usuario.papel == "PACIENTE":
         nome = session.scalar(select(Paciente.nome).where(Paciente.usuario_id == usuario.id))
-        return EuSaida(id=usuario.id, papel=usuario.papel, nome=nome, filas=None)
+        return _eu(usuario, nome, None)
     # A equipe não tem nome no modelo de dados (só e-mail): `nome` fica `null`.
     filas = sorted(carregar_escopo(session, usuario.id))
-    return EuSaida(id=usuario.id, papel=usuario.papel, nome=None, filas=filas)
+    return _eu(usuario, None, filas)

@@ -182,12 +182,31 @@ def registrar_tentativa(
     )
 
 
+def gerar_senha_temporaria() -> str:
+    """16 caracteres URL-safe (~96 bits). Devolvida uma vez ao admin; nunca vai para log."""
+    return secrets.token_urlsafe(12)
+
+
+def aplicar_senha_temporaria(session: Session, usuario: Usuario, agora: datetime) -> str:
+    """Troca a senha por uma temporária, liga a troca obrigatória e revoga todas as sessões.
+    Devolve a senha em claro, para ser mostrada uma única vez. Não faz commit nem auditoria."""
+    senha = gerar_senha_temporaria()
+    usuario.senha_hash = hash_senha(senha)
+    usuario.senha_temporaria = True
+    revogar_sessoes(session, agora, SessaoRefresh.usuario_id == usuario.id)
+    return senha
+
+
 def falhas_de_login(
-    session: Session, desde: datetime, ip: str | None, identificador_hash: str
+    session: Session,
+    desde: datetime,
+    ip: str | None,
+    identificador_hash: str,
+    tipo: str = "LOGIN",
 ) -> int:
-    """Maior número de falhas na janela: pelo IP ou pelo identificador (AM-004)."""
+    """Maior número de falhas na janela: pelo IP ou pelo identificador (AM-004, AM-020)."""
     base = select(func.count()).where(
-        TentativaLogin.tipo == "LOGIN",
+        TentativaLogin.tipo == tipo,
         TentativaLogin.sucesso.is_(False),
         TentativaLogin.ocorrido_em > desde,
     )

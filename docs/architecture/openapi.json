@@ -440,6 +440,25 @@
         "title": "ErroDeCampo",
         "type": "object"
       },
+      "EspecialidadeResumo": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nome": {
+            "title": "Nome",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nome"
+        ],
+        "title": "EspecialidadeResumo",
+        "type": "object"
+      },
       "EspecialidadeSaida": {
         "properties": {
           "id": {
@@ -495,6 +514,18 @@
           },
           "papel": {
             "$ref": "#/components/schemas/Papel"
+          },
+          "trocar_senha": {
+            "anyOf": [
+              {
+                "const": true,
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trocar Senha"
           }
         },
         "required": [
@@ -634,6 +665,38 @@
           }
         },
         "title": "FaixaCriterio",
+        "type": "object"
+      },
+      "FilaAdmin": {
+        "properties": {
+          "ativa": {
+            "title": "Ativa",
+            "type": "boolean"
+          },
+          "especialidade": {
+            "$ref": "#/components/schemas/EspecialidadeResumo"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nome": {
+            "title": "Nome",
+            "type": "string"
+          },
+          "unidade": {
+            "$ref": "#/components/schemas/UnidadeResumo"
+          }
+        },
+        "required": [
+          "id",
+          "nome",
+          "ativa",
+          "unidade",
+          "especialidade"
+        ],
+        "title": "FilaAdmin",
         "type": "object"
       },
       "FilaDetalheSaida": {
@@ -810,6 +873,25 @@
         "title": "FilaSaida",
         "type": "object"
       },
+      "FilasEntrada": {
+        "additionalProperties": false,
+        "properties": {
+          "fila_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 500,
+            "title": "Fila Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "fila_ids"
+        ],
+        "title": "FilasEntrada",
+        "type": "object"
+      },
       "ItemPainel": {
         "properties": {
           "classificacao_risco": {
@@ -916,6 +998,37 @@
         "title": "LoginEntrada",
         "type": "object"
       },
+      "LoginSaida": {
+        "description": "`trocar_senha` só aparece (`true`) para conta com senha temporária: o frontend deve levar\na pessoa à troca, porque o resto da API responde 403 até lá.",
+        "properties": {
+          "expira_em": {
+            "format": "date-time",
+            "title": "Expira Em",
+            "type": "string"
+          },
+          "papel": {
+            "$ref": "#/components/schemas/Papel"
+          },
+          "trocar_senha": {
+            "anyOf": [
+              {
+                "const": true,
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trocar Senha"
+          }
+        },
+        "required": [
+          "papel",
+          "expira_em"
+        ],
+        "title": "LoginSaida",
+        "type": "object"
+      },
       "MotivoCancelamento": {
         "enum": [
           "NAO_PRECISO_MAIS",
@@ -1018,6 +1131,48 @@
           "itens"
         ],
         "title": "PaginaSolicitacoes",
+        "type": "object"
+      },
+      "Pagina_FilaAdmin_": {
+        "properties": {
+          "itens": {
+            "items": {
+              "$ref": "#/components/schemas/FilaAdmin"
+            },
+            "title": "Itens",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "itens"
+        ],
+        "title": "Pagina[FilaAdmin]",
+        "type": "object"
+      },
+      "Pagina_UsuarioAdmin_": {
+        "properties": {
+          "itens": {
+            "items": {
+              "$ref": "#/components/schemas/UsuarioAdmin"
+            },
+            "title": "Itens",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "itens"
+        ],
+        "title": "Pagina[UsuarioAdmin]",
         "type": "object"
       },
       "PainelSaida": {
@@ -1376,6 +1531,26 @@
           "respostas"
         ],
         "title": "RespostasEntrada",
+        "type": "object"
+      },
+      "SenhaTemporariaSaida": {
+        "description": "A senha aparece só aqui, uma vez. Não há como lê-la depois.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "senha_temporaria": {
+            "title": "Senha Temporaria",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "senha_temporaria"
+        ],
+        "title": "SenhaTemporariaSaida",
         "type": "object"
       },
       "SessaoSaida": {
@@ -1770,6 +1945,33 @@
         "title": "TipoEventoLinhaDoTempo",
         "type": "string"
       },
+      "TrocaSenhaEntrada": {
+        "additionalProperties": false,
+        "properties": {
+          "senha_atual": {
+            "format": "password",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Senha Atual",
+            "type": "string",
+            "writeOnly": true
+          },
+          "senha_nova": {
+            "format": "password",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Senha Nova",
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "senha_atual",
+          "senha_nova"
+        ],
+        "title": "TrocaSenhaEntrada",
+        "type": "object"
+      },
       "Turno": {
         "enum": [
           "MANHA",
@@ -1798,6 +2000,25 @@
         "title": "UltimaMudanca",
         "type": "object"
       },
+      "UnidadeResumo": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "sigla": {
+            "title": "Sigla",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "sigla"
+        ],
+        "title": "UnidadeResumo",
+        "type": "object"
+      },
       "UnidadeSaida": {
         "properties": {
           "id": {
@@ -1820,6 +2041,139 @@
           "nome"
         ],
         "title": "UnidadeSaida",
+        "type": "object"
+      },
+      "UnidadesEntrada": {
+        "additionalProperties": false,
+        "properties": {
+          "confirmar_visao_central": {
+            "default": false,
+            "title": "Confirmar Visao Central",
+            "type": "boolean"
+          },
+          "unidade_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 500,
+            "title": "Unidade Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "unidade_ids"
+        ],
+        "title": "UnidadesEntrada",
+        "type": "object"
+      },
+      "UsuarioAdmin": {
+        "description": "`filas` só para ATENDENTE e `unidades` só para GESTOR; gestor sem unidade vê a central.",
+        "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "filas": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Filas",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "papel": {
+            "$ref": "#/components/schemas/Papel"
+          },
+          "senha_temporaria": {
+            "title": "Senha Temporaria",
+            "type": "boolean"
+          },
+          "situacao": {
+            "enum": [
+              "ATIVO",
+              "SUSPENSO"
+            ],
+            "title": "Situacao",
+            "type": "string"
+          },
+          "unidades": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Unidades",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "papel",
+          "situacao",
+          "senha_temporaria",
+          "filas",
+          "unidades"
+        ],
+        "title": "UsuarioAdmin",
+        "type": "object"
+      },
+      "UsuarioEntrada": {
+        "additionalProperties": false,
+        "description": "Papel só da equipe. `unidade_ids` vale só para GESTOR (outro papel → 422).",
+        "properties": {
+          "confirmar_visao_central": {
+            "default": false,
+            "title": "Confirmar Visao Central",
+            "type": "boolean"
+          },
+          "email": {
+            "maxLength": 254,
+            "title": "Email",
+            "type": "string"
+          },
+          "papel": {
+            "enum": [
+              "ATENDENTE",
+              "GESTOR",
+              "ADMIN"
+            ],
+            "title": "Papel",
+            "type": "string"
+          },
+          "unidade_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unidade Ids"
+          }
+        },
+        "required": [
+          "email",
+          "papel"
+        ],
+        "title": "UsuarioEntrada",
         "type": "object"
       },
       "VagaPainel": {
@@ -1885,6 +2239,739 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/admin/filas": {
+      "get": {
+        "description": "Todas as filas, com unidade e especialidade, para a tela de atribuição.",
+        "operationId": "listar_filas_api_v1_admin_filas_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_FilaAdmin_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unauthorized: `/problemas/nao-autenticado`"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/troca-de-senha-obrigatoria`"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "cookieSessao": []
+          }
+        ],
+        "summary": "Listar Filas",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/usuarios": {
+      "get": {
+        "description": "Contas da equipe (sem pacientes), com as filas e unidades atribuídas.",
+        "operationId": "listar_usuarios_api_v1_admin_usuarios_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "papel",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "ATENDENTE",
+                    "GESTOR",
+                    "ADMIN"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Papel"
+            }
+          },
+          {
+            "in": "query",
+            "name": "situacao",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "ATIVO",
+                    "SUSPENSO"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Situacao"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_UsuarioAdmin_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unauthorized: `/problemas/nao-autenticado`"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/troca-de-senha-obrigatoria`"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "cookieSessao": []
+          }
+        ],
+        "summary": "Listar Usuarios",
+        "tags": [
+          "admin"
+        ]
+      },
+      "post": {
+        "description": "Cria ATENDENTE, GESTOR ou ADMIN com senha temporária forte, devolvida só aqui. A pessoa\nprecisa trocá-la no primeiro acesso. GESTOR sem unidade exige `confirmar_visao_central`.",
+        "operationId": "criar_usuario_api_v1_admin_usuarios_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UsuarioEntrada"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SenhaTemporariaSaida"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unauthorized: `/problemas/nao-autenticado`"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`, `/problemas/troca-de-senha-obrigatoria`"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Conflict: `/problemas/email-ja-cadastrado`, `/problemas/visao-central-nao-confirmada`"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "cookieSessao": [],
+            "csrfToken": []
+          }
+        ],
+        "summary": "Criar Usuario",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/usuarios/{usuario_id}/filas": {
+      "put": {
+        "description": "Substitui as filas do ATENDENTE (RF-035). Outro papel → 409.",
+        "operationId": "atribuir_filas_api_v1_admin_usuarios__usuario_id__filas_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "usuario_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Usuario Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FilasEntrada"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unauthorized: `/problemas/nao-autenticado`"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`, `/problemas/troca-de-senha-obrigatoria`"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Conflict: `/problemas/operacao-nao-permitida`"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "cookieSessao": [],
+            "csrfToken": []
+          }
+        ],
+        "summary": "Atribuir Filas",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/usuarios/{usuario_id}/reativar": {
+      "post": {
+        "description": "Volta a ATIVO. `suspenso_em` e `motivo_suspensao` ficam como registro (ADR-028).",
+        "operationId": "reativar_api_v1_admin_usuarios__usuario_id__reativar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "usuario_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Usuario Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unauthorized: `/problemas/nao-autenticado`"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`, `/problemas/troca-de-senha-obrigatoria`"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Conflict: `/problemas/transicao-invalida`"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "cookieSessao": [],
+            "csrfToken": []
+          }
+        ],
+        "summary": "Reativar",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/usuarios/{usuario_id}/redefinir-senha": {
+      "post": {
+        "description": "Nova senha temporária (devolvida uma vez) e revogação de todas as sessões do usuário.",
+        "operationId": "redefinir_senha_api_v1_admin_usuarios__usuario_id__redefinir_senha_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "usuario_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Usuario Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SenhaTemporariaSaida"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unauthorized: `/problemas/nao-autenticado`"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`, `/problemas/troca-de-senha-obrigatoria`"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Conflict: `/problemas/operacao-nao-permitida`"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "cookieSessao": [],
+            "csrfToken": []
+          }
+        ],
+        "summary": "Redefinir Senha",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/usuarios/{usuario_id}/suspender": {
+      "post": {
+        "description": "Grava a suspensão e revoga todas as sessões do usuário. O access token que ainda não\nvenceu deixa de valer na próxima requisição, porque `usuario_da_sessao` relê a situação.",
+        "operationId": "suspender_api_v1_admin_usuarios__usuario_id__suspender_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "usuario_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Usuario Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuspensaoEntrada"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unauthorized: `/problemas/nao-autenticado`"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`, `/problemas/troca-de-senha-obrigatoria`"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Conflict: `/problemas/transicao-invalida`, `/problemas/operacao-nao-permitida`"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "cookieSessao": [],
+            "csrfToken": []
+          }
+        ],
+        "summary": "Suspender",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/usuarios/{usuario_id}/unidades": {
+      "put": {
+        "description": "Substitui as unidades do GESTOR (RF-035). Outro papel → 409. Lista vazia faz o gestor\nver a central inteira (ADR-025) e exige `confirmar_visao_central: true`.",
+        "operationId": "atribuir_unidades_api_v1_admin_usuarios__usuario_id__unidades_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "usuario_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Usuario Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnidadesEntrada"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unauthorized: `/problemas/nao-autenticado`"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`, `/problemas/troca-de-senha-obrigatoria`"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Conflict: `/problemas/operacao-nao-permitida`, `/problemas/visao-central-nao-confirmada`"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "cookieSessao": [],
+            "csrfToken": []
+          }
+        ],
+        "summary": "Atribuir Unidades",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/v1/agendamentos/{agendamento_id}/confirmar": {
       "post": {
         "description": "UC-004: PROPOSTO → CONFIRMADO e solicitação AGENDADA, só antes de `expira_em`.",
@@ -1930,7 +3017,7 @@
                 }
               }
             },
-            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`"
+            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`, `/problemas/troca-de-senha-obrigatoria`"
           },
           "404": {
             "content": {
@@ -2020,7 +3107,7 @@
                 }
               }
             },
-            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`"
+            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`, `/problemas/troca-de-senha-obrigatoria`"
           },
           "404": {
             "content": {
@@ -2084,7 +3171,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SessaoSaida"
+                  "$ref": "#/components/schemas/LoginSaida"
                 }
               }
             },
@@ -2268,6 +3355,77 @@
         ]
       }
     },
+    "/api/v1/auth/trocar-senha": {
+      "post": {
+        "description": "Qualquer usuário autenticado. Zera `senha_temporaria` e revoga as outras sessões; a\natual continua. Senha atual errada conta no limite do login (AM-020), por usuário e por IP,\ne o excesso responde 429 sem revogar nada.",
+        "operationId": "trocar_senha_api_v1_auth_trocar_senha_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrocaSenhaEntrada"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unauthorized: `/problemas/nao-autenticado`"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Forbidden: `/problemas/csrf-invalido`"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Too Many Requests: `/problemas/muitas-tentativas`"
+          }
+        },
+        "security": [
+          {
+            "cookieSessao": [],
+            "csrfToken": []
+          }
+        ],
+        "summary": "Trocar Senha",
+        "tags": [
+          "autenticacao"
+        ]
+      }
+    },
     "/api/v1/avisos": {
       "get": {
         "description": "Mais recentes primeiro.",
@@ -2328,6 +3486,16 @@
             },
             "description": "Unauthorized: `/problemas/nao-autenticado`"
           },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Forbidden: `/problemas/troca-de-senha-obrigatoria`"
+          },
           "422": {
             "content": {
               "application/problem+json": {
@@ -2374,6 +3542,16 @@
               }
             },
             "description": "Unauthorized: `/problemas/nao-autenticado`"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Forbidden: `/problemas/troca-de-senha-obrigatoria`"
           }
         },
         "security": [
@@ -2412,7 +3590,7 @@
                 }
               }
             },
-            "description": "Forbidden: `/problemas/csrf-invalido`"
+            "description": "Forbidden: `/problemas/csrf-invalido`, `/problemas/troca-de-senha-obrigatoria`"
           }
         },
         "security": [
@@ -2465,7 +3643,7 @@
                 }
               }
             },
-            "description": "Forbidden: `/problemas/csrf-invalido`"
+            "description": "Forbidden: `/problemas/csrf-invalido`, `/problemas/troca-de-senha-obrigatoria`"
           },
           "404": {
             "content": {
@@ -2555,7 +3733,7 @@
                 }
               }
             },
-            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`"
+            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`, `/problemas/troca-de-senha-obrigatoria`"
           },
           "404": {
             "content": {
@@ -2658,7 +3836,7 @@
                 }
               }
             },
-            "description": "Forbidden: `/problemas/sem-permissao`"
+            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/troca-de-senha-obrigatoria`"
           },
           "422": {
             "content": {
@@ -2741,7 +3919,7 @@
                 }
               }
             },
-            "description": "Forbidden: `/problemas/sem-permissao`"
+            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/troca-de-senha-obrigatoria`"
           },
           "404": {
             "content": {
@@ -2824,7 +4002,7 @@
                 }
               }
             },
-            "description": "Forbidden: `/problemas/sem-permissao`"
+            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/troca-de-senha-obrigatoria`"
           },
           "404": {
             "content": {
@@ -2956,7 +4134,7 @@
                 }
               }
             },
-            "description": "Forbidden: `/problemas/sem-permissao`"
+            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/troca-de-senha-obrigatoria`"
           },
           "404": {
             "content": {
@@ -3055,7 +4233,7 @@
                 }
               }
             },
-            "description": "Forbidden: `/problemas/sem-permissao`"
+            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/troca-de-senha-obrigatoria`"
           },
           "404": {
             "content": {
@@ -3134,7 +4312,7 @@
                 }
               }
             },
-            "description": "Forbidden: `/problemas/sem-permissao`"
+            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/troca-de-senha-obrigatoria`"
           },
           "404": {
             "content": {
@@ -3223,7 +4401,7 @@
                 }
               }
             },
-            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`"
+            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`, `/problemas/troca-de-senha-obrigatoria`"
           },
           "404": {
             "content": {
@@ -3323,7 +4501,7 @@
                 }
               }
             },
-            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`"
+            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`, `/problemas/troca-de-senha-obrigatoria`"
           },
           "404": {
             "content": {
@@ -3426,7 +4604,7 @@
                 }
               }
             },
-            "description": "Forbidden: `/problemas/sem-permissao`"
+            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/troca-de-senha-obrigatoria`"
           },
           "422": {
             "content": {
@@ -3495,7 +4673,7 @@
                 }
               }
             },
-            "description": "Forbidden: `/problemas/sem-permissao`"
+            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/troca-de-senha-obrigatoria`"
           },
           "404": {
             "content": {
@@ -3679,7 +4857,7 @@
                 }
               }
             },
-            "description": "Forbidden: `/problemas/sem-permissao`"
+            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/troca-de-senha-obrigatoria`"
           },
           "422": {
             "content": {
@@ -3744,7 +4922,7 @@
                 }
               }
             },
-            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`, `/problemas/sem-consentimento`"
+            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`, `/problemas/sem-consentimento`, `/problemas/troca-de-senha-obrigatoria`"
           },
           "409": {
             "content": {
@@ -3824,7 +5002,7 @@
                 }
               }
             },
-            "description": "Forbidden: `/problemas/sem-permissao`"
+            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/troca-de-senha-obrigatoria`"
           },
           "404": {
             "content": {
@@ -3913,7 +5091,7 @@
                 }
               }
             },
-            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`"
+            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`, `/problemas/troca-de-senha-obrigatoria`"
           },
           "404": {
             "content": {
@@ -3977,182 +5155,6 @@
         "summary": "Vigente",
         "tags": [
           "termos"
-        ]
-      }
-    },
-    "/api/v1/usuarios/{usuario_id}/reativar": {
-      "post": {
-        "description": "Volta a ATIVO. `suspenso_em` e `motivo_suspensao` ficam como registro (ADR-028).",
-        "operationId": "reativar_api_v1_usuarios__usuario_id__reativar_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "usuario_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Usuario Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "401": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problema"
-                }
-              }
-            },
-            "description": "Unauthorized: `/problemas/nao-autenticado`"
-          },
-          "403": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problema"
-                }
-              }
-            },
-            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`"
-          },
-          "404": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problema"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "409": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problema"
-                }
-              }
-            },
-            "description": "Conflict: `/problemas/transicao-invalida`"
-          },
-          "422": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problema"
-                }
-              }
-            },
-            "description": "Unprocessable Entity"
-          }
-        },
-        "security": [
-          {
-            "cookieSessao": [],
-            "csrfToken": []
-          }
-        ],
-        "summary": "Reativar",
-        "tags": [
-          "usuarios"
-        ]
-      }
-    },
-    "/api/v1/usuarios/{usuario_id}/suspender": {
-      "post": {
-        "description": "Grava a suspensão e revoga todas as sessões do usuário. O access token que ainda não\nvenceu deixa de valer na próxima requisição, porque `usuario_da_sessao` relê a situação.",
-        "operationId": "suspender_api_v1_usuarios__usuario_id__suspender_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "usuario_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Usuario Id",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SuspensaoEntrada"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "401": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problema"
-                }
-              }
-            },
-            "description": "Unauthorized: `/problemas/nao-autenticado`"
-          },
-          "403": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problema"
-                }
-              }
-            },
-            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`"
-          },
-          "404": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problema"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "409": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problema"
-                }
-              }
-            },
-            "description": "Conflict: `/problemas/transicao-invalida`, `/problemas/operacao-nao-permitida`"
-          },
-          "422": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problema"
-                }
-              }
-            },
-            "description": "Unprocessable Entity"
-          }
-        },
-        "security": [
-          {
-            "cookieSessao": [],
-            "csrfToken": []
-          }
-        ],
-        "summary": "Suspender",
-        "tags": [
-          "usuarios"
         ]
       }
     }

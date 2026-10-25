@@ -96,6 +96,26 @@ def test_escrita_declara_o_csrf_e_rota_autenticada_declara_o_cookie(metodo, cami
         assert "403" in operacao["responses"]
 
 
+def test_toda_rota_autenticada_declara_o_403_de_troca_de_senha_obrigatoria():
+    sem_troca = {"/api/v1/me", "/api/v1/auth/trocar-senha"}
+    autenticadas = [
+        (m, c, o)
+        for m, c, o in OPERACOES
+        if any("cookieSessao" in e for e in o.get("security", [])) and c not in sem_troca
+    ]
+    assert autenticadas
+    for metodo, caminho, operacao in autenticadas:
+        assert "troca-de-senha-obrigatoria" in operacao["responses"]["403"]["description"], (
+            metodo,
+            caminho,
+        )
+    for caminho in sem_troca:
+        for operacao in ESQUEMA["paths"][caminho].values():
+            assert "troca-de-senha-obrigatoria" not in operacao["responses"].get("403", {}).get(
+                "description", ""
+            )
+
+
 @pytest.mark.ultimo
 def test_erros_que_os_testes_provocam_estao_declarados():
     """Cada status de erro que a suíte provocou numa rota consta nas respostas dela."""

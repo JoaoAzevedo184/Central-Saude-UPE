@@ -499,6 +499,7 @@ def test_uc004_confirmar_dentro_do_prazo(api, sessao, paciente, proposta, relogi
     assert not chaves(corpo) & CHAVES_PROIBIDAS
     ag = sessao.get(Agendamento, proposta.id)
     assert ag.status == "CONFIRMADO" and ag.respondido_em == relogio.agora()
+    assert ag.confirmado_em == relogio.agora()
     assert (
         contar(
             sessao,
@@ -1168,6 +1169,7 @@ def test_uc005_cancelar_com_proposta_pendente(api, sessao, proposta):
     assert resposta.status_code == 200, resposta.text
     sessao.expire_all()
     assert sessao.get(Agendamento, proposta.id).status == "CANCELADO"
+    assert sessao.get(Agendamento, proposta.id).confirmado_em is None  # nunca foi confirmada
     assert sessao.get(Solicitacao, proposta.solicitacao_id).status == "CANCELADA"
 
 

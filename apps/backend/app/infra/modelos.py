@@ -52,7 +52,7 @@ FINALIDADES_CONSENTIMENTO = ("AGENDAMENTO", "LEMBRETE_EMAIL")
 CANAIS = ("IN_APP", "EMAIL")
 STATUS_ENVIO = ("PENDENTE", "ENVIADA", "FALHOU", "CANCELADA")
 STATUS_OUTBOX = ("PENDENTE", "PROCESSADO", "FALHOU")
-TIPOS_TENTATIVA = ("LOGIN", "REGISTRO")
+TIPOS_TENTATIVA = ("LOGIN", "REGISTRO", "TROCA_SENHA")
 
 
 def em(coluna: str, valores: tuple[str, ...]) -> CheckConstraint:
@@ -90,6 +90,8 @@ class Usuario(Base):
     situacao: Mapped[str] = mapped_column(Text, server_default="ATIVO")
     suspenso_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     motivo_suspensao: Mapped[str | None] = mapped_column(Text)
+    # Conta criada ou redefinida pelo ADMIN: só troca a senha até definir a própria.
+    senha_temporaria: Mapped[bool] = mapped_column(server_default=text("false"))
     criado_em: Mapped[datetime] = agora()
 
 
@@ -167,7 +169,9 @@ class TentativaLogin(Base):
 
     id: Mapped[UUID] = pk_uuid()
     tipo: Mapped[str] = mapped_column(Text)
-    identificador_hash: Mapped[str | None] = mapped_column(Text)  # HMAC-SHA256 do CPF/e-mail
+    identificador_hash: Mapped[str | None] = mapped_column(
+        Text
+    )  # HMAC-SHA256 do CPF/e-mail/usuário
     ip: Mapped[str | None] = mapped_column(INET)
     sucesso: Mapped[bool] = mapped_column(Boolean)
     ocorrido_em: Mapped[datetime] = mapped_column(DateTime(timezone=True))
@@ -426,6 +430,8 @@ class Agendamento(Base):
     proposto_em: Mapped[datetime] = agora()
     expira_em: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     respondido_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Só a confirmação o preenche; `respondido_em` também marca recusa e cancelamento.
+    confirmado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     motivo_cancelamento: Mapped[str | None] = mapped_column(Text)
 
 

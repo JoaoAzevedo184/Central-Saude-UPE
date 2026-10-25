@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { lerCsrf } from './csrf'
 import { criarClienteHttp } from './http'
 import { ApiError } from './problem-details'
+import type { components } from './generated/schema'
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status, headers: { 'Content-Type': 'application/json' },
@@ -239,14 +240,15 @@ describe('ADR-003 — cliente HTTP e sessão', () => {
   it('422 de trocar-senha preserva o erro de senha_atual e envia CSRF sem refresh', async () => {
     const errors = [{ loc: ['body', 'senha_atual'], msg: 'Senha atual incorreta.', type: 'value_error' }]
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
-      type: '/problemas/validacao', status: 422, title: 'Validação', errors,
+      type: 'about:blank', status: 422, title: 'Unprocessable Entity', errors,
     }), { status: 422, headers: { 'Content-Type': 'application/problem+json' } }))
     const api = criarClienteHttp(fetcher, () => 'csrf-sintetico')
     const expirar = vi.fn(), trocar = vi.fn()
     api.aoExpirarSessao(expirar); api.aoExigirTrocaDeSenha(trocar)
-    await expect(api.request('/auth/trocar-senha', { method: 'POST', body: {
+    const body = {
       senha_atual: 'Temporaria!123', senha_nova: 'NovaSintetica!123',
-    } })).rejects.toMatchObject({ problem: { status: 422, errors } })
+    } satisfies components['schemas']['TrocaSenhaEntrada']
+    await expect(api.request('/auth/trocar-senha', { method: 'POST', body })).rejects.toMatchObject({ problem: { status: 422, errors } })
     expect(fetcher).toHaveBeenCalledTimes(1)
     expect(new Headers(fetcher.mock.calls[0]?.[1]?.headers).get('X-CSRF-Token')).toBe('csrf-sintetico')
     expect(expirar).not.toHaveBeenCalled()

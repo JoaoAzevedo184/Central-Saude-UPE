@@ -1,8 +1,9 @@
+import type { components } from '../api/generated/schema'
+
 export const rotaTrocarSenha = '/trocar-senha'
 
-// Compatibilidade em runtime até o novo contrato chegar ao OpenAPI do worktree.
-// Não substitui nem estende à mão os DTOs gerados.
-export function exigeTrocaDeSenha(dados: unknown): boolean {
-  return dados !== null && typeof dados === 'object'
-    && 'trocar_senha' in dados && dados.trocar_senha === true
+export function exigeTrocaDeSenha(
+  dados: components['schemas']['LoginSaida'] | components['schemas']['EuSaida'] | null | undefined,
+): boolean {
+  return dados?.trocar_senha === true
 }

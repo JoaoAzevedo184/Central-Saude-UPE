@@ -34,7 +34,7 @@ npm run api:generate -- http://127.0.0.1:8000/api/v1/openapi.json
 
 O build usa o arquivo gerado e não depende de Python, rede ou API em execução. Gere os tipos novamente após mudanças de contrato. Referência da ferramenta: [OpenAPI TypeScript CLI](https://openapi-ts.dev/cli).
 
-**Atualização de autenticação — 24/10/2026:** o contrato deste worktree ainda não inclui `trocar_senha` ou `POST /auth/trocar-senha`. Não foram inventados DTOs nem editados tipos gerados. A detecção em runtime do campo opcional e do `403 /problemas/troca-de-senha-obrigatoria` já encaminha à rota provisória `/trocar-senha`, mantendo a sessão, sem formulário de troca. A regeneração com o novo contrato depende do merge da main; depois dele, execute os dois comandos acima e ajuste os consumidores tipados. O `--check` atual confere apenas o contrato antigo disponível neste worktree.
+**Atualização de autenticação — 24/10/2026:** o contrato da Parte 1 (`be32204`) inclui `trocar_senha` e `POST /auth/trocar-senha`; os tipos foram regenerados pela ferramenta. Login usa `LoginSaida`, `/me` usa `EuSaida`, ambos com `trocar_senha?: true | null`. Ausência ou `null` seguem o fluxo habitual; `true` e o `403 /problemas/troca-de-senha-obrigatoria` encaminham à rota provisória `/trocar-senha`, mantendo a sessão, sem formulário. O payload `TrocaSenhaEntrada` e a associação do erro 422 a `senha_atual` estão cobertos nos testes, sem refresh. A geração inclui `/admin/*` e remove as rotas administrativas antigas; não há telas administrativas nem rota de indicadores nesta entrega.
 
 ## Validar
 
@@ -106,7 +106,7 @@ O HTTP associa respostas à época de autenticação e serializa escritas de coo
 
 As regressões usam dados sintéticos e cobrem login com senha temporária, `/me` com troca obrigatória, transição de `false` para `true`, `403` sem limpeza/refresh, `422` com erro em `senha_atual`, logout atrasado com `204`, ordem de aplicação de cookies em logout/refresh antes de login/registro e diálogo/confirmação preservados durante revalidação. A simulação de cookies verifica a ordem do transporte; não representa uma nova execução E2E com o backend atualizado.
 
-Validação desta rodada: `npm test` passou com **191 testes em 9 arquivos**; `npm run lint`, `npm run build` e `npm run api:generate -- --check` também passaram. O build mantém os dois avisos de comentários de otimização do Zod. O check de geração usa o contrato antigo local; a regeneração com a atualização administrativa continua dependente do merge da main. As revisões de código e segurança terminaram sem achados pendentes.
+Validação daquela rodada: `npm test` passou com **191 testes em 9 arquivos**; `npm run lint`, `npm run build` e `npm run api:generate -- --check` também passaram. O build manteve os dois avisos de comentários de otimização do Zod. Naquela etapa, o check de geração usava o contrato antigo local e a regeneração dependia da atualização administrativa da main. As revisões de código e segurança terminaram sem achados pendentes.
 
 ## Correções finais I1/I2 e espera de autenticação — 24/10/2026
 
@@ -116,4 +116,8 @@ Cada operação coordenada de autenticação tem limite de **15 segundos**, cent
 
 Vitest passou com **208 testes em 9 arquivos**, incluindo redução do total de 6 para 5, total zero, resposta tardia de página antiga, foco após navegação, logout/refresh travados antes de login/registro, cancelamento enfileirado, corpo de login travado e respostas/rejeições tardias. No Chrome com API interceptada, a paginação corrigiu os offsets, Enter focou `main#conteudo-paciente` e Esc restaurou Menu. Logout e refresh travados atingiram o limite real de 15 segundos, com `net::ERR_ABORTED`; login prosseguiu e uma tentativa posterior de resposta antiga com `Set-Cookie` preservou a sessão e os cookies novos, inclusive com `trocar_senha=true`. O axe passou na rota provisória após a navegação.
 
-Essas reproduções usam somente dados sintéticos interceptados. **E2E real: pendente e não executado nesta rodada.** O OpenAPI local continua antigo; nenhum tipo gerado foi editado manualmente.
+Essas reproduções usam somente dados sintéticos interceptados. **E2E real: pendente e não executado naquela rodada.** Naquele momento o OpenAPI local ainda era antigo; a atualização de contrato descrita acima veio depois, sem edição manual dos tipos gerados.
+
+## Validação do contrato da Parte 1 — 24/10/2026
+
+Após a regeneração, `npm test` passou com **211 testes em 9 arquivos**; lint, build e check de geração também passaram. A cobertura inclui login e `/me` com troca obrigatória, campo ausente ou `null`, revalidação descobrindo o bloqueio, 403 sem refresh/limpeza de sessão e 422 associado a `senha_atual` com CSRF. Os testes de B1/B2, I1/I2 e timeout de autenticação continuam passando. O catálogo de mensagens inclui os três Problem Details novos. **E2E real: PENDENTE.**

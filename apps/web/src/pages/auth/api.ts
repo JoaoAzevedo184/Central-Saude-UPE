@@ -4,6 +4,7 @@ import { http } from '../../shared/api/http'
 import { permitirNovaSessao } from '../../shared/auth/session'
 
 export type RegistroEntrada = components['schemas']['RegistroEntrada']
+export type LoginSaida = components['schemas']['LoginSaida']
 export type SessaoSaida = components['schemas']['SessaoSaida']
 
 export const termoOptions = {

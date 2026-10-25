@@ -56,6 +56,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/trocar-senha": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Trocar Senha
+         * @description Qualquer usuário autenticado. Zera `senha_temporaria` e revoga as outras sessões; a
+         *     atual continua. Senha atual errada conta no limite do login (AM-020), por usuário e por IP,
+         *     e o excesso responde 429 sem revogar nada.
+         */
+        post: operations["trocar_senha_api_v1_auth_trocar_senha_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/refresh": {
         parameters: {
             query?: never;
@@ -119,7 +141,113 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/usuarios/{usuario_id}/suspender": {
+    "/api/v1/admin/usuarios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Listar Usuarios
+         * @description Contas da equipe (sem pacientes), com as filas e unidades atribuídas.
+         */
+        get: operations["listar_usuarios_api_v1_admin_usuarios_get"];
+        put?: never;
+        /**
+         * Criar Usuario
+         * @description Cria ATENDENTE, GESTOR ou ADMIN com senha temporária forte, devolvida só aqui. A pessoa
+         *     precisa trocá-la no primeiro acesso. GESTOR sem unidade exige `confirmar_visao_central`.
+         */
+        post: operations["criar_usuario_api_v1_admin_usuarios_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/usuarios/{usuario_id}/redefinir-senha": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Redefinir Senha
+         * @description Nova senha temporária (devolvida uma vez) e revogação de todas as sessões do usuário.
+         */
+        post: operations["redefinir_senha_api_v1_admin_usuarios__usuario_id__redefinir_senha_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/usuarios/{usuario_id}/filas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Atribuir Filas
+         * @description Substitui as filas do ATENDENTE (RF-035). Outro papel → 409.
+         */
+        put: operations["atribuir_filas_api_v1_admin_usuarios__usuario_id__filas_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/usuarios/{usuario_id}/unidades": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Atribuir Unidades
+         * @description Substitui as unidades do GESTOR (RF-035). Outro papel → 409. Lista vazia faz o gestor
+         *     ver a central inteira (ADR-025) e exige `confirmar_visao_central: true`.
+         */
+        put: operations["atribuir_unidades_api_v1_admin_usuarios__usuario_id__unidades_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/filas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Listar Filas
+         * @description Todas as filas, com unidade e especialidade, para a tela de atribuição.
+         */
+        get: operations["listar_filas_api_v1_admin_filas_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/usuarios/{usuario_id}/suspender": {
         parameters: {
             query?: never;
             header?: never;
@@ -133,14 +261,14 @@ export interface paths {
          * @description Grava a suspensão e revoga todas as sessões do usuário. O access token que ainda não
          *     venceu deixa de valer na próxima requisição, porque `usuario_da_sessao` relê a situação.
          */
-        post: operations["suspender_api_v1_usuarios__usuario_id__suspender_post"];
+        post: operations["suspender_api_v1_admin_usuarios__usuario_id__suspender_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/usuarios/{usuario_id}/reativar": {
+    "/api/v1/admin/usuarios/{usuario_id}/reativar": {
         parameters: {
             query?: never;
             header?: never;
@@ -153,7 +281,7 @@ export interface paths {
          * Reativar
          * @description Volta a ATIVO. `suspenso_em` e `motivo_suspensao` ficam como registro (ADR-028).
          */
-        post: operations["reativar_api_v1_usuarios__usuario_id__reativar_post"];
+        post: operations["reativar_api_v1_admin_usuarios__usuario_id__reativar_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -785,6 +913,16 @@ export interface components {
             /** Type */
             type: string;
         };
+        /** EspecialidadeResumo */
+        EspecialidadeResumo: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Nome */
+            nome: string;
+        };
         /** EspecialidadeSaida */
         EspecialidadeSaida: {
             /**
@@ -813,6 +951,8 @@ export interface components {
             nome: string | null;
             /** Filas */
             filas: string[] | null;
+            /** Trocar Senha */
+            trocar_senha?: true | null;
         };
         /** EventoEquipe */
         EventoEquipe: {
@@ -855,6 +995,20 @@ export interface components {
             min?: number | null;
             /** Max */
             max?: number | null;
+        };
+        /** FilaAdmin */
+        FilaAdmin: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Nome */
+            nome: string;
+            /** Ativa */
+            ativa: boolean;
+            unidade: components["schemas"]["UnidadeResumo"];
+            especialidade: components["schemas"]["EspecialidadeResumo"];
         };
         /** FilaDetalheSaida */
         FilaDetalheSaida: {
@@ -925,6 +1079,11 @@ export interface components {
             /** Motivo Inelegivel */
             motivo_inelegivel: string | null;
         };
+        /** FilasEntrada */
+        FilasEntrada: {
+            /** Fila Ids */
+            fila_ids: string[];
+        };
         /** ItemPainel */
         ItemPainel: {
             /**
@@ -958,6 +1117,21 @@ export interface components {
              * Format: password
              */
             senha: string;
+        };
+        /**
+         * LoginSaida
+         * @description `trocar_senha` só aparece (`true`) para conta com senha temporária: o frontend deve levar
+         *     a pessoa à troca, porque o resto da API responde 403 até lá.
+         */
+        LoginSaida: {
+            papel: components["schemas"]["Papel"];
+            /**
+             * Expira Em
+             * Format: date-time
+             */
+            expira_em: string;
+            /** Trocar Senha */
+            trocar_senha?: true | null;
         };
         /**
          * MotivoCancelamento
@@ -996,6 +1170,20 @@ export interface components {
             total: number;
             /** Itens */
             itens: components["schemas"]["SolicitacaoItem"][];
+        };
+        /** Pagina[FilaAdmin] */
+        Pagina_FilaAdmin_: {
+            /** Total */
+            total: number;
+            /** Itens */
+            itens: components["schemas"]["FilaAdmin"][];
+        };
+        /** Pagina[UsuarioAdmin] */
+        Pagina_UsuarioAdmin_: {
+            /** Total */
+            total: number;
+            /** Itens */
+            itens: components["schemas"]["UsuarioAdmin"][];
         };
         /** PainelSaida */
         PainelSaida: {
@@ -1130,6 +1318,19 @@ export interface components {
         RespostasEntrada: {
             /** Respostas */
             respostas: components["schemas"]["RespostaEntrada"][];
+        };
+        /**
+         * SenhaTemporariaSaida
+         * @description A senha aparece só aqui, uma vez. Não há como lê-la depois.
+         */
+        SenhaTemporariaSaida: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Senha Temporaria */
+            senha_temporaria: string;
         };
         /**
          * SessaoSaida
@@ -1289,6 +1490,19 @@ export interface components {
          * @enum {string}
          */
         TipoEventoLinhaDoTempo: "CRIADA" | "CLASSIFICADA" | "ENTROU_NA_FILA" | "PROPOSTA_ENVIADA" | "CONFIRMADA" | "RECUSADA" | "PROPOSTA_EXPIRADA" | "FALTOU" | "ATENDIDA" | "CANCELADA" | "REENTROU_NA_FILA" | "RECLASSIFICADA";
+        /** TrocaSenhaEntrada */
+        TrocaSenhaEntrada: {
+            /**
+             * Senha Atual
+             * Format: password
+             */
+            senha_atual: string;
+            /**
+             * Senha Nova
+             * Format: password
+             */
+            senha_nova: string;
+        };
         /**
          * Turno
          * @enum {string}
@@ -1306,6 +1520,16 @@ export interface components {
              */
             ocorrido_em: string;
         };
+        /** UnidadeResumo */
+        UnidadeResumo: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Sigla */
+            sigla: string;
+        };
         /** UnidadeSaida */
         UnidadeSaida: {
             /**
@@ -1317,6 +1541,61 @@ export interface components {
             sigla: string;
             /** Nome */
             nome: string;
+        };
+        /** UnidadesEntrada */
+        UnidadesEntrada: {
+            /** Unidade Ids */
+            unidade_ids: string[];
+            /**
+             * Confirmar Visao Central
+             * @default false
+             */
+            confirmar_visao_central: boolean;
+        };
+        /**
+         * UsuarioAdmin
+         * @description `filas` só para ATENDENTE e `unidades` só para GESTOR; gestor sem unidade vê a central.
+         */
+        UsuarioAdmin: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Email */
+            email: string | null;
+            papel: components["schemas"]["Papel"];
+            /**
+             * Situacao
+             * @enum {string}
+             */
+            situacao: "ATIVO" | "SUSPENSO";
+            /** Senha Temporaria */
+            senha_temporaria: boolean;
+            /** Filas */
+            filas: string[];
+            /** Unidades */
+            unidades: string[];
+        };
+        /**
+         * UsuarioEntrada
+         * @description Papel só da equipe. `unidade_ids` vale só para GESTOR (outro papel → 422).
+         */
+        UsuarioEntrada: {
+            /** Email */
+            email: string;
+            /**
+             * Papel
+             * @enum {string}
+             */
+            papel: "ATENDENTE" | "GESTOR" | "ADMIN";
+            /** Unidade Ids */
+            unidade_ids?: string[] | null;
+            /**
+             * Confirmar Visao Central
+             * @default false
+             */
+            confirmar_visao_central: boolean;
         };
         /** VagaPainel */
         VagaPainel: {
@@ -1449,11 +1728,69 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SessaoSaida"];
+                    "application/json": components["schemas"]["LoginSaida"];
                 };
             };
             /** @description Unauthorized: `/problemas/credenciais-invalidas` */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Too Many Requests: `/problemas/muitas-tentativas` */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+        };
+    };
+    trocar_senha_api_v1_auth_trocar_senha_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrocaSenhaEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized: `/problemas/nao-autenticado` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Forbidden: `/problemas/csrf-invalido` */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1575,7 +1912,374 @@ export interface operations {
             };
         };
     };
-    suspender_api_v1_usuarios__usuario_id__suspender_post: {
+    listar_usuarios_api_v1_admin_usuarios_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                papel?: ("ATENDENTE" | "GESTOR" | "ADMIN") | null;
+                situacao?: ("ATIVO" | "SUSPENSO") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Pagina_UsuarioAdmin_"];
+                };
+            };
+            /** @description Unauthorized: `/problemas/nao-autenticado` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/troca-de-senha-obrigatoria` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+        };
+    };
+    criar_usuario_api_v1_admin_usuarios_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UsuarioEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SenhaTemporariaSaida"];
+                };
+            };
+            /** @description Unauthorized: `/problemas/nao-autenticado` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`, `/problemas/troca-de-senha-obrigatoria` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Conflict: `/problemas/email-ja-cadastrado`, `/problemas/visao-central-nao-confirmada` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+        };
+    };
+    redefinir_senha_api_v1_admin_usuarios__usuario_id__redefinir_senha_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                usuario_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SenhaTemporariaSaida"];
+                };
+            };
+            /** @description Unauthorized: `/problemas/nao-autenticado` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`, `/problemas/troca-de-senha-obrigatoria` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Conflict: `/problemas/operacao-nao-permitida` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+        };
+    };
+    atribuir_filas_api_v1_admin_usuarios__usuario_id__filas_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                usuario_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FilasEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized: `/problemas/nao-autenticado` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`, `/problemas/troca-de-senha-obrigatoria` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Conflict: `/problemas/operacao-nao-permitida` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+        };
+    };
+    atribuir_unidades_api_v1_admin_usuarios__usuario_id__unidades_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                usuario_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UnidadesEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized: `/problemas/nao-autenticado` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`, `/problemas/troca-de-senha-obrigatoria` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Conflict: `/problemas/operacao-nao-permitida`, `/problemas/visao-central-nao-confirmada` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+        };
+    };
+    listar_filas_api_v1_admin_filas_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Pagina_FilaAdmin_"];
+                };
+            };
+            /** @description Unauthorized: `/problemas/nao-autenticado` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/troca-de-senha-obrigatoria` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+        };
+    };
+    suspender_api_v1_admin_usuarios__usuario_id__suspender_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1606,7 +2310,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problema"];
                 };
             };
-            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido` */
+            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`, `/problemas/troca-de-senha-obrigatoria` */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -1644,7 +2348,7 @@ export interface operations {
             };
         };
     };
-    reativar_api_v1_usuarios__usuario_id__reativar_post: {
+    reativar_api_v1_admin_usuarios__usuario_id__reativar_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1671,7 +2375,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problema"];
                 };
             };
-            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido` */
+            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`, `/problemas/troca-de-senha-obrigatoria` */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -1739,7 +2443,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problema"];
                 };
             };
-            /** @description Forbidden: `/problemas/sem-permissao` */
+            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/troca-de-senha-obrigatoria` */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -1788,7 +2492,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problema"];
                 };
             };
-            /** @description Forbidden: `/problemas/sem-permissao` */
+            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/troca-de-senha-obrigatoria` */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -1848,7 +2552,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problema"];
                 };
             };
-            /** @description Forbidden: `/problemas/sem-permissao` */
+            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/troca-de-senha-obrigatoria` */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -1899,7 +2603,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problema"];
                 };
             };
-            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`, `/problemas/sem-consentimento` */
+            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`, `/problemas/sem-consentimento`, `/problemas/troca-de-senha-obrigatoria` */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -1957,7 +2661,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problema"];
                 };
             };
-            /** @description Forbidden: `/problemas/sem-permissao` */
+            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/troca-de-senha-obrigatoria` */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2019,7 +2723,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problema"];
                 };
             };
-            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido` */
+            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`, `/problemas/troca-de-senha-obrigatoria` */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2086,7 +2790,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problema"];
                 };
             };
-            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido` */
+            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`, `/problemas/troca-de-senha-obrigatoria` */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2153,7 +2857,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problema"];
                 };
             };
-            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido` */
+            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`, `/problemas/troca-de-senha-obrigatoria` */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2221,7 +2925,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problema"];
                 };
             };
-            /** @description Forbidden: `/problemas/sem-permissao` */
+            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/troca-de-senha-obrigatoria` */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2275,7 +2979,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problema"];
                 };
             };
-            /** @description Forbidden: `/problemas/sem-permissao` */
+            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/troca-de-senha-obrigatoria` */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2333,7 +3037,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problema"];
                 };
             };
-            /** @description Forbidden: `/problemas/sem-permissao` */
+            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/troca-de-senha-obrigatoria` */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2391,7 +3095,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problema"];
                 };
             };
-            /** @description Forbidden: `/problemas/sem-permissao` */
+            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/troca-de-senha-obrigatoria` */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2453,7 +3157,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problema"];
                 };
             };
-            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido` */
+            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`, `/problemas/troca-de-senha-obrigatoria` */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2524,7 +3228,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problema"];
                 };
             };
-            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido` */
+            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`, `/problemas/troca-de-senha-obrigatoria` */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2593,7 +3297,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problema"];
                 };
             };
-            /** @description Forbidden: `/problemas/sem-permissao` */
+            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/troca-de-senha-obrigatoria` */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2655,7 +3359,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problema"];
                 };
             };
-            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido` */
+            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/csrf-invalido`, `/problemas/troca-de-senha-obrigatoria` */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2725,7 +3429,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problema"];
                 };
             };
-            /** @description Forbidden: `/problemas/sem-permissao` */
+            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/troca-de-senha-obrigatoria` */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2785,6 +3489,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problema"];
                 };
             };
+            /** @description Forbidden: `/problemas/troca-de-senha-obrigatoria` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
                 headers: {
@@ -2823,6 +3536,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problema"];
                 };
             };
+            /** @description Forbidden: `/problemas/troca-de-senha-obrigatoria` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
         };
     };
     marcar_todos_api_v1_avisos_lidos_post: {
@@ -2850,7 +3572,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problema"];
                 };
             };
-            /** @description Forbidden: `/problemas/csrf-invalido` */
+            /** @description Forbidden: `/problemas/csrf-invalido`, `/problemas/troca-de-senha-obrigatoria` */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2888,7 +3610,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problema"];
                 };
             };
-            /** @description Forbidden: `/problemas/csrf-invalido` */
+            /** @description Forbidden: `/problemas/csrf-invalido`, `/problemas/troca-de-senha-obrigatoria` */
             403: {
                 headers: {
                     [name: string]: unknown;

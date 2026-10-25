@@ -12,6 +12,7 @@ export const mensagensPorTipo: Readonly<Record<string, string>> = {
   '/problemas/cadastro-nao-concluido': 'Não foi possível concluir o cadastro. Se você já tem conta, entre com seu CPF.',
   '/problemas/credenciais-invalidas': 'CPF/e-mail ou senha incorretos.',
   '/problemas/csrf-invalido': 'Não foi possível verificar esta ação. Atualize a página e tente novamente.',
+  '/problemas/email-ja-cadastrado': 'Já existe uma conta com este e-mail.',
   '/problemas/muitas-tentativas': 'Muitas tentativas. Aguarde alguns minutos e tente de novo.',
   '/problemas/nao-autenticado': 'Sua sessão terminou. Entre novamente para continuar.',
   '/problemas/nao-elegivel': 'Você não atende aos critérios desta fila. Confira as orientações da fila.',
@@ -22,6 +23,8 @@ export const mensagensPorTipo: Readonly<Record<string, string>> = {
   '/problemas/solicitacao-duplicada': 'Você já tem um pedido aberto nesta fila.',
   '/problemas/tolerancia-nao-encerrada': 'Ainda é cedo para registrar a falta. Aguarde o prazo indicado.',
   '/problemas/transicao-invalida': 'Este atendimento mudou. Atualize a página para ver as ações disponíveis.',
+  '/problemas/troca-de-senha-obrigatoria': 'Troque sua senha para continuar.',
+  '/problemas/visao-central-nao-confirmada': 'Confirme o acesso à central inteira para continuar.',
 }
 
 export function mensagemDoProblema(problem: Pick<Problema, 'type' | 'status'>): string {

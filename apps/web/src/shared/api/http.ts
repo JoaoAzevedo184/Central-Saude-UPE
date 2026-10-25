@@ -1,6 +1,7 @@
 import { lerCsrf } from './csrf'
 import { ApiError, erroDaResposta } from './problem-details'
 import { exigeTrocaDeSenha } from '../auth/troca-de-senha'
+import type { components } from './generated/schema'
 
 type Metodo = 'GET' | 'HEAD' | 'OPTIONS' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 interface Opcoes {
@@ -182,9 +183,15 @@ export function criarClienteHttp(
     if (response.status === 204 || response.status === 205 || options.method === 'HEAD') {
       return undefined as T
     }
+    if (novaSessao) {
+      // O registro retorna SessaoSaida, compatível com LoginSaida sem a flag opcional.
+      const dados: components['schemas']['LoginSaida'] = await response.json()
+      verificarAtual()
+      iniciarSessao(exigeTrocaDeSenha(dados))
+      return dados as T
+    }
     const dados = await response.json() as T
     verificarAtual()
-    if (novaSessao) iniciarSessao(exigeTrocaDeSenha(dados))
     return dados
   }
 

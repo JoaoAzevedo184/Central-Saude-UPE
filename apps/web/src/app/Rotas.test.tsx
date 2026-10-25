@@ -1,5 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query'
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Rotas } from './Rotas'
@@ -8,8 +8,9 @@ import { sessaoOptions } from '../shared/auth/session'
 import { http } from '../shared/api/http'
 import { rotaAposLogin } from '../shared/auth/retorno'
 import { ExigirPapel } from '../shared/auth/ExigirPapel'
+import type { components } from '../shared/api/generated/schema'
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => { vi.unstubAllGlobals(); http.iniciarSessao() })
 
 function abrir(path: string) {
   const client = criarQueryClient()
@@ -26,14 +27,69 @@ function Localizacao() {
   return <div data-testid="localizacao">{JSON.stringify({ pathname: location.pathname, state: location.state })}</div>
 }
 
-function responderPapel(papel: string) {
-  vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockImplementation(async () => new Response(
-    JSON.stringify({ id: '00000000-0000-4000-8000-000000000001', papel, nome: null, filas: [] }),
+function responderPapel(papel: string, trocarSenha?: components['schemas']['EuSaida']['trocar_senha']) {
+  vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockImplementation(async (url) => new Response(
+    JSON.stringify(String(url).includes('/solicitacoes') ? { total: 0, itens: [] } : String(url).endsWith('/avisos/contagem') ? { nao_lidos: 0 } : { id: '00000000-0000-4000-8000-000000000001', papel, nome: null, filas: [], ...(trocarSenha === undefined ? {} : { trocar_senha: trocarSenha }) }),
     { status: 200, headers: { 'Content-Type': 'application/json' } },
   )))
 }
 
 describe('ADR-003/ADR-025/ADR-028 — rotas e proteção por papel', () => {
+  it('preserva trocar_senha de /me e encaminha ao fluxo provisório', async () => {
+    const dados = { id: '00000000-0000-4000-8000-000000000001', papel: 'PACIENTE', nome: null, filas: [], trocar_senha: true } satisfies components['schemas']['EuSaida']
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockImplementation(async () => new Response(JSON.stringify(dados))))
+    const client = abrir('/paciente')
+    await screen.findByRole('heading', { name: 'Troca de senha obrigatória' })
+    expect(client.getQueryData(sessaoOptions.queryKey)).toEqual(dados)
+    expect(screen.queryByRole('main', { name: 'Área do paciente' })).toBeNull()
+  })
+
+  it('transiciona de /me sem bloqueio para troca obrigatória após revalidação', async () => {
+    responderPapel('PACIENTE')
+    const client = abrir('/paciente')
+    await screen.findByRole('main', { name: 'Área do paciente' })
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockImplementation(async () => new Response(JSON.stringify({
+      id: '00000000-0000-4000-8000-000000000001', papel: 'PACIENTE', nome: null, filas: [], trocar_senha: true,
+    }))))
+    await act(async () => { await client.invalidateQueries({ queryKey: sessaoOptions.queryKey }) })
+    await screen.findByRole('heading', { name: 'Troca de senha obrigatória' })
+    expect(client.getQueryData(sessaoOptions.queryKey)).toMatchObject({ trocar_senha: true })
+  })
+
+  it.each([undefined, null])('preserva a sessão normal de /me com trocar_senha %s', async (trocarSenha) => {
+    responderPapel('PACIENTE', trocarSenha)
+    const client = abrir('/paciente')
+    await screen.findByRole('main', { name: 'Área do paciente' })
+    const sessao = client.getQueryData<components['schemas']['EuSaida']>(sessaoOptions.queryKey)
+    expect(sessao?.papel).toBe('PACIENTE')
+    expect(sessao?.trocar_senha).toBe(trocarSenha)
+    expect(http.trocaDeSenhaObrigatoria()).toBe(false)
+    expect(JSON.parse(screen.getByTestId('localizacao').textContent!).pathname).toBe('/paciente')
+  })
+
+  it.each(['/me', '/recurso-autenticado'])('403 troca obrigatória em %s redireciona sem limpar sessão nem renovar', async (path) => {
+    responderPapel('PACIENTE')
+    const client = abrir('/paciente')
+    await screen.findByRole('main', { name: 'Área do paciente' })
+    const sessao = client.getQueryData(sessaoOptions.queryKey)
+    client.setQueryDefaults(['dados-sinteticos'], { gcTime: Infinity })
+    client.setQueryData(['dados-sinteticos'], { id: 'preservado' })
+    const limpar = vi.spyOn(client, 'clear')
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async () => new Response(JSON.stringify({
+      type: '/problemas/troca-de-senha-obrigatoria', status: 403, title: 'Troca obrigatória',
+    }), { status: 403, headers: { 'Content-Type': 'application/problem+json' } }))
+    vi.stubGlobal('fetch', fetcher)
+    await act(async () => {
+      if (path === '/me') await client.invalidateQueries({ queryKey: sessaoOptions.queryKey })
+      else await http.request(path).catch(() => undefined)
+    })
+    await screen.findByRole('heading', { name: 'Troca de senha obrigatória' })
+    expect(client.getQueryData(sessaoOptions.queryKey)).toEqual(sessao)
+    expect(client.getQueryData(['dados-sinteticos'])).toEqual({ id: 'preservado' })
+    expect(limpar).not.toHaveBeenCalled()
+    expect(fetcher).toHaveBeenCalledTimes(1)
+    expect(fetcher.mock.calls[0]?.[0]).toBe(`/api/v1${path}`)
+  })
   it('mantém a entrada pública sem consultar sessão nem renderizar telas de negócio', () => {
     const fetcher = vi.fn<typeof fetch>()
     vi.stubGlobal('fetch', fetcher)
@@ -47,11 +103,12 @@ describe('ADR-003/ADR-025/ADR-028 — rotas e proteção por papel', () => {
     ['ATENDENTE', '/equipe', 'Área da equipe'],
     ['GESTOR', '/equipe', 'Área da equipe'],
     ['ADMIN', '/equipe', 'Área da equipe'],
-  ])('permite %s em %s com layout vazio', async (papel, path, label) => {
+  ])('permite %s em %s com o layout do papel', async (papel, path, label) => {
     responderPapel(papel)
     abrir(path)
     const layout = await screen.findByRole('main', { name: label })
-    expect(layout.childElementCount).toBe(0)
+    if (papel === 'PACIENTE') expect(within(layout).getByRole('heading', { name: 'Meus atendimentos' })).toBeTruthy()
+    else expect(layout.childElementCount).toBe(0)
   })
 
   it.each([

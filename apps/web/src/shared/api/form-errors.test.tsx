@@ -4,6 +4,7 @@ import type { UseFormSetError } from 'react-hook-form'
 import { describe, expect, it, vi } from 'vitest'
 import { ApiError } from './problem-details'
 import { aplicarErrosDeValidacao } from './form-errors'
+import type { components } from './generated/schema'
 
 type Formulario = { cpf: string; respostas: { valor: string }[] }
 function validacao(errors: unknown, status = 422) {
@@ -11,6 +12,13 @@ function validacao(errors: unknown, status = 422) {
 }
 
 describe('RFC 9457 — validação 422 e React Hook Form', () => {
+  it('associa senha atual incorreta ao campo senha_atual da futura troca de senha', () => {
+    const setError = vi.fn<UseFormSetError<components['schemas']['TrocaSenhaEntrada']>>()
+    expect(aplicarErrosDeValidacao<components['schemas']['TrocaSenhaEntrada']>(validacao([
+      { loc: ['body', 'senha_atual'], msg: 'Senha atual incorreta.', type: 'value_error' },
+    ]), setError, ['senha_atual', 'senha_nova'])).toBe(true)
+    expect(setError).toHaveBeenCalledExactlyOnceWith('senha_atual', { type: 'server', message: 'Senha atual incorreta.' }, { shouldFocus: true })
+  })
   it('leva campos simples e índices de arrays ao setError e mantém o primeiro erro', () => {
     const setError = vi.fn<UseFormSetError<Formulario>>()
     expect(aplicarErrosDeValidacao<Formulario>(validacao([

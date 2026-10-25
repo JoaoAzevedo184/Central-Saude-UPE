@@ -10,13 +10,14 @@ import { soDigitos } from '../../shared/mascaras'
 import { CampoSenha } from '../../shared/ui/Campo'
 import { CampoIdentificador } from '../../shared/ui/CampoIdentificador'
 import { papelSchema } from '../../shared/auth/session'
+import { exigeTrocaDeSenha, rotaTrocarSenha } from '../../shared/auth/troca-de-senha'
 import { Botao } from '../../shared/ui/Botao'
 import { Alerta } from '../../shared/ui/Alerta'
 import { LayoutAutenticacao } from './LayoutAutenticacao'
 import { loginSchema, resolverZod } from './validacao'
 import type { LoginForm } from './validacao'
 import { limparSessaoAnterior } from './api'
-import type { SessaoSaida } from './api'
+import type { LoginSaida } from './api'
 
 export function Entrar() {
   const client = useQueryClient()
@@ -30,12 +31,16 @@ export function Entrar() {
   const enviar = handleSubmit(async (dados) => {
     setFalha(undefined)
     try {
-      const sessao = await http.request<SessaoSaida>('/auth/login', { method: 'POST', body: {
+      const sessao = await http.request<LoginSaida>('/auth/login', { method: 'POST', body: {
         identificador: /^[\d.\-\s]+$/.test(dados.identificador) ? soDigitos(dados.identificador) : dados.identificador,
         senha: dados.senha,
       } })
       const papel = papelSchema.parse(sessao.papel)
-      await limparSessaoAnterior(client)
+      if (!await limparSessaoAnterior(client)) return
+      if (exigeTrocaDeSenha(sessao)) {
+        await navigate(rotaTrocarSenha, { replace: true })
+        return
+      }
       const home = papel === 'PACIENTE' ? '/paciente' : '/equipe'
       const origem = rotaAposLogin(location.state)
       // Origem de outra área (ex.: paciente com /equipe) cai na home do papel, sem "Acesso não permitido".

@@ -31,24 +31,14 @@ from app.api.tipos import (
     Turno,
 )
 from app.config import get_settings
-from app.dominio.agendamento.estados import registrar_presenca
 from app.dominio.agendamento.vagas import situacao_da_vaga
 from app.dominio.cadastro import abreviar_nome, mascarar_cpf
 from app.dominio.erros import EntradaInvalida
-from app.dominio.fila.criterios import ORIGENS_DA_EQUIPE, calcular_nota, pontuar_respostas
+from app.dominio.fila.criterios import ORIGENS_DA_EQUIPE
 from app.dominio.relogio import Relogio
-from app.dominio.solicitacao import classificar as classificar_solicitacao
-from app.dominio.solicitacao import (
-    exigir_aceita_respostas,
-    recalcular_nota,
-    registrar_atendimento,
-    registrar_falta,
-)
 from app.dominio.vocabulario import STATUS_SOLICITACAO
 from app.infra.agendamentos import (
     ATIVOS,
-    aplicar_agendamento,
-    para_dominio_agendamento,
     travar_agendamento,
 )
 from app.infra.modelos import (
@@ -68,11 +58,13 @@ from app.infra.modelos import (
 )
 from app.infra.solicitacoes import (
     TIPOS_MUDANCA_DE_POSICAO,
-    criterios_da_fila,
-    gravar_transicao,
     ordem_da_fila,
-    para_dominio,
     posicoes_na_fila,
+)
+from app.infra.transicoes import (
+    classificar_na_fila,
+    registrar_presenca_do_agendamento,
+    responder_criterios_da_equipe,
 )
 
 logger = logging.getLogger(__name__)
@@ -533,19 +525,14 @@ def classificar(
     """Classificação de risco, simulando a regulação. EM_ANALISE → NA_FILA; em NA_FILA só
     reclassifica, com motivo obrigatório. Outros estados → 409."""
     s = _travar(session, solicitacao_id, escopo)
-    primeira = s.status == "EM_ANALISE"
-    nova, eventos = classificar_solicitacao(
-        para_dominio(s), dados.classificacao_risco, dados.motivo, relogio.agora()
-    )
-    gravar_transicao(
+    classificar_na_fila(
         session,
         s,
-        nova,
-        eventos,
-        ator_id=atendente.id,
-        acao="CLASSIFICAR" if primeira else "RECLASSIFICAR",
+        dados.classificacao_risco,
+        dados.motivo,
+        agora=relogio.agora(),
+        atendente_id=atendente.id,
         ip=ip_do_cliente(request),
-        evento_outbox="SOLICITACAO_NA_FILA" if primeira else None,
     )
     session.commit()
     logger.info("solicitacao classificada: id=%s", s.id)
@@ -568,43 +555,13 @@ def responder_criterios(
     """Critérios de origem REGULACAO ou EQUIPE; a nota é recalculada por `calcular_nota()`.
     Na fila, nota diferente grava RECLASSIFICADA (só equipe)."""
     s = _travar(session, solicitacao_id, escopo)
-    exigir_aceita_respostas(para_dominio(s))  # estado de origem antes de validar a entrada
-    criterios = criterios_da_fila(session, s.fila_id)
-    novas = [(r.criterio_id, r.valor) for r in dados.respostas]
-    pontos = pontuar_respostas(criterios, novas, ORIGENS_DA_EQUIPE)
-
-    gravadas = {
-        r.criterio_id: r
-        for r in session.scalars(
-            select(RespostaCriterio).where(RespostaCriterio.solicitacao_id == s.id)
-        )
-    }
-    valores = {c: r.valor for c, r in gravadas.items() if c in criterios} | dict(novas)
-    nota = calcular_nota((criterios[c], v) for c, v in valores.items())
-    agora = relogio.agora()
-    nova, evento = recalcular_nota(para_dominio(s), nota, agora)
-    # RN-010: quais respostas mudaram, sem nome nem CPF.
-    respostas_antes = {str(c): gravadas[c].valor if c in gravadas else None for c, _ in novas}
-
-    for criterio_id, valor in novas:
-        resposta = gravadas.get(criterio_id) or RespostaCriterio(
-            solicitacao_id=s.id, criterio_id=criterio_id, fila_id=s.fila_id
-        )
-        resposta.valor = valor
-        resposta.pontos = pontos[criterio_id]
-        resposta.respondido_por_usuario_id = atendente.id
-        resposta.respondido_em = agora
-        session.add(resposta)
-    gravar_transicao(
+    responder_criterios_da_equipe(
         session,
         s,
-        nova,
-        [evento] if evento else [],
-        ator_id=atendente.id,
-        acao="RESPONDER_CRITERIOS",
+        [(r.criterio_id, r.valor) for r in dados.respostas],
+        agora=relogio.agora(),
+        atendente_id=atendente.id,
         ip=ip_do_cliente(request),
-        auditoria_antes={"respostas": respostas_antes},
-        auditoria_depois={"respostas": {str(c): v for c, v in novas}},
     )
     session.commit()
     logger.info("criterios respondidos: solicitacao=%s", s.id)
@@ -697,35 +654,14 @@ def presenca(
     if par is None:
         raise HTTPException(404, "Agendamento não encontrado.")
     s, a = par
-    inicio, tolerancia = session.execute(
-        select(Vaga.inicio, Fila.tolerancia_atraso_min)
-        .join(Agenda, Agenda.id == Vaga.agenda_id)
-        .join(Fila, Fila.id == Agenda.fila_id)
-        .where(Vaga.id == a.vaga_id)
-    ).one()
-    agora = relogio.agora()
-    novo = registrar_presenca(
-        para_dominio_agendamento(a), dados.compareceu, inicio, tolerancia, agora
-    )
-    if dados.compareceu:
-        nova, evento = registrar_atendimento(para_dominio(s), agora)
-        eventos, acao, outbox = [evento], "REGISTRAR_COMPARECIMENTO", "ATENDIMENTO_REGISTRADO"
-    else:
-        nova, eventos = registrar_falta(para_dominio(s), agora)
-        acao, outbox = "REGISTRAR_FALTA", "FALTA_REGISTRADA"
-    aplicar_agendamento(
-        session, a, novo, ator_id=atendente.id, acao=acao, ip=ip_do_cliente(request)
-    )
-    gravar_transicao(
+    registrar_presenca_do_agendamento(
         session,
         s,
-        nova,
-        eventos,
-        ator_id=atendente.id,
-        acao=acao,
+        a,
+        dados.compareceu,
+        agora=relogio.agora(),
+        atendente_id=atendente.id,
         ip=ip_do_cliente(request),
-        evento_outbox=outbox,
-        agendamento_id=a.id,
     )
     session.commit()
     logger.info("presenca registrada: agendamento=%s status=%s", a.id, a.status)

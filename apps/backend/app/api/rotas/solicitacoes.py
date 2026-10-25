@@ -13,8 +13,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import and_, exists, func, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_relogio, get_session, ip_do_cliente, paciente_da_sessao
@@ -28,26 +27,14 @@ from app.api.tipos import (
     Turno,
 )
 from app.config import get_settings
-from app.dominio.agendamento.estados import cancelar_pelo_paciente as cancelar_agendamento
-from app.dominio.agendamento.estados import confirmar as confirmar_agendamento
-from app.dominio.agendamento.estados import recusar as recusar_agendamento
-from app.dominio.erros import EntradaInvalida, NaoElegivel, SemConsentimento, SolicitacaoDuplicada
-from app.dominio.fila.criterios import ORIGENS_DO_PACIENTE, calcular_nota, pontuar_respostas
-from app.dominio.fila.elegibilidade import DadosPaciente, RestricoesFila, motivo_inelegivel
 from app.dominio.relogio import Relogio
-from app.dominio.solicitacao import cancelar as cancelar_solicitacao
-from app.dominio.solicitacao import confirmar_proposta, evento_criada, recusar_proposta
 from app.infra.agendamentos import (
     ATIVOS,
-    aplicar_agendamento,
-    contar_recusas,
-    para_dominio_agendamento,
     travar_agendamento,
 )
 from app.infra.modelos import (
     Agenda,
     Agendamento,
-    Consentimento,
     CriterioFila,
     Especialidade,
     Fila,
@@ -58,7 +45,14 @@ from app.infra.modelos import (
     Unidade,
     Vaga,
 )
-from app.infra.solicitacoes import criterios_da_fila, gravar_transicao, para_dominio
+from app.infra.transicoes import (
+    ENCERRADAS,
+    cancelar_do_paciente,
+    confirmar_do_paciente,
+    criar_solicitacao,
+    motivo_de_inelegibilidade,
+    recusar_do_paciente,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -67,9 +61,6 @@ router = APIRouter(tags=["paciente"])
 PacienteDep = Annotated[Paciente, Depends(paciente_da_sessao)]
 SessionDep = Annotated[Session, Depends(get_session)]
 RelogioDep = Annotated[Relogio, Depends(get_relogio)]
-
-ENCERRADAS = ("ATENDIDA", "CANCELADA")
-INDICE_SOLICITACAO_ATIVA = "ux_solicitacao_ativa_por_fila"
 
 
 # Erros comuns: sessão (401), papel (403) e, nas escritas, CSRF (403).
@@ -215,14 +206,6 @@ def _hoje(relogio: Relogio) -> date:
     return relogio.agora().astimezone(ZoneInfo(get_settings().timezone_exibicao)).date()
 
 
-def _motivo(paciente: Paciente, fila: Fila, hoje: date) -> str | None:
-    return motivo_inelegivel(
-        DadosPaciente(paciente.sexo, paciente.data_nascimento),
-        RestricoesFila(fila.sexo_elegivel, fila.idade_minima, fila.idade_maxima),
-        hoje,
-    )
-
-
 def _fila_saida(fila: Fila, unidade: Unidade, especialidade: Especialidade, motivo: str | None):
     return {
         "id": fila.id,
@@ -343,7 +326,10 @@ def listar_filas(
     total = session.scalar(select(func.count()).select_from(Fila).where(Fila.ativa))
     return PaginaFilas(
         total=total or 0,
-        itens=[FilaSaida(**_fila_saida(f, u, e, _motivo(paciente, f, hoje))) for f, u, e in linhas],
+        itens=[
+            FilaSaida(**_fila_saida(f, u, e, motivo_de_inelegibilidade(paciente, f, hoje)))
+            for f, u, e in linhas
+        ],
     )
 
 
@@ -364,7 +350,9 @@ def detalhar_fila(
         .order_by(CriterioFila.codigo)
     )
     return FilaDetalheSaida(
-        **_fila_saida(fila, unidade, especialidade, _motivo(paciente, fila, _hoje(relogio))),
+        **_fila_saida(
+            fila, unidade, especialidade, motivo_de_inelegibilidade(paciente, fila, _hoje(relogio))
+        ),
         criterios=[
             CriterioPacienteSaida(
                 id=c.id,
@@ -398,82 +386,20 @@ def criar(
     relogio: RelogioDep,
 ) -> SolicitacaoDetalhe:
     """UC-002: cria a solicitação em EM_ANALISE, com a nota das respostas (RN-006)."""
-    consentimento = session.scalar(
-        select(
-            exists().where(
-                Consentimento.paciente_id == paciente.id,
-                Consentimento.finalidade == "AGENDAMENTO",
-                Consentimento.revogado_em.is_(None),
-            )
-        )
-    )
-    if not consentimento:
-        raise SemConsentimento("É preciso consentir com o uso dos dados para agendamento.")
-    fila = session.scalar(select(Fila).where(Fila.id == dados.fila_id, Fila.ativa))
-    if fila is None:
-        raise EntradaInvalida("Fila inexistente ou inativa.")
-    hoje = _hoje(relogio)
-    if motivo := _motivo(paciente, fila, hoje):
-        raise NaoElegivel(motivo)
-
-    criterios = criterios_da_fila(session, fila.id)
-    respostas = [(r.criterio_id, r.valor) for r in dados.respostas]
-    pontos = pontuar_respostas(criterios, respostas, ORIGENS_DO_PACIENTE)
-    nota = calcular_nota((criterios[c], v) for c, v in respostas)
-
     agora = relogio.agora()
-    try:
-        with session.begin_nested():
-            s = Solicitacao(
-                paciente_id=paciente.id,
-                fila_id=fila.id,
-                status="EM_ANALISE",
-                nota=nota,
-                turno_preferido=dados.turno_preferido,
-                origem_encaminhamento=dados.origem_encaminhamento,
-                data_pedido=hoje,
-                criada_em=agora,
-            )
-            session.add(s)
-            session.flush()
-    except IntegrityError as exc:
-        if getattr(getattr(exc.orig, "diag", None), "constraint_name", None) != (
-            INDICE_SOLICITACAO_ATIVA
-        ):
-            raise
-        existente = session.scalar(
-            select(Solicitacao.id).where(
-                Solicitacao.paciente_id == paciente.id,
-                Solicitacao.fila_id == fila.id,
-                Solicitacao.status.not_in(ENCERRADAS),
-            )
-        )
-        raise SolicitacaoDuplicada(existente) from None
-    gravar_transicao(
+    s = criar_solicitacao(
         session,
-        s,
-        para_dominio(s),
-        [evento_criada(agora)],
-        ator_id=paciente.usuario_id,
-        acao="CRIAR_SOLICITACAO",
+        paciente,
+        dados.fila_id,
+        [(r.criterio_id, r.valor) for r in dados.respostas],
+        turno_preferido=dados.turno_preferido,
+        origem_encaminhamento=dados.origem_encaminhamento,
+        agora=agora,
+        hoje=_hoje(relogio),
         ip=ip_do_cliente(request),
-        evento_outbox="SOLICITACAO_CRIADA",
-        criacao=True,
-    )
-    session.add_all(
-        RespostaCriterio(
-            solicitacao_id=s.id,
-            criterio_id=c,
-            fila_id=fila.id,
-            valor=v,
-            pontos=pontos[c],
-            respondido_por_usuario_id=paciente.usuario_id,
-            respondido_em=agora,
-        )
-        for c, v in respostas
     )
     session.commit()
-    logger.info("solicitacao criada: id=%s fila=%s", s.id, fila.id)
+    logger.info("solicitacao criada: id=%s fila=%s", s.id, s.fila_id)
     return _detalhe(session, paciente.id, s.id)
 
 
@@ -569,31 +495,14 @@ def cancelar(
         .with_for_update(of=Agendamento)
         .execution_options(populate_existing=True)
     ).one_or_none()
-    nova, evento = cancelar_solicitacao(
-        para_dominio(s), dados.motivo_codigo, agora, tem_agendamento_ativo=ativo is not None
-    )
-    if ativo:
-        a, inicio = ativo
-        aplicar_agendamento(
-            session,
-            a,
-            cancelar_agendamento(para_dominio_agendamento(a), inicio, agora),
-            ator_id=paciente.usuario_id,
-            acao="CANCELAR_AGENDAMENTO",
-            ip=ip_do_cliente(request),
-        )
-    s.motivo_cancelamento = dados.motivo_codigo
-    gravar_transicao(
+    cancelar_do_paciente(
         session,
         s,
-        nova,
-        [evento],
-        ator_id=paciente.usuario_id,
-        acao="CANCELAR_SOLICITACAO",
+        ativo,
+        dados.motivo_codigo,
+        agora=agora,
+        usuario_id=paciente.usuario_id,
         ip=ip_do_cliente(request),
-        evento_outbox="AGENDAMENTO_CANCELADO" if ativo else "SOLICITACAO_CANCELADA",
-        auditoria_depois={"motivo_cancelamento": dados.motivo_codigo},
-        agendamento_id=ativo[0].id if ativo else None,
     )
     session.commit()
     logger.info("solicitacao cancelada: id=%s", s.id)
@@ -627,26 +536,8 @@ def confirmar(
     """UC-004: PROPOSTO → CONFIRMADO e solicitação AGENDADA, só antes de `expira_em`."""
     s, a = _travar_do_paciente(session, agendamento_id, paciente)
     agora = relogio.agora()
-    novo = confirmar_agendamento(para_dominio_agendamento(a), agora)
-    nova, evento = confirmar_proposta(para_dominio(s), agora)
-    aplicar_agendamento(
-        session,
-        a,
-        novo,
-        ator_id=paciente.usuario_id,
-        acao="CONFIRMAR_AGENDAMENTO",
-        ip=ip_do_cliente(request),
-    )
-    gravar_transicao(
-        session,
-        s,
-        nova,
-        [evento],
-        ator_id=paciente.usuario_id,
-        acao="CONFIRMAR_AGENDAMENTO",
-        ip=ip_do_cliente(request),
-        evento_outbox="AGENDAMENTO_CONFIRMADO",
-        agendamento_id=a.id,
+    confirmar_do_paciente(
+        session, s, a, agora=agora, usuario_id=paciente.usuario_id, ip=ip_do_cliente(request)
     )
     session.commit()
     logger.info("agendamento confirmado: id=%s", a.id)
@@ -667,31 +558,8 @@ def recusar(
     """UC-005 ("esta data não serve"): só PROPOSTO. A vaga fica livre para o próximo."""
     s, a = _travar_do_paciente(session, agendamento_id, paciente)
     agora = relogio.agora()
-    novo = recusar_agendamento(para_dominio_agendamento(a), agora)
-    nova, eventos = recusar_proposta(
-        para_dominio(s),
-        contar_recusas(session, s),
-        get_settings().recusas_mantendo_posicao,
-        agora,
-    )
-    aplicar_agendamento(
-        session,
-        a,
-        novo,
-        ator_id=paciente.usuario_id,
-        acao="RECUSAR_PROPOSTA",
-        ip=ip_do_cliente(request),
-    )
-    gravar_transicao(
-        session,
-        s,
-        nova,
-        eventos,
-        ator_id=paciente.usuario_id,
-        acao="RECUSAR_PROPOSTA",
-        ip=ip_do_cliente(request),
-        evento_outbox="PROPOSTA_RECUSADA",
-        agendamento_id=a.id,
+    recusar_do_paciente(
+        session, s, a, agora=agora, usuario_id=paciente.usuario_id, ip=ip_do_cliente(request)
     )
     session.commit()
     logger.info("proposta recusada: id=%s", a.id)

@@ -8,7 +8,9 @@ soma das semanas. Nenhuma consulta devolve dado de paciente.
 from datetime import date, datetime
 from uuid import UUID
 
+from psycopg.errors import QueryCanceled
 from sqlalchemy import Date, and_, cast, exists, func, not_, select, text, true
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, aliased
 
 from app.infra.modelos import Agenda, Agendamento, Fila, HistoricoSolicitacao, Solicitacao, Vaga
@@ -45,10 +47,18 @@ def filas_do_escopo(
     return list(session.scalars(consulta))
 
 
-def sem_jit(session: Session) -> None:
-    """O JIT custava 3 a 5 vezes a própria consulta nos EXPLAIN com 100 mil agendamentos.
-    Vale só até o fim da transação."""
+def preparar(session: Session, timeout_s: float) -> None:
+    """Ajustes que valem só até o fim da transação. O JIT custava 3 a 5 vezes a própria consulta
+    nos EXPLAIN com 100 mil agendamentos. O timeout vale para cada consulta, não para o total."""
     session.execute(text("SET LOCAL jit = off"))
+    session.execute(
+        text("SELECT set_config('statement_timeout', :ms, true)"),
+        {"ms": f"{int(timeout_s * 1000)}ms"},
+    )
+
+
+def consulta_cancelada(erro: OperationalError) -> bool:
+    return isinstance(erro.orig, QueryCanceled)
 
 
 def _semana(coluna, fuso: str):

@@ -8,9 +8,11 @@ from itertools import count
 from zoneinfo import ZoneInfo
 
 import pytest
-from sqlalchemy import event, select
+from sqlalchemy import event, select, text
 
 from app.api.main import app
+from app.config import get_settings
+from app.infra import indicadores as consultas
 from app.infra.modelos import (
     Agenda,
     Agendamento,
@@ -494,3 +496,28 @@ def test_rn021_consultas_rodam_com_jit_desligado(api, sessao, gestor):
         event.remove(sessao.get_bind(), "before_cursor_execute", ver)
     primeira = next(i for i, c in enumerate(vistos) if "date_trunc" in c)
     assert any(c == "SET LOCAL jit = off" for c in vistos[:primeira])
+
+
+def test_rn021_consulta_que_passa_do_limite_responde_503_neutro(api, sessao, gestor, monkeypatch):
+    monkeypatch.setenv("INDICADORES_TIMEOUT_S", "0.05")
+    get_settings.cache_clear()
+    try:
+        original = consultas.propostas
+
+        def lenta(*args, **kwargs):
+            sessao.execute(text("SELECT pg_sleep(0.5)"))
+            return original(*args, **kwargs)
+
+        monkeypatch.setattr(consultas, "propostas", lenta)
+        resposta = consultar(api)
+    finally:
+        get_settings.cache_clear()
+    assert resposta.status_code == 503
+    assert resposta.headers["content-type"].startswith("application/problem+json")
+    assert resposta.headers["retry-after"] == "30"
+    corpo = resposta.json()
+    assert corpo["type"] == "/problemas/consulta-demorada"
+    assert "pg_sleep" not in resposta.text and "statement" not in resposta.text.lower()
+    # a transação foi desfeita: nada auditado e a sessão continua utilizável
+    assert sessao.scalar(select(Auditoria).where(Auditoria.acao == "CONSULTAR_INDICADORES")) is None
+    assert sessao.scalar(text("SELECT 1")) == 1

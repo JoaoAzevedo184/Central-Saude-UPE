@@ -11,9 +11,17 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
-from app.api.deps import escopo_da_equipe, exige_papel, get_relogio, get_session, ip_do_cliente
+from app.api.deps import (
+    Problema,
+    escopo_da_equipe,
+    exige_papel,
+    get_relogio,
+    get_session,
+    ip_do_cliente,
+)
 from app.api.problemas import NAO_AUTENTICADO, SEM_PERMISSAO, erros
 from app.api.tipos import ClassificacaoRisco
 from app.config import get_settings
@@ -116,7 +124,32 @@ def _resumo(c: dict[str, int]) -> dict[str, int | float | None]:
     }
 
 
-@router.get("/indicadores", responses=erros(NAO_AUTENTICADO, SEM_PERMISSAO, 404, 422))
+def _agregar(session, filas, de, ate, inicio, fim, agora, fuso):
+    familias = [
+        consultas.propostas(session, filas, inicio, fim, fuso),
+        consultas.presencas(session, filas, inicio, fim, fuso),
+        consultas.solicitacoes(session, filas, inicio, fim, fuso),
+        consultas.vagas(session, filas, inicio, fim, agora, fuso),
+    ]
+    semanas = []
+    for segunda in semanas_do_periodo(de, ate):
+        contagens = dict.fromkeys(consultas.CONTAGENS, 0)
+        for familia in familias:
+            contagens.update(familia.get(segunda, {}))
+        semanas.append((segunda, contagens))
+    totais = {k: sum(c[k] for _, c in semanas) for k in consultas.CONTAGENS}
+    return (
+        semanas,
+        totais,
+        consultas.tempo_de_espera(session, filas, inicio, fim),
+        consultas.fila_atual(session, filas),
+    )
+
+
+@router.get(
+    "/indicadores",
+    responses=erros(NAO_AUTENTICADO, SEM_PERMISSAO, 404, 422, (503, "consulta-demorada")),
+)
 def indicadores(
     de: Dia,
     ate: Dia,
@@ -135,25 +168,23 @@ def indicadores(
     if (unidade_id or fila_id) and not filas:
         raise HTTPException(404, "Unidade ou fila não encontrada.")
 
-    consultas.sem_jit(session)
     fuso = get_settings().timezone_exibicao
     inicio, fim = limites_do_periodo(de, ate, ZoneInfo(fuso))
-    agora = relogio.agora()
-    familias = [
-        consultas.propostas(session, filas, inicio, fim, fuso),
-        consultas.presencas(session, filas, inicio, fim, fuso),
-        consultas.solicitacoes(session, filas, inicio, fim, fuso),
-        consultas.vagas(session, filas, inicio, fim, agora, fuso),
-    ]
-    semanas = []
-    for segunda in semanas_do_periodo(de, ate):
-        contagens = dict.fromkeys(consultas.CONTAGENS, 0)
-        for familia in familias:
-            contagens.update(familia.get(segunda, {}))
-        semanas.append((segunda, contagens))
-    totais = {k: sum(c[k] for _, c in semanas) for k in consultas.CONTAGENS}
-    n, mediana, p90 = consultas.tempo_de_espera(session, filas, inicio, fim)
-    cores = consultas.fila_atual(session, filas)
+    try:
+        consultas.preparar(session, get_settings().indicadores_timeout_s)
+        semanas, totais, (n, mediana, p90), cores = _agregar(
+            session, filas, de, ate, inicio, fim, relogio.agora(), fuso
+        )
+    except OperationalError as erro:
+        if not consultas.consulta_cancelada(erro):
+            raise
+        session.rollback()
+        raise Problema(
+            503,
+            "/problemas/consulta-demorada",
+            "A consulta demorou mais que o esperado. Tente de novo em instantes.",
+            headers={"Retry-After": "30"},
+        ) from None
 
     session.add(
         Auditoria(

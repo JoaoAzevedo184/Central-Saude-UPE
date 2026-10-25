@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Roda o pytest no host a partir de qualquer worktree, contra o Postgres do checkout principal.
 #   scripts/testar.sh [args do pytest]
+#   scripts/testar.sh --rapido [args]            # pula os testes marcados `lento` (carga do histórico)
 #   scripts/testar.sh --limpar-bancos-orfaos     # lista e apaga (com confirmação) bancos _test_* órfãos
 set -euo pipefail
 
@@ -83,4 +84,9 @@ if ! flock -n 9; then
     echo "Outra execução de testes neste worktree está em andamento; aguardando..." >&2
     flock 9
 fi
-uv run pytest "$@"
+# --rapido pula os testes marcados `lento` (carga do histórico do seed); sem ele, a suíte é completa.
+args=()
+for a in "$@"; do
+    if [[ $a == --rapido ]]; then args+=(-m "not lento"); else args+=("$a"); fi
+done
+uv run pytest "${args[@]}"

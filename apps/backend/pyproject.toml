@@ -35,5 +35,6 @@ testpaths = ["tests"]
 addopts = "-ra --strict-markers"
 markers = [
     "integracao: usa o PostgreSQL real definido por DATABASE_URL",
+    "lento: carga do histórico do seed (minutos); `scripts/testar.sh --rapido` pula",
     "ultimo: roda depois de todos os outros (confere o que a suíte inteira provocou)",
 ]

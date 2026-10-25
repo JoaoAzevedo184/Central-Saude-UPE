@@ -70,6 +70,12 @@ class Settings(BaseSettings):
     worker_intervalo_lembrete_s: float = 3600  # RF-024: lembretes antes da consulta
     worker_lote_maximo: int = Field(100, ge=1)  # itens por rodada; o resto fica para a próxima
 
+    # Trava do seed em production (banco de demonstração): ver app/infra/seed.py.
+    demo_seed_permitido: bool = False
+
+    # Indicadores do gestor: tempo máximo de cada consulta; passou disso, a API responde 503.
+    indicadores_timeout_s: float = Field(5, gt=0)
+
     # Regras de negócio configuráveis
     proposta_antecedencia_minima_horas: int = 24  # RN-008 / ADR-021
     proposta_janela_minima_horas: int = 12  # ADR-021: menos que isso para responder, não propõe

@@ -21,8 +21,8 @@ export function GerenciarSessao() {
   }), [client, location, navigate])
 
   useEffect(() => http.aoExigirTrocaDeSenha(() => {
-    void navigate(rotaTrocarSenha, { replace: true })
-  }), [navigate])
+    if (location.pathname !== rotaTrocarSenha) void navigate(rotaTrocarSenha, { replace: true })
+  }), [location.pathname, navigate])
 
   return null
 }

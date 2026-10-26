@@ -16,6 +16,100 @@ function deferred<T>() {
 }
 
 describe('ADR-003 — cliente HTTP e sessão', () => {
+  it('RN-022: troca com query renova uma vez fora da fila e relê CSRF', async () => {
+    let token = 'antes'
+    let tentativas = 0
+    const fetcher = vi.fn<typeof fetch>(async (url, options) => {
+      if (url === '/api/v1/auth/refresh') { token = 'depois'; return json({ papel: 'GESTOR' }) }
+      expect(new Headers(options?.headers).get('X-CSRF-Token')).toBe(tentativas === 0 ? 'antes' : 'depois')
+      return ++tentativas === 1 ? unauthorized() : new Response(null, { status: 204 })
+    })
+    const api = criarClienteHttp(fetcher, () => token)
+    await expect(api.request('/auth/trocar-senha?origem=teste', { method: 'POST' })).resolves.toBeUndefined()
+    expect(fetcher.mock.calls.map(([url]) => url)).toEqual([
+      '/api/v1/auth/trocar-senha?origem=teste', '/api/v1/auth/refresh', '/api/v1/auth/trocar-senha?origem=teste',
+    ])
+  })
+
+  it.each([401, 403, 503, 'rede'])('RN-022: falha de refresh na troca expira a sessão (%s)', async (status) => {
+    const fetcher = vi.fn<typeof fetch>(async (url) => {
+      if (url === '/api/v1/auth/refresh') {
+        if (status === 'rede') throw new TypeError('Falha sintética')
+        return new Response(null, { status: Number(status) })
+      }
+      return unauthorized()
+    })
+    const api = criarClienteHttp(fetcher)
+    const expirar = vi.fn(); api.aoExpirarSessao(expirar)
+    await expect(api.request('/auth/trocar-senha', { method: 'POST' })).rejects.toBeTruthy()
+    expect(expirar).toHaveBeenCalledTimes(1)
+    expect(fetcher).toHaveBeenCalledTimes(2)
+  })
+
+  it('RN-022: segundo 401 na troca expira sem uma segunda renovação', async () => {
+    const fetcher = vi.fn<typeof fetch>(async (url) => url === '/api/v1/auth/refresh' ? json({}) : unauthorized())
+    const api = criarClienteHttp(fetcher)
+    const expirar = vi.fn(); api.aoExpirarSessao(expirar)
+    await expect(api.request('/auth/trocar-senha', { method: 'POST' })).rejects.toBeTruthy()
+    expect(fetcher).toHaveBeenCalledTimes(3)
+    expect(expirar).toHaveBeenCalledTimes(1)
+  })
+
+  it.each(['login', 'registro', 'refresh', 'logout'])('ADR-003: POST %s com query não renova', async (rota) => {
+    const fetcher = vi.fn<typeof fetch>(async () => unauthorized())
+    await expect(criarClienteHttp(fetcher).request(`/auth/${rota}?teste=1`, { method: 'POST' })).rejects.toBeTruthy()
+    expect(fetcher).toHaveBeenCalledTimes(1)
+  })
+
+  it.each(['/auth/login', '/auth/login-extra', '/auth/recurso'])('ADR-003: GET %s continua elegível a refresh', async (rota) => {
+    const fetcher = vi.fn<typeof fetch>(async (url) => url === '/api/v1/auth/refresh' ? json({}) : unauthorized())
+    await expect(criarClienteHttp(fetcher).request(rota)).rejects.toBeTruthy()
+    expect(fetcher).toHaveBeenCalledTimes(3)
+  })
+
+  it('RN-022: liberação da trava não altera uma época nova', () => {
+    const api = criarClienteHttp()
+    const antiga = api.iniciarSessao(true)
+    expect(api.liberarTrocaDeSenha(antiga)).toBe(true)
+    expect(api.geracaoSessao()).toBe(antiga)
+    const nova = api.iniciarSessao(true)
+    expect(api.liberarTrocaDeSenha(antiga)).toBe(false)
+    expect(api.trocaDeSenhaObrigatoria()).toBe(true)
+    expect(api.liberarTrocaDeSenha(nova)).toBe(true)
+    expect(api.trocaDeSenhaObrigatoria()).toBe(false)
+  })
+
+  it('RN-022: troca compartilha renovação com /me e aguarda CSRF novo', async () => {
+    const refresh = deferred<Response>()
+    let renovada = false
+    const fetcher = vi.fn<typeof fetch>(async (url) => {
+      if (url === '/api/v1/auth/refresh') { const response = await refresh.promise; renovada = true; return response }
+      if (!renovada) return unauthorized()
+      return url === '/api/v1/me' ? json({ papel: 'GESTOR' }) : new Response(null, { status: 204 })
+    })
+    const api = criarClienteHttp(fetcher)
+    const leitura = api.request('/me')
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2))
+    const troca = api.request('/auth/trocar-senha', { method: 'POST' })
+    expect(fetcher).toHaveBeenCalledTimes(2)
+    refresh.resolve(json({ papel: 'GESTOR' }))
+    await Promise.all([leitura, troca])
+    expect(fetcher.mock.calls.filter(([url]) => url === '/api/v1/auth/refresh')).toHaveLength(1)
+  })
+
+  it('B1: queries não retiram logout/login da fila nem perdem flag do login', async () => {
+    const logout = deferred<Response>()
+    const fetcher = vi.fn<typeof fetch>(async (url) => url === '/api/v1/auth/logout?teste=1' ? logout.promise : json({ papel: 'GESTOR', trocar_senha: true }))
+    const api = criarClienteHttp(fetcher)
+    const saindo = api.request('/auth/logout?teste=1', { method: 'POST' })
+    const entrando = api.request('/auth/login?teste=1', { method: 'POST' })
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1))
+    logout.resolve(new Response(null, { status: 204 }))
+    await Promise.all([saindo, entrando])
+    expect(api.trocaDeSenhaObrigatoria()).toBe(true)
+    expect(api.geracaoSessao()).toBe(1)
+  })
+
   it.each([
     ['logout', 'login'], ['logout', 'registro'], ['refresh', 'login'], ['refresh', 'registro'],
   ].flatMap(([bloqueador, entrada]) => [[bloqueador, entrada, 'ok'], [bloqueador, entrada, 'erro']]))(

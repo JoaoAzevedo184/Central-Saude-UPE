@@ -14,6 +14,18 @@ interface Opcoes {
 // Limita cada escrita coordenada, incluindo a leitura de seu corpo de resposta.
 export const limiteOperacaoAuthMs = 15_000
 
+// Somente estas operações escrevem cookies e não podem renovar recursivamente.
+// A classificação ignora query, mas exige método e pathname exatos.
+const operacoesDeCookies = new Set([
+  'POST /api/v1/auth/login',
+  'POST /api/v1/auth/registro',
+  'POST /api/v1/auth/refresh',
+  'POST /api/v1/auth/logout',
+])
+function operacao(url: string, options: Opcoes): string {
+  return `${options.method ?? 'GET'} ${new URL(url, 'http://api.local').pathname}`
+}
+
 function aguardarComAbort<T>(resultado: Promise<T>, signal: AbortSignal): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const abortar = () => { signal.removeEventListener('abort', abortar); reject(signal.reason) }
@@ -150,7 +162,9 @@ export function criarClienteHttp(
   }
 
   async function realizar<T>(url: string, options: Opcoes, epocaInicial: number): Promise<T> {
-    const novaSessao = options.method === 'POST' && ['/api/v1/auth/login', '/api/v1/auth/registro'].includes(url)
+    const chave = operacao(url, options)
+    const novaSessao = chave === 'POST /api/v1/auth/login' || chave === 'POST /api/v1/auth/registro'
+    const permiteRefresh = !operacoesDeCookies.has(chave)
     // Um login explícito estabelece uma sessão nova, mesmo se a anterior
     // expirar enquanto as credenciais estão sendo verificadas.
     const verificarAtual = () => {
@@ -159,12 +173,12 @@ export function criarClienteHttp(
     }
     const geracaoInicial = geracao
     // Aguarda a rotação já em andamento antes de enviar novos pedidos protegidos.
-    if (renovacao && !url.startsWith('/api/v1/auth/')) await renovacao
+    if (renovacao && permiteRefresh) await renovacao
     verificarAtual()
     options.signal?.throwIfAborted()
     let response = await enviar(url, options)
     verificarAtual()
-    if (response.status === 401 && !url.startsWith('/api/v1/auth/')) {
+    if (response.status === 401 && permiteRefresh) {
       if (geracaoInicial === geracao) await renovar()
       else if (falhaRenovacao) throw falhaRenovacao
       verificarAtual()
@@ -198,6 +212,11 @@ export function criarClienteHttp(
   return {
     geracaoSessao: () => epoca,
     trocaDeSenhaObrigatoria: () => trocaObrigatoria,
+    liberarTrocaDeSenha(epocaEsperada: number): boolean {
+      if (epocaEsperada !== epoca) return false
+      trocaObrigatoria = false
+      return true
+    },
     iniciarSessao,
     aoExigirTrocaDeSenha(listener: () => void): () => void {
       aoExigirTroca.add(listener)
@@ -211,7 +230,7 @@ export function criarClienteHttp(
       try {
         const url = urlDaApi(path)
         const epocaInicial = epoca
-        if (url.startsWith('/api/v1/auth/') && options.method && !['GET', 'HEAD', 'OPTIONS'].includes(options.method)) {
+        if (operacoesDeCookies.has(operacao(url, options))) {
           return serializarCookies((signal) => realizar<T>(url, { ...options, signal }, epocaInicial), options.signal)
         }
         return realizar<T>(url, options, epocaInicial)

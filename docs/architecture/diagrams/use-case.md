@@ -20,7 +20,7 @@ flowchart LR
     uc7(["UC-007 Validar solicitação"])
     uc8(["UC-008 Registrar comparecimento ou falta"])
     uc9(["UC-009 Acompanhar indicadores"])
-    uc10(["UC-010 Gerenciar unidades, agendas e vagas"])
+    uc10(["UC-010 Administrar equipe, unidades, agendas e vagas"])
   end
 
   pac --- uc1
@@ -33,6 +33,7 @@ flowchart LR
   uc7 --- ate
   uc8 --- ate
   uc9 --- ges
+  uc9 --- adm
   uc10 --- adm
 
   uc5 -. "libera vaga para" .-> uc3

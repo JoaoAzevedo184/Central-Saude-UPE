@@ -22,7 +22,7 @@
 | Motivo do cancelamento | `solicitacao.motivo_cancelamento`, `agendamento.motivo_cancelamento` | Entender por que o pedido ou a proposta foi encerrado; contar recusas (RN-020). Códigos de lista fechada, sem texto livre | Não | Paciente (como rótulo) e equipe |
 | Nome do profissional da agenda | `agenda.profissional` | Dizer ao paciente com quem é a consulta ([UC-004](../requirements/use-cases/UC-004-confirmar-proposta.md)) | Não (dado funcional do profissional) | O paciente vê só o da **própria** proposta ou consulta; a equipe, na agenda do dia e no painel de vagas |
 | Linha do tempo da solicitação | `historico_solicitacao` | Transparência para o paciente e motivo das mudanças para a equipe | Não (sem posição) | O paciente vê só os eventos com `visivel_paciente = true` |
-| Situação da conta da equipe (suspensão, data, motivo) | `usuario` | Controle de acesso ([ADR-028](../decisions/ADR-028-suspensao-de-acesso.md)) | Não | Só o admin |
+| Situação da conta da equipe (suspensão, data, motivo) e se a senha ainda é temporária (`senha_temporaria`) | `usuario` | Controle de acesso ([ADR-028](../decisions/ADR-028-suspensao-de-acesso.md)) e troca obrigatória de senha (RN-022) | Não | Só o admin |
 | IP e ações (inclui login e registro) | `auditoria` | Rastreabilidade e segurança | Não | Só o admin |
 
 O sistema **não** guarda diagnóstico, prontuário, resultados de exames nem qualquer dado clínico além do necessário para agendar.
@@ -34,7 +34,9 @@ O sistema **não** guarda diagnóstico, prontuário, resultados de exames nem qu
   - o motivo do cancelamento pelo paciente é um **código fechado**, sem texto livre, que poderia trazer dado de saúde ou de terceiros;
   - a linha do tempo do paciente mostra **só o dia** (fuso `America/Recife`), sem hora: a hora de `ENTROU_NA_FILA` revelaria a `data_entrada_fila` e a ordem de chegada;
   - o motivo da reclassificação (texto livre da equipe) **não aparece no painel**, só no detalhe, que é auditado.
-- **Auditoria das leituras da equipe** (`CONSULTAR_PAINEL`, `CONSULTAR_SOLICITACAO`, `CONSULTAR_AGENDAMENTOS`, `CONSULTAR_VAGAS`) guarda ator, entidade e filtros, sem nome, CPF nem respostas dos critérios. A agenda do dia mostra o nome abreviado e não traz CPF.
+- **Auditoria das leituras da equipe** (`CONSULTAR_PAINEL`, `CONSULTAR_SOLICITACAO`, `CONSULTAR_AGENDAMENTOS`, `CONSULTAR_VAGAS`, `CONSULTAR_INDICADORES`) guarda ator, entidade e filtros, sem nome, CPF nem respostas dos critérios. A agenda do dia mostra o nome abreviado e não traz CPF.
+- **Indicadores sem dado de paciente:** `GET /equipe/indicadores` devolve só contagens e razões; nenhuma consulta traz nome, CPF, nota nem risco individual. `CONSULTAR_INDICADORES` registra o ator e o recorte pedido: `de`, `ate`, `unidade_id` e `fila_id`.
+- **Administração de contas: o que não é registrado.** A auditoria de `/admin` (`CRIAR_USUARIO`, `REDEFINIR_SENHA`, `ATRIBUIR_FILAS`, `ATRIBUIR_UNIDADES`, `SUSPENDER`, `REATIVAR`) e a de `TROCAR_SENHA` guardam o ator, a conta alvo (por ID) e os campos de estado alterados (papel, IDs de filas e unidades, situação). **Nunca** guardam senha (temporária, atual ou nova), hash de senha nem o e-mail completo; o e-mail só aparece na tela do admin. Os logs dessas rotas levam só IDs e papel. A senha temporária sai uma única vez, na resposta da API (ou no terminal), com `Cache-Control: no-store`, e não é guardada em claro em lugar nenhum.
 - **Sem dados de terceiros:** o histórico familiar é guardado só como a resposta do paciente ao critério. O sistema nunca cadastra parentes, nunca liga o cadastro de um paciente ao de outro e nunca guarda nome, CPF ou qualquer dado pessoal dos parentes ([ADR-030](../decisions/ADR-030-historico-familiar-como-criterio.md)).
 - **Consentimento por finalidade:** `AGENDAMENTO` (obrigatório para usar o serviço) e `LEMBRETE_EMAIL` (opcional), com versão do termo e data; revogável a qualquer momento (RN-009).
 - **Mascaramento:** CPF e cartão do SUS mascarados nas interfaces e nas respostas da API, exceto para o próprio titular quando necessário.
@@ -64,3 +66,4 @@ O MVP cobre consultar os próprios dados, revogar consentimentos e acompanhar o 
 
 - O script de carga (seed) gera nomes, CPFs válidos porém fictícios e históricos plausíveis.
 - Nenhum print, apresentação ou relatório usa dados de pessoas reais, incluindo os próprios integrantes.
+- O seed com histórico (`--historico`) cria pacientes com nomes claramente fictícios ("Exemplo 001"), CPFs válidos nas faixas reservadas ao seed e **sem e-mail**; as linhas de `outbox` do histórico nascem processadas, então nenhum aviso nem e-mail sai por elas. Os números dos indicadores da demonstração são simulados ([README](../../README.md#dados-da-demonstração)).

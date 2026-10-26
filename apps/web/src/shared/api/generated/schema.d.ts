@@ -628,6 +628,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/equipe/indicadores": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Indicadores
+         * @description Indicadores de `de` a `ate` (dias em Recife, inclusivos, até 366 dias), com totais,
+         *     série semanal e a fila atual. `unidade_id` e `fila_id` restringem o escopo do usuário.
+         */
+        get: operations["indicadores_api_v1_equipe_indicadores_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/avisos": {
         parameters: {
             query?: never;
@@ -1084,6 +1105,34 @@ export interface components {
             /** Fila Ids */
             fila_ids: string[];
         };
+        /** IndicadoresSaida */
+        IndicadoresSaida: {
+            /**
+             * De
+             * Format: date
+             */
+            de: string;
+            /**
+             * Ate
+             * Format: date
+             */
+            ate: string;
+            /** Unidade Id */
+            unidade_id: string | null;
+            /** Fila Id */
+            fila_id: string | null;
+            totais: components["schemas"]["Resumo"];
+            /** Semanas */
+            semanas: components["schemas"]["Semana"][];
+            tempo_de_espera: components["schemas"]["TempoDeEspera"];
+            /**
+             * Fila Atual
+             * @description Solicitações NA_FILA agora, por cor de risco. Não depende do período.
+             */
+            fila_atual: {
+                [key: string]: number;
+            };
+        };
         /** ItemPainel */
         ItemPainel: {
             /**
@@ -1320,6 +1369,180 @@ export interface components {
             respostas: components["schemas"]["RespostaEntrada"][];
         };
         /**
+         * Resumo
+         * @description Contagens e razões de um recorte de tempo (o período todo ou uma semana).
+         *
+         *     Uma razão é `null` quando o denominador é 0. Cada família usa a própria âncora de tempo,
+         *     descrita nos campos.
+         */
+        Resumo: {
+            /**
+             * Confirmadas
+             * @description Propostas feitas no recorte e confirmadas (`proposto_em`).
+             */
+            confirmadas: number;
+            /**
+             * Recusadas
+             * @description Propostas feitas no recorte e recusadas pelo paciente.
+             */
+            recusadas: number;
+            /**
+             * Expiradas
+             * @description Propostas feitas no recorte e expiradas sem resposta.
+             */
+            expiradas: number;
+            /**
+             * Propostas Encerradas
+             * @description Confirmadas + recusadas + expiradas: denominador das taxas.
+             */
+            propostas_encerradas: number;
+            /**
+             * Propostas Canceladas Sem Resposta
+             * @description Propostas canceladas por outro motivo, sem resposta. Fora das taxas.
+             */
+            propostas_canceladas_sem_resposta: number;
+            /** Taxa Confirmacao */
+            taxa_confirmacao: number | null;
+            /** Taxa Recusa */
+            taxa_recusa: number | null;
+            /** Taxa Expiracao */
+            taxa_expiracao: number | null;
+            /**
+             * Realizadas
+             * @description Atendimentos realizados com vaga no recorte (`vaga.inicio`).
+             */
+            realizadas: number;
+            /**
+             * Faltas
+             * @description Faltas registradas com vaga no recorte (`vaga.inicio`).
+             */
+            faltas: number;
+            /**
+             * Taxa Faltas
+             * @description Faltas ÷ (realizadas + faltas).
+             */
+            taxa_faltas: number | null;
+            /**
+             * Solicitacoes Criadas
+             * @description Solicitações criadas no recorte (`criada_em`).
+             */
+            solicitacoes_criadas: number;
+            /**
+             * Desistencias
+             * @description Dessas solicitações, as que o paciente cancelou (estão CANCELADA com motivo).
+             */
+            desistencias: number;
+            /** Taxa Desistencia */
+            taxa_desistencia: number | null;
+            /**
+             * Vagas Ofertadas
+             * @description Vagas ATIVAS com início no recorte.
+             */
+            vagas_ofertadas: number;
+            /**
+             * Vagas Ocupadas
+             * @description Vagas ofertadas com agendamento CONFIRMADO, REALIZADO ou FALTOU. Inclui CONFIRMADO de vaga futura: nem toda ocupada já foi atendida.
+             */
+            vagas_ocupadas: number;
+            /**
+             * Vagas Reaproveitadas
+             * @description Vagas com proposta desfeita que outra solicitação confirmou depois.
+             */
+            vagas_reaproveitadas: number;
+            /**
+             * Vagas Perdidas
+             * @description Vagas ofertadas já iniciadas sem agendamento CONFIRMADO, REALIZADO ou FALTOU.
+             */
+            vagas_perdidas: number;
+        };
+        /** Semana */
+        Semana: {
+            /**
+             * Confirmadas
+             * @description Propostas feitas no recorte e confirmadas (`proposto_em`).
+             */
+            confirmadas: number;
+            /**
+             * Recusadas
+             * @description Propostas feitas no recorte e recusadas pelo paciente.
+             */
+            recusadas: number;
+            /**
+             * Expiradas
+             * @description Propostas feitas no recorte e expiradas sem resposta.
+             */
+            expiradas: number;
+            /**
+             * Propostas Encerradas
+             * @description Confirmadas + recusadas + expiradas: denominador das taxas.
+             */
+            propostas_encerradas: number;
+            /**
+             * Propostas Canceladas Sem Resposta
+             * @description Propostas canceladas por outro motivo, sem resposta. Fora das taxas.
+             */
+            propostas_canceladas_sem_resposta: number;
+            /** Taxa Confirmacao */
+            taxa_confirmacao: number | null;
+            /** Taxa Recusa */
+            taxa_recusa: number | null;
+            /** Taxa Expiracao */
+            taxa_expiracao: number | null;
+            /**
+             * Realizadas
+             * @description Atendimentos realizados com vaga no recorte (`vaga.inicio`).
+             */
+            realizadas: number;
+            /**
+             * Faltas
+             * @description Faltas registradas com vaga no recorte (`vaga.inicio`).
+             */
+            faltas: number;
+            /**
+             * Taxa Faltas
+             * @description Faltas ÷ (realizadas + faltas).
+             */
+            taxa_faltas: number | null;
+            /**
+             * Solicitacoes Criadas
+             * @description Solicitações criadas no recorte (`criada_em`).
+             */
+            solicitacoes_criadas: number;
+            /**
+             * Desistencias
+             * @description Dessas solicitações, as que o paciente cancelou (estão CANCELADA com motivo).
+             */
+            desistencias: number;
+            /** Taxa Desistencia */
+            taxa_desistencia: number | null;
+            /**
+             * Vagas Ofertadas
+             * @description Vagas ATIVAS com início no recorte.
+             */
+            vagas_ofertadas: number;
+            /**
+             * Vagas Ocupadas
+             * @description Vagas ofertadas com agendamento CONFIRMADO, REALIZADO ou FALTOU. Inclui CONFIRMADO de vaga futura: nem toda ocupada já foi atendida.
+             */
+            vagas_ocupadas: number;
+            /**
+             * Vagas Reaproveitadas
+             * @description Vagas com proposta desfeita que outra solicitação confirmou depois.
+             */
+            vagas_reaproveitadas: number;
+            /**
+             * Vagas Perdidas
+             * @description Vagas ofertadas já iniciadas sem agendamento CONFIRMADO, REALIZADO ou FALTOU.
+             */
+            vagas_perdidas: number;
+            /**
+             * Semana
+             * Format: date
+             * @description Segunda-feira da semana, em Recife.
+             */
+            semana: string;
+        };
+        /**
          * SenhaTemporariaSaida
          * @description A senha aparece só aqui, uma vez. Não há como lê-la depois.
          */
@@ -1467,6 +1690,19 @@ export interface components {
         SuspensaoEntrada: {
             /** Motivo */
             motivo: string;
+        };
+        /**
+         * TempoDeEspera
+         * @description Da entrada na fila até a primeira confirmação, em dias. Só solicitações cuja primeira
+         *     confirmação cai no período.
+         */
+        TempoDeEspera: {
+            /** Confirmacoes */
+            confirmacoes: number;
+            /** Mediana Dias */
+            mediana_dias: number | null;
+            /** P90 Dias */
+            p90_dias: number | null;
         };
         /** TermoSaida */
         TermoSaida: {
@@ -3449,6 +3685,76 @@ export interface operations {
             };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+        };
+    };
+    indicadores_api_v1_equipe_indicadores_get: {
+        parameters: {
+            query: {
+                de: string;
+                ate: string;
+                unidade_id?: string | null;
+                fila_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndicadoresSaida"];
+                };
+            };
+            /** @description Unauthorized: `/problemas/nao-autenticado` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/troca-de-senha-obrigatoria` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Service Unavailable: `/problemas/consulta-demorada` */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

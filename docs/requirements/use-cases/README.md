@@ -24,8 +24,8 @@ Visão gráfica: [diagrama de casos de uso](../../architecture/diagrams/use-case
 | [UC-006](UC-006-expirar-proposta.md) | Expirar proposta | Sistema | Detalhado |
 | [UC-007](UC-007-validar-solicitacao.md) | Validar solicitação | Atendente | Detalhado |
 | [UC-008](UC-008-registrar-comparecimento-ou-falta.md) | Registrar comparecimento ou falta | Atendente | Detalhado ([ADR-026](../../decisions/ADR-026-prazos-e-volta-ao-fim-da-fila.md)) |
-| UC-009 | Acompanhar indicadores | Gestor | A detalhar |
-| UC-010 | Gerenciar unidades, especialidades, filas (protocolo e elegibilidade), agendas, vagas e acessos da equipe | Administrador | A detalhar |
+| [UC-009](UC-009-acompanhar-indicadores.md) | Acompanhar indicadores | Gestor (e Admin) | Detalhado |
+| [UC-010](UC-010-administrar-equipe.md) | Gerenciar unidades, especialidades, filas (protocolo e elegibilidade), agendas, vagas e acessos da equipe | Administrador | Detalhado só na parte da equipe (contas, senhas, atribuições, suspensão); o resto, a detalhar |
 
 ## Modelo
 

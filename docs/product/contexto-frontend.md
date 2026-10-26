@@ -68,7 +68,7 @@
 - `POST /equipe/agendamentos/{id}/presenca`: `compareceu: true|false`.
 - `GET /equipe/filas/{id}/vagas?de=&ate=`: situação das vagas, inclusive "livre sem proposta".
 
-**Administração:** `POST /usuarios/{id}/suspender` e `/reativar`. Vão migrar para `/admin/...`.
+**Administração:** `POST /admin/usuarios/{id}/suspender` e `/reativar` (as rotas antigas, fora de `/admin`, foram removidas).
 
 ## 5. Telas
 

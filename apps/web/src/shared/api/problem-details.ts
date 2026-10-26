@@ -25,6 +25,7 @@ export const mensagensPorTipo: Readonly<Record<string, string>> = {
   '/problemas/transicao-invalida': 'Este atendimento mudou. Atualize a página para ver as ações disponíveis.',
   '/problemas/troca-de-senha-obrigatoria': 'Troque sua senha para continuar.',
   '/problemas/visao-central-nao-confirmada': 'Confirme o acesso à central inteira para continuar.',
+  '/problemas/consulta-demorada': 'A consulta demorou demais. Tente um período menor.',
 }
 
 export function mensagemDoProblema(problem: Pick<Problema, 'type' | 'status'>): string {

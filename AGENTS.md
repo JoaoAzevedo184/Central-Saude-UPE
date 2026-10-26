@@ -104,7 +104,7 @@ Usamos o Orca para rodar Claude Code e Codex lado a lado, cada tarefa num **git 
 | Assunto | Arquivo |
 | --- | --- |
 | Termos e escopo | `docs/product/PRD.md` |
-| Estados e regras RN-001…RN-011 | `docs/requirements/business-rules.md` |
+| Estados e regras RN-001…RN-022 | `docs/requirements/business-rules.md` |
 | Fluxos e critérios de aceite | `docs/requirements/use-cases/UC-*.md` |
 | Esquema e índices | `docs/architecture/data-model.md` |
 | Endpoints e convenções | `docs/architecture/api-design.md` |

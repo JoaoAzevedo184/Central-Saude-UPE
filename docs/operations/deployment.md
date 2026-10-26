@@ -37,7 +37,7 @@ Máquinas envolvidas: **PC (Linux)** de quem implanta e **Servidor (VM Oracle, L
 2. **Servidor (VM Oracle, Linux):** clonar o repositório e criar o `.env` a partir do `.env.example`, com segredos novos.
 3. **Servidor (VM Oracle, Linux):** subir os containers em modo de produção.
 4. **Servidor (VM Oracle, Linux):** aplicar as migrações do Alembic.
-5. **Servidor (VM Oracle, Linux):** carregar os dados sintéticos (seed).
+5. **Servidor (VM Oracle, Linux):** carregar os dados sintéticos (seed), com o roteiro do [README](../../README.md#dados-da-demonstração): parar API e Worker, ligar `DEMO_SEED_PERMITIDO`, rodar o seed com `--confirmo-banco-de-demonstracao`, **desligar a variável** e subir de novo. O limite de requisições dos indicadores (`limit_req`) deve entrar no Nginx da VM *(proposta; ainda não configurado)* ([AM-025](../security/threat-model.md)).
 6. **PC (Linux):** abrir o domínio no navegador e conferir `GET /api/v1/health`.
 
 ## Atualização

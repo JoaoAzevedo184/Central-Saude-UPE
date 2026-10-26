@@ -8,6 +8,7 @@
 4. **Recurso alheio responde `404`**, para não confirmar que ele existe.
 5. **Um usuário, um papel.** Se alguém precisar de dois papéis, ganha duas contas *(proposta)*.
 6. **Suspenso não entra.** Usuário com `situacao = 'SUSPENSO'` não faz login (mesma mensagem genérica de credenciais inválidas), não renova o refresh token, não passa por `usuario_da_sessao` e não tem escopo. A conta nunca é apagada ([ADR-028](../decisions/ADR-028-suspensao-de-acesso.md)).
+7. **Senha temporária só serve para trocar a senha.** Conta criada ou redefinida pelo admin tem `senha_temporaria = true`; até a troca, toda rota autenticada responde `403` `troca-de-senha-obrigatoria`, menos `/me`, `/auth/trocar-senha`, `/auth/logout` e `/auth/refresh` ([RN-022](../requirements/business-rules.md)).
 
 ## Matriz de permissões
 
@@ -35,14 +36,17 @@ Legenda:
 | Ler os critérios de origem `REGULACAO`/`EQUIPE` de uma fila (`GET /equipe/filas/{id}/criterios`): só o formulário, sem pesos, fatores nem pontos; sem auditoria | — | 🏥 | 🏥 | ✅ |
 | Ler o termo de uso vigente (`GET /termos/vigente`) | público | público | público | público |
 | Registrar comparecimento ou falta | — | 🏥 | — | — |
-| Ver indicadores | — | — | 🏥 | ✅ |
+| Ver indicadores (`GET /equipe/indicadores`: só contagens e razões, sem dado de paciente; auditado). Atendente → `403`; `unidade_id` ou `fila_id` fora do escopo → `404` | — | — | 🏥 | ✅ |
 | Cadastrar unidades, especialidades e filas (elegibilidade, prazos) | — | — | — | ✅ |
 | Cadastrar agendas, bloquear vagas | — | — | — | ✅ |
 | Configurar o protocolo de critérios das filas | — | — | — | ✅ |
 | Consultar auditoria | — | — | — | ✅ |
-| Criar contas da equipe | — | — | — | ✅ |
-| Atribuir filas a atendentes e unidades a gestores | — | — | — | ✅ |
-| Suspender e reativar contas da equipe (`POST /usuarios/{id}/suspender` e `/reativar`) | — | — | — | ✅ |
+| Criar contas da equipe (`POST /admin/usuarios`; senha temporária devolvida uma vez). Gestor sem unidade exige confirmar a visão central | — | — | — | ✅ |
+| Atribuir filas a atendentes e unidades a gestores (o papel do alvo é conferido na API; gestor sem unidade exige confirmar a visão central) | — | — | — | ✅ |
+| Suspender e reativar contas da equipe (`POST /admin/usuarios/{id}/suspender` e `/reativar`) | — | — | — | ✅ |
+| Redefinir a senha de atendente ou gestor (`POST /admin/usuarios/{id}/redefinir-senha`) | — | — | — | ✅ |
+| Redefinir a senha de um admin | — | — | — | só pelo terminal do servidor (`python -m app.infra.admin redefinir-senha`) |
+| Trocar a própria senha (`POST /auth/trocar-senha`; vale também com senha temporária) | 🔒 | 🔒 | 🔒 | 🔒 |
 
 ## Escopo da equipe
 
@@ -55,14 +59,17 @@ Legenda:
 
 A regra está em `calcular_escopo()` (`app/dominio/acesso.py`) e falha fechada: papel desconhecido ou dado ausente devolvem um escopo vazio.
 
-O banco não impede que um usuário de outro papel apareça em `usuario_fila` ou `usuario_unidade`. O domínio ignora essas linhas, e a futura tela de administração deve validar o papel ao gravar a atribuição (RF-035).
+O banco não impede que um usuário de outro papel apareça em `usuario_fila` ou `usuario_unidade`. O domínio ignora essas linhas, e a API de administração valida o papel ao gravar a atribuição (RF-035): fila só para ATENDENTE e unidade só para GESTOR, senão `409`.
+
+**Gestor sem unidade vê a central inteira**, e isso nunca acontece por omissão: criar ou atribuir um gestor sem unidades exige `confirmar_visao_central: true`, senão `409` `visao-central-nao-confirmada` (`verificar_atribuicao_de_unidades`, [AM-022](threat-model.md)). A auditoria marca `visao_central` na atribuição.
 
 ## Implementação
 
 - O papel vem do usuário da sessão, carregado no servidor; nunca do corpo ou dos parâmetros da requisição.
 - Uma dependência do FastAPI por regra de acesso, aplicada na rota; as rotas não repetem a verificação à mão:
-  - `usuario_da_sessao`: lê o access token, carrega o usuário e confere, **a cada requisição**, a situação (`pode_autenticar()`) e se a família da sessão (`sid`) segue ativa. Falha → `401`;
-  - `exige_papel(...)`: constrói em cima de `usuario_da_sessao` e responde `403` para outro papel;
+  - `usuario_da_sessao_sem_troca`: lê o access token, carrega o usuário e confere, **a cada requisição**, a situação (`pode_autenticar()`) e se a família da sessão (`sid`) segue ativa. Falha → `401`. Só `/me` e `/auth/trocar-senha` o usam direto;
+  - `usuario_da_sessao`: constrói em cima da anterior e, com `senha_temporaria`, responde `403` `troca-de-senha-obrigatoria`. É o que as demais rotas usam, então rota nova nasce protegida;
+  - `exige_papel(...)`: constrói em cima de `usuario_da_sessao` e responde `403` para outro papel (a rota de administração usa `exige_papel("ADMIN")`; a de indicadores, `GESTOR` e `ADMIN`);
   - `escopo_da_equipe`: conjunto de filas da equipe;
   - `paciente_da_sessao`: exige o papel `PACIENTE` e devolve o paciente da sessão; as rotas do paciente usam o `paciente_id` dele na query.
 - Consultas do paciente sempre incluem `paciente_id = <paciente da sessão>` na própria query, em vez de buscar pelo ID e comparar depois.
@@ -70,7 +77,7 @@ O banco não impede que um usuário de outro papel apareça em `usuario_fila` ou
 
 ## Auditoria das leituras da equipe
 
-Ler o painel, o detalhe, a agenda do dia e o painel de vagas também é auditado (AM-007), sem nome, CPF nem respostas:
+Ler o painel, o detalhe, a agenda do dia, o painel de vagas e os indicadores também é auditado (AM-007), sem nome, CPF nem respostas:
 
 | Ação | Entidade | Dados registrados |
 | --- | --- | --- |
@@ -78,10 +85,24 @@ Ler o painel, o detalhe, a agenda do dia e o painel de vagas também é auditado
 | `CONSULTAR_SOLICITACAO` | `solicitacao` | só o ID da entidade |
 | `CONSULTAR_AGENDAMENTOS` | `fila` | a `data` consultada |
 | `CONSULTAR_VAGAS` | `fila` | o período `de` e `ate` |
+| `CONSULTAR_INDICADORES` | `fila`, `unidade` ou `usuario` (o filtro mais específico; sem filtro, o próprio gestor) | `de`, `ate`, `unidade_id` e `fila_id` |
+
+## Auditoria da administração
+
+Toda escrita de `/admin` grava uma linha em `auditoria` com o admin como ator e a conta alvo como entidade. **Nunca** vão para lá senha, hash nem e-mail completo.
+
+| Ação | Dados registrados |
+| --- | --- |
+| `CRIAR_USUARIO` | papel e IDs das unidades |
+| `REDEFINIR_SENHA` | nada (pelo terminal: ator vazio e `origem: terminal`) |
+| `ATRIBUIR_FILAS` | IDs das filas, antes e depois |
+| `ATRIBUIR_UNIDADES` | IDs das unidades, antes e depois, e `visao_central` |
+| `SUSPENDER`, `REATIVAR` | situação antes e depois |
+| `TROCAR_SENHA` (o próprio usuário) | nada |
 
 ## Suspender e reativar ([ADR-028](../decisions/ADR-028-suspensao-de-acesso.md))
 
-Rotas `POST /usuarios/{id}/suspender` (corpo `motivo`) e `POST /usuarios/{id}/reativar`: só `ADMIN` (`exige_papel("ADMIN")`), respondem `204` e gravam auditoria. Pela decisão de 2026-10-19, as rotas de administração ficam sob `/admin/*`; estas duas ainda estão no caminho antigo e mudam para `/admin/usuarios/...` numa tarefa própria ([API](../architecture/api-design.md#administração)).
+Rotas `POST /admin/usuarios/{id}/suspender` (corpo `motivo`) e `POST /admin/usuarios/{id}/reativar`: só `ADMIN` (`exige_papel("ADMIN")`), respondem `204` e gravam auditoria. As rotas antigas, fora do prefixo `/admin`, foram removidas ([API](../architecture/api-design.md#administração)).
 
 | Situação | Resposta |
 | --- | --- |

@@ -10,6 +10,7 @@ from starlette.routing import Match
 from app.api import tipos
 from app.api.main import ROTAS_SEM_CSRF, app
 from app.dominio import vocabulario
+from app.dominio.acesso import SENHA_MINIMA
 from app.dominio.notificacoes.avisos import TIPOS_AVISO
 from tests.conftest import ERROS_PROVOCADOS
 from tests.raiz import raiz_do_repositorio
@@ -145,3 +146,12 @@ def test_snapshot_do_openapi_esta_atualizado():
     assert json.loads(SNAPSHOT.read_text(encoding="utf-8")) == ESQUEMA, (
         "o contrato mudou: rode com ATUALIZAR_OPENAPI=1 e avise o frontend"
     )
+
+
+def test_senha_declara_o_minimo_do_dominio_e_a_atual_so_nao_vazia():
+    """Contrato de senha: a nova (e a do registro) exige `SENHA_MINIMA`; a atual, só não vazia."""
+    schemas = ESQUEMA["components"]["schemas"]
+    troca = schemas["TrocaSenhaEntrada"]["properties"]
+    assert troca["senha_nova"]["minLength"] == SENHA_MINIMA
+    assert troca["senha_atual"]["minLength"] == 1
+    assert schemas["RegistroEntrada"]["properties"]["senha"]["minLength"] == SENHA_MINIMA

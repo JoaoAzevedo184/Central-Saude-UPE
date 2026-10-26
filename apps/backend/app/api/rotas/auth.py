@@ -38,6 +38,7 @@ from app.dominio.acesso import (
     verificar_troca_de_senha,
 )
 from app.dominio.cadastro import EMAIL, cns_valido, cpf_valido, erro_data_nascimento
+from app.dominio.erros import EntradaInvalida
 from app.dominio.relogio import Relogio
 from app.infra.acesso import carregar_escopo
 from app.infra.autenticacao import (
@@ -178,8 +179,9 @@ class LoginSaida(SessaoSaida):
 class TrocaSenhaEntrada(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    # A atual só não pode ser vazia: uma senha antiga curta ainda tem de chegar ao domínio.
     senha_atual: SecretStr = Field(min_length=1, max_length=256)
-    senha_nova: SecretStr = Field(min_length=1, max_length=256)
+    senha_nova: SecretStr = Field(min_length=SENHA_MINIMA, max_length=256)
 
 
 class EuSaida(BaseModel):
@@ -424,7 +426,13 @@ def trocar_senha(
                 }
             ]
         )
-    verificar_troca_de_senha(atual, nova)
+    try:
+        verificar_troca_de_senha(atual, nova)
+    except EntradaInvalida as erro:
+        # Mesmo formato da senha atual errada: o frontend lê o campo em `errors[].loc`.
+        raise RequestValidationError(
+            [{"loc": ("body", "senha_nova"), "msg": str(erro), "type": "value_error"}]
+        ) from erro
 
     token = request.cookies.get(COOKIE_ACCESS)
     lido = ler_access_token(token or "", agora, settings.jwt_secret_key.get_secret_value())

@@ -282,6 +282,19 @@ def test_rf036_troca_de_senha_libera_o_acesso_e_revoga_as_outras_sessoes(
     assert auditoria.dados_antes is None and auditoria.dados_depois is None
 
 
+def test_rf036_troca_invalida_retorna_422_com_loc_do_campo(api, sessao, admin):
+    casos = [
+        ({"senha_atual": SENHA, "senha_nova": "curta"}, "senha_nova"),
+        ({"senha_atual": SENHA, "senha_nova": SENHA}, "senha_nova"),
+        ({"senha_atual": "errada", "senha_nova": "uma-senha-nova-forte"}, "senha_atual"),
+    ]
+    for corpo, campo in casos:
+        r = api.post("/api/v1/auth/trocar-senha", json=corpo, headers=com_csrf(api))
+        assert r.status_code == 422
+        assert r.headers["content-type"].startswith("application/problem+json")
+        assert [e["loc"] for e in r.json()["errors"]] == [["body", campo]]
+
+
 @pytest.mark.parametrize(
     "corpo",
     [

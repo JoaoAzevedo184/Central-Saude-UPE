@@ -1,6 +1,6 @@
 # Frontend — CH/UPE
 
-React + TypeScript + Vite, com as telas Entrar e Criar conta. Usa somente dados sintéticos. Arquitetura e limites: [frontend](../../docs/architecture/frontend.md).
+React + TypeScript + Vite, com Entrar, Criar conta, Meus atendimentos e Novo pedido em três etapas na área do paciente. Usa somente dados sintéticos. Arquitetura e limites: [frontend](../../docs/architecture/frontend.md).
 
 ## Executar
 
@@ -13,7 +13,7 @@ npm run dev
 
 Abra `http://127.0.0.1:5173`. O Vite lê o `.env` da raiz e encaminha `/api` ao `WEB_API_PROXY_TARGET` (padrão `http://127.0.0.1:8000`), sem reescrever o caminho. Ajuste o destino se a porta da API for diferente. Não coloque segredos em variáveis `VITE_*`: elas ficam disponíveis no navegador. No desenvolvimento por HTTP, a API precisa usar `COOKIE_SECURE=false` e `COOKIE_DOMAIN` vazio, como no `.env.example`.
 
-Execute banco e API no checkout principal, seguindo o README da raiz. Não suba Compose em worktrees. Não é necessário iniciar a API para conferir lint, testes ou build. As rotas `/paciente` e `/equipe` exigem uma sessão real da API e continuam com layouts vazios. `/paciente` também exibe “Conta criada.” após cadastro bem-sucedido. Não há login simulado na aplicação.
+Execute banco e API no checkout principal, seguindo o README da raiz. Não suba Compose em worktrees. Não é necessário iniciar a API para conferir lint, testes ou build. As rotas `/paciente` e `/equipe` exigem uma sessão real da API. `/paciente` entrega Meus atendimentos, navegação e Sair; `/equipe` continua com layout vazio. `/paciente/novo` permite criar um pedido em três etapas. `/paciente/solicitacoes/:id` e `/paciente/avisos` são provisórias, apenas com título. Após cadastro bem-sucedido, “Conta criada.” aparece uma vez e desaparece após seis segundos ou ao usar a navegação do cabeçalho. Não há login simulado na aplicação.
 
 Falha de refresh em qualquer consulta limpa a sessão e o cache, cancela consultas pendentes e leva a `/entrar`, guardando a rota de origem em `location.state.origem`. A tela de login usa `rotaAposLogin(location.state)` para voltar a uma origem interna validada; sem ela, vai a `/paciente` ou `/equipe` conforme o papel. O cliente HTTP próprio mantém `credentials: 'same-origin'` e usa os tipos gerados do backend. `ApiError.message` oferece a mensagem amigável por type; formulários podem chamar `aplicarErrosDeValidacao(error, setError, ['campo'])` para os erros 422, exibindo também `errors.root?.server?.message` para erros globais.
 
@@ -34,15 +34,18 @@ npm run api:generate -- http://127.0.0.1:8000/api/v1/openapi.json
 
 O build usa o arquivo gerado e não depende de Python, rede ou API em execução. Gere os tipos novamente após mudanças de contrato. Referência da ferramenta: [OpenAPI TypeScript CLI](https://openapi-ts.dev/cli).
 
+**Atualização de autenticação — 24/10/2026:** o contrato da Parte 1 (`be32204`) inclui `trocar_senha` e `POST /auth/trocar-senha`; os tipos foram regenerados pela ferramenta. Login usa `LoginSaida`, `/me` usa `EuSaida`, ambos com `trocar_senha?: true | null`. Ausência ou `null` seguem o fluxo habitual; `true` e o `403 /problemas/troca-de-senha-obrigatoria` encaminham à rota provisória `/trocar-senha`, mantendo a sessão, sem formulário. O payload `TrocaSenhaEntrada` e a associação do erro 422 a `senha_atual` estão cobertos nos testes, sem refresh. A geração inclui `/admin/*` e remove as rotas administrativas antigas; não há telas administrativas nesta entrega. A API `GET /api/v1/equipe/indicadores` já existe no backend; a tela de indicadores e seu consumo ficam para a tarefa específica da tela de gestor/equipe.
+
 ## Validar
 
 ```bash
 npm run lint
 npm test
 npm run build
+npm run api:generate -- --check
 ```
 
-`lint` inclui ESLint e verificação TypeScript. Vitest cobre HTTP/CSRF/refresh, erros, guardas de rota, login, cadastro e máscaras com respostas sintéticas. O build fica em `dist/` (ignorado pelo Git). `npm run preview` permite inspecionar esses arquivos, sem proxy de API. O [proxy de desenvolvimento](https://vite.dev/config/server-options#server-proxy) não substitui a configuração do Nginx em produção.
+`lint` inclui ESLint e verificação TypeScript. Vitest cobre HTTP/CSRF/refresh, erros, guardas de rota, login, cadastro, máscaras, layout do paciente, lista, resposta à proposta e datas em Recife, com respostas sintéticas. O build fica em `dist/` (ignorado pelo Git). `npm run preview` permite inspecionar esses arquivos, sem proxy de API. O [proxy de desenvolvimento](https://vite.dev/config/server-options#server-proxy) não substitui a configuração do Nginx em produção.
 
 Para os testes existentes do backend, use `scripts/testar.sh` a partir da raiz; cada worktree recebe seu próprio banco de teste.
 
@@ -73,7 +76,7 @@ Contrastes calculados pela luminância relativa sRGB de WCAG, razão `(L maior +
 
 Os testes das telas usam Testing Library, user-event e MSW (somente em testes). Os documentos de `src/test/fixtures/documentos-sinteticos.json` foram gerados por `apps/backend/tests/sinteticos.py`, incluindo CNS definitivos e provisórios.
 
-`vitest-axe` verifica login e todas as etapas do cadastro, incluindo termo expandido. A regra de contraste fica desativada no jsdom, que não calcula a apresentação como um navegador; as razões de contraste são documentadas acima. Há teste que intercepta `Storage.prototype.setItem`, `removeItem` e `clear` durante cadastro, retorno de etapa e envio, abrangendo localStorage e sessionStorage.
+`vitest-axe` verifica login, todas as etapas do cadastro (incluindo termo expandido), Meus atendimentos e diálogo da proposta. A regra de contraste fica desativada no jsdom, que não calcula a apresentação como um navegador; as razões de contraste são documentadas acima. Há teste que intercepta `Storage.prototype.setItem`, `removeItem` e `clear` durante cadastro, retorno de etapa e envio, abrangendo localStorage e sessionStorage.
 
 Conferência visual realizada no Chrome em **360×640** e **1440×1024**: duas telas e três etapas, termo expandido, foco inicial de erro, teclado, ausência de rolagem horizontal, alvos de toque e tamanho da fonte. Na inspeção do cadastro, o termo foi interceptado com o texto sintético do repositório. Essa inspeção não representa integração com o backend.
 
@@ -85,4 +88,46 @@ O bloqueio inicial de **404** no termo vigente foi resolvido pela atualização 
 - Novo login pelo formulário: **200**; retorno a `/paciente` e `/me` **200**, com o mesmo ID da conta criada.
 - Nenhuma escrita em localStorage/sessionStorage durante o cadastro. Cookies access/refresh conferidos como `httpOnly`.
 
-Limite da verificação: `/paciente` ainda é um layout vazio, sem tela de Meus atendimentos nem botão Sair. O logout foi chamado pelo endpoint real no navegador; portanto, o ciclo de sessão passou, mas não há validação de um botão Sair. Foi criada uma conta de desenvolvimento com CPF e CNS gerados pelos utilitários sintéticos existentes. Nenhum Docker Compose foi iniciado no worktree e nenhum serviço do checkout principal foi alterado.
+Limite dessa verificação anterior: naquela versão, `/paciente` ainda era um layout vazio, sem Meus atendimentos nem botão Sair. O logout foi chamado pelo endpoint real no navegador; esse registro confirma o ciclo de sessão daquela versão, não o botão Sair implementado depois. Foi criada uma conta de desenvolvimento com CPF e CNS gerados pelos utilitários sintéticos existentes. Nenhum Docker Compose foi iniciado no worktree e nenhum serviço do checkout principal foi alterado.
+
+## Entrega de Meus atendimentos (24/10/2026)
+
+A [arquitetura da tela](../../docs/architecture/frontend.md#meus-atendimentos-e-proposta-de-vaga) descreve a paginação, a busca complementar com parada antecipada, atualização de cache, resposta à proposta e acessibilidade. O layout do paciente inclui navegação, contador de avisos e saída, inclusive limpeza local quando o logout falha. As rotas provisórias não antecipam formulários, detalhe ou lista de avisos.
+
+A inspeção visual no Chrome usou **360×640**, **360×800** e **1440×1024**, com dados sintéticos interceptados. Foram conferidos ausência de rolagem horizontal, alvos visíveis de pelo menos 44 px, menu por teclado e diálogo com foco inicial, contenção nos dois sentidos, Esc e retorno ao acionador. Capturas e relatório local: `/tmp/central-upe-paciente/visual-360.png`, `visual-1440.png`, `menu-360.png`, `dialogo-360.png`, `dialogo-1440.png`, `visual-360x640.png` e `visual.json`. Essa inspeção não comprova integração com o backend.
+
+Os testes de paciente incluem saída com sucesso e falha, cancelamento de consultas e limpeza de cache, contador, abas, paginação, vazio, repetição após erro, busca de proposta fora da página, parada antecipada, prazo em Recife, confirmação e recusa com CSRF, erro de proposta expirada, ADR-007, axe, foco e ausência de escrita em storage. O diálogo nativo é substituído por uma implementação mínima de `showModal`/`close` somente no jsdom; o comportamento no Chrome também foi conferido. Na verificação final desta entrega, `npm run lint`, `npm test` (**170 testes**, 9 arquivos), `npm run build` e `npm run api:generate -- --check` passaram. O build emitiu dois avisos de comentários de otimização na dependência Zod, sem falhar. O axe também passou na tela e no diálogo no Chrome, com a regra de contraste ativa. Foi conferido no navegador que “Conta criada.” desaparece após seis segundos e não reaparece ao recarregar.
+
+**E2E real desta entrega: pendente.** O roteiro está preparado para criar um paciente sintético, usar o atendente do seed pela API da equipe para classificar o pedido, aguardar a proposta do Worker e confirmar pelo botão da interface. A execução aguarda a senha de desenvolvimento do seed; ainda não há comprovação de proposta criada pelo Worker nem de confirmação ou recusa ponta a ponta nesta entrega.
+
+## Correções de sessão B1/B2 — 24/10/2026
+
+O HTTP associa respostas à época de autenticação e serializa escritas de cookies de login, registro, logout e refresh. Isso impede que `Set-Cookie` antigo sobrescreva um login novo. O logout também verifica a época antes e depois de cancelar consultas, protegendo estado e navegação de sessões novas, inclusive com troca obrigatória. A guarda mantém a árvore montada durante revalidação de `/me`; uma resposta concluída com `trocar_senha=true` ou um `403` específico encaminha à rota provisória sem tratar o bloqueio como logout.
+
+As regressões usam dados sintéticos e cobrem login com senha temporária, `/me` com troca obrigatória, transição de `false` para `true`, `403` sem limpeza/refresh, `422` com erro em `senha_atual`, logout atrasado com `204`, ordem de aplicação de cookies em logout/refresh antes de login/registro e diálogo/confirmação preservados durante revalidação. A simulação de cookies verifica a ordem do transporte; não representa uma nova execução E2E com o backend atualizado.
+
+Validação daquela rodada: `npm test` passou com **191 testes em 9 arquivos**; `npm run lint`, `npm run build` e `npm run api:generate -- --check` também passaram. O build manteve os dois avisos de comentários de otimização do Zod. Naquela etapa, o check de geração usava o contrato antigo local e a regeneração dependia da atualização administrativa da main. As revisões de código e segurança terminaram sem achados pendentes.
+
+## Correções finais I1/I2 e espera de autenticação — 24/10/2026
+
+A tela corrige a página atual quando uma nova resposta reduz o total, buscando a última página válida antes de exibir a lista. Total zero retorna à página inicial. O layout diferencia fechar o menu (foco no botão Menu) de navegar (foco no conteúdo principal após a mudança de rota), inclusive com Enter e Esc.
+
+Cada operação coordenada de autenticação tem limite de **15 segundos**, centralizado em `limiteOperacaoAuthMs`. O limite aborta o fetch anterior antes de liberar o próximo envio; sinais e épocas impedem efeitos de respostas tardias. Abort de autenticação ainda enfileirada termina imediatamente, impede seu envio e preserva o funcionamento da fila. Timers e listeners são removidos ao finalizar. B1/B2 e o fluxo provisório de troca obrigatória permanecem cobertos.
+
+Vitest passou com **208 testes em 9 arquivos**, incluindo redução do total de 6 para 5, total zero, resposta tardia de página antiga, foco após navegação, logout/refresh travados antes de login/registro, cancelamento enfileirado, corpo de login travado e respostas/rejeições tardias. No Chrome com API interceptada, a paginação corrigiu os offsets, Enter focou `main#conteudo-paciente` e Esc restaurou Menu. Logout e refresh travados atingiram o limite real de 15 segundos, com `net::ERR_ABORTED`; login prosseguiu e uma tentativa posterior de resposta antiga com `Set-Cookie` preservou a sessão e os cookies novos, inclusive com `trocar_senha=true`. O axe passou na rota provisória após a navegação.
+
+Essas reproduções usam somente dados sintéticos interceptados. **E2E real: pendente e não executado naquela rodada.** Naquele momento o OpenAPI local ainda era antigo; a atualização de contrato descrita acima veio depois, sem edição manual dos tipos gerados.
+
+## Validação do contrato da Parte 1 — 24/10/2026
+
+Após a regeneração, `npm test` passou com **211 testes em 9 arquivos**; lint, build e check de geração também passaram. A cobertura inclui login e `/me` com troca obrigatória, campo ausente ou `null`, revalidação descobrindo o bloqueio, 403 sem refresh/limpeza de sessão e 422 associado a `senha_atual` com CSRF. Os testes de B1/B2, I1/I2 e timeout de autenticação continuam passando. O catálogo de mensagens inclui os três Problem Details novos. **E2E real: PENDENTE.**
+
+## Novo pedido — 25/10/2026
+
+A [arquitetura do fluxo UC-002](../../docs/architecture/frontend.md#nova-solicitação-uc-002--25102026) descreve o contrato e os estados de `/paciente/novo`. As etapas são Atendimento (lista incremental e elegibilidade), Informações (origem, turno e perguntas opcionais) e Revisar (resumo e envio). A unidade/especialidade vem da fila escolhida. Só a etapa final envia `POST /solicitacoes` com CSRF. Sucesso 201 retorna a Meus atendimentos com mensagem única, consumida do Router mesmo com o layout montado.
+
+Não há persistência do formulário. Ausência de resposta, false e zero são distintos; códigos das opções são literais. A tela trata 422 por campo quando possível, ambos os conflitos 409 reais e os 403 por type. Falha de rede no POST orienta conferir a lista antes de tentar de novo, sem retry automático. Detalhes de fila atrasados e respostas de uma sessão antiga são descartados. Consentimento novo, anexos, busca, detalhe completo e seleção independente de unidade/profissional continuam fora do escopo.
+
+Conferência real: login, três etapas, POST 201 pela interface, mensagem, cartão e consulta oficial de confirmação; sem mocks/interceptações. Chromium/axe passou nas etapas, erro e sucesso. Capturas e relatório estão em `/tmp/nova-solicitacao-e2e/`, fora do repositório. Nenhum Docker Compose foi executado no worktree.
+
+Validação final da tela: `npm run lint`, `npm test` (**255 testes em 10 arquivos**, incluindo 44 novos), `npm run build`, `npm run api:generate -- --check` e `git diff --check` passaram. O build mantém os dois avisos anteriores de comentários de otimização do Zod. Evidência final do navegador: `/tmp/nova-solicitacao-e2e/final/relatorio.json`, com zero violações axe nos cinco estados, zero escritas em storage, POST 201 com CSRF e conferência oficial do pedido. Alvos de seleção de 44 px, controles/botões de 52 px e nenhum scroll horizontal nas três resoluções.

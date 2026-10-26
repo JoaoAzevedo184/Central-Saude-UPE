@@ -77,7 +77,7 @@ export function CriarConta() {
     }
     try {
       await http.request<SessaoSaida>('/auth/registro', { method: 'POST', body: payload })
-      await limparSessaoAnterior(client)
+      if (!await limparSessaoAnterior(client)) return
       await navigate('/paciente', { replace: true, state: { mensagem: 'Conta criada.' } })
     } catch (error) {
       let primeiro: FieldPath<CadastroForm> | undefined

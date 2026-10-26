@@ -12,6 +12,23 @@ function validacao(errors: unknown, status = 422) {
 }
 
 describe('RFC 9457 — validação 422 e React Hook Form', () => {
+  it('permite mensagens locais por campo e código, sem usar msg bruto', () => {
+    const setError = vi.fn<UseFormSetError<components['schemas']['TrocaSenhaEntrada']>>()
+    aplicarErrosDeValidacao<components['schemas']['TrocaSenhaEntrada']>(validacao([
+      { loc: ['body', 'senha_nova'], msg: 'TEXTO TÉCNICO NÃO EXIBIR', type: 'too_short' },
+    ]), setError, ['senha_atual', 'senha_nova'], (campo, erro) =>
+      campo === 'senha_nova' && erro.type === 'too_short' ? 'Mensagem local segura.' : undefined)
+    expect(setError).toHaveBeenCalledExactlyOnceWith('senha_nova', { type: 'server', message: 'Mensagem local segura.' }, { shouldFocus: true })
+  })
+
+  it('mapeamento local desconhecido vira erro global seguro, sem fallback para msg bruto', () => {
+    const setError = vi.fn<UseFormSetError<components['schemas']['TrocaSenhaEntrada']>>()
+    aplicarErrosDeValidacao<components['schemas']['TrocaSenhaEntrada']>(validacao([
+      { loc: ['body', 'senha_nova'], msg: 'NÃO EXIBIR', type: 'codigo_desconhecido' },
+    ]), setError, ['senha_atual', 'senha_nova'], () => undefined)
+    expect(setError).toHaveBeenCalledExactlyOnceWith('root.server', { type: 'server', message: 'Confira os campos indicados e tente novamente.' })
+  })
+
   it('associa senha atual incorreta ao campo senha_atual da futura troca de senha', () => {
     const setError = vi.fn<UseFormSetError<components['schemas']['TrocaSenhaEntrada']>>()
     expect(aplicarErrosDeValidacao<components['schemas']['TrocaSenhaEntrada']>(validacao([

@@ -1,20 +1,16 @@
 import { useEffect, useRef, useState, type MouseEvent } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
-import { http } from '../shared/api/http'
-import { encerrarSessaoLocal } from '../shared/auth/session'
+import { useQuery } from '@tanstack/react-query'
+import { Link, NavLink, Outlet, useLocation } from 'react-router'
+import { useSair } from '../shared/auth/useSair'
 import { avisosOptions } from '../pages/paciente/api'
 import { Botao } from '../shared/ui/Botao'
 import { MensagemNavegacao } from '../shared/ui/MensagemNavegacao'
 
 export function PacienteLayout() {
   const location = useLocation()
-  const navigate = useNavigate()
-  const client = useQueryClient()
   const avisos = useQuery(avisosOptions)
   const [menuAberto, setMenuAberto] = useState(false)
-  const [saindo, setSaindo] = useState(false)
-  const travaSaida = useRef(false)
+  const { sair, saindo } = useSair()
   const botaoMenu = useRef<HTMLButtonElement>(null)
   const conteudo = useRef<HTMLElement>(null)
   const focarAposNavegar = useRef(false)
@@ -23,20 +19,6 @@ export function PacienteLayout() {
     focarAposNavegar.current = false
     conteudo.current?.focus()
   }, [location.key])
-  async function sair() {
-    if (travaSaida.current) return
-    travaSaida.current = true; setSaindo(true)
-    const geracao = http.geracaoSessao()
-    try { await http.request('/auth/logout', { method: 'POST' }) }
-    catch { /* A saída local também acontece quando o servidor está indisponível. */ }
-    finally {
-      const encerramento = encerrarSessaoLocal(client, geracao)
-      const geracaoEncerramento = http.geracaoSessao()
-      if (await encerramento && geracaoEncerramento === http.geracaoSessao()) {
-        await navigate('/entrar', { replace: true })
-      }
-    }
-  }
   function fecharMenu() { setMenuAberto(false); botaoMenu.current?.focus() }
   function navegarPeloMenu(event: MouseEvent<HTMLAnchorElement>) {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return

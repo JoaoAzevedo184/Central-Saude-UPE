@@ -7,6 +7,7 @@ import { Entrar } from '../pages/auth/Entrar'
 import { MeusAtendimentos } from '../pages/paciente/MeusAtendimentos'
 import { NovaSolicitacao } from '../pages/paciente/NovaSolicitacao'
 import { CriarConta } from '../pages/auth/CriarConta'
+import { TrocarSenha } from '../pages/auth/TrocarSenha'
 import { rotaTrocarSenha } from '../shared/auth/troca-de-senha'
 
 export function Rotas() {
@@ -19,10 +20,9 @@ export function Rotas() {
         } />
         <Route path="/entrar" element={<Entrar />} />
         <Route path="/criar-conta" element={<CriarConta />} />
-        <Route path={rotaTrocarSenha} element={<main>
-          <h1>Troca de senha obrigatória</h1>
-          <p>Sua conta precisa de uma nova senha para continuar. Esta tela está em desenvolvimento.</p>
-        </main>} />
+        <Route element={<ExigirPapel papeis={['PACIENTE', 'ATENDENTE', 'GESTOR', 'ADMIN']} permitirTrocaDeSenha />}>
+          <Route path={rotaTrocarSenha} element={<TrocarSenha />} />
+        </Route>
         <Route element={<ExigirPapel papeis={['PACIENTE']} />}>
           <Route path="/paciente" element={<PacienteLayout />}>
             <Route index element={<MeusAtendimentos />} />

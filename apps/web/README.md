@@ -1,6 +1,6 @@
 # Frontend — CH/UPE
 
-React + TypeScript + Vite, com Entrar, Criar conta, Meus atendimentos e Novo pedido em três etapas na área do paciente. Usa somente dados sintéticos. Arquitetura e limites: [frontend](../../docs/architecture/frontend.md).
+React + TypeScript + Vite, com Entrar, Criar conta, Trocar senha, Meus atendimentos e Novo pedido em três etapas na área do paciente. Usa somente dados sintéticos. Arquitetura e limites: [frontend](../../docs/architecture/frontend.md).
 
 ## Executar
 
@@ -34,7 +34,7 @@ npm run api:generate -- http://127.0.0.1:8000/api/v1/openapi.json
 
 O build usa o arquivo gerado e não depende de Python, rede ou API em execução. Gere os tipos novamente após mudanças de contrato. Referência da ferramenta: [OpenAPI TypeScript CLI](https://openapi-ts.dev/cli).
 
-**Atualização de autenticação — 24/10/2026:** o contrato da Parte 1 (`be32204`) inclui `trocar_senha` e `POST /auth/trocar-senha`; os tipos foram regenerados pela ferramenta. Login usa `LoginSaida`, `/me` usa `EuSaida`, ambos com `trocar_senha?: true | null`. Ausência ou `null` seguem o fluxo habitual; `true` e o `403 /problemas/troca-de-senha-obrigatoria` encaminham à rota provisória `/trocar-senha`, mantendo a sessão, sem formulário. O payload `TrocaSenhaEntrada` e a associação do erro 422 a `senha_atual` estão cobertos nos testes, sem refresh. A geração inclui `/admin/*` e remove as rotas administrativas antigas; não há telas administrativas nesta entrega. A API `GET /api/v1/equipe/indicadores` já existe no backend; a tela de indicadores e seu consumo ficam para a tarefa específica da tela de gestor/equipe.
+**Atualização de autenticação — 24/10/2026:** o contrato da Parte 1 (`be32204`) inclui `trocar_senha` e `POST /auth/trocar-senha`; os tipos foram regenerados pela ferramenta. Login usa `LoginSaida`, `/me` usa `EuSaida`, ambos com `trocar_senha?: true | null`. Ausência ou `null` seguem o fluxo habitual; `true` e o `403 /problemas/troca-de-senha-obrigatoria` encaminham à rota `/trocar-senha`, mantendo a sessão. O formulário obrigatório foi implementado em 26/10/2026, conforme a seção abaixo. O payload `TrocaSenhaEntrada` e a associação do erro 422 a `senha_atual` estão cobertos nos testes, sem refresh. A geração inclui `/admin/*` e remove as rotas administrativas antigas; não há telas administrativas nesta entrega. A API `GET /api/v1/equipe/indicadores` já existe no backend; a tela de indicadores e seu consumo ficam para a tarefa específica da tela de gestor/equipe.
 
 ## Validar
 
@@ -131,3 +131,15 @@ Não há persistência do formulário. Ausência de resposta, false e zero são 
 Conferência real: login, três etapas, POST 201 pela interface, mensagem, cartão e consulta oficial de confirmação; sem mocks/interceptações. Chromium/axe passou nas etapas, erro e sucesso. Capturas e relatório estão em `/tmp/nova-solicitacao-e2e/`, fora do repositório. Nenhum Docker Compose foi executado no worktree.
 
 Validação final da tela: `npm run lint`, `npm test` (**255 testes em 10 arquivos**, incluindo 44 novos), `npm run build`, `npm run api:generate -- --check` e `git diff --check` passaram. O build mantém os dois avisos anteriores de comentários de otimização do Zod. Evidência final do navegador: `/tmp/nova-solicitacao-e2e/final/relatorio.json`, com zero violações axe nos cinco estados, zero escritas em storage, POST 201 com CSRF e conferência oficial do pedido. Alvos de seleção de 44 px, controles/botões de 52 px e nenhum scroll horizontal nas três resoluções.
+
+## Trocar senha — 26/10/2026
+
+`/trocar-senha` atende os quatro papéis, somente quando há troca obrigatória. Usa layout mínimo próprio e logout compartilhado com o paciente. Senhas ficam no formulário em memória, sem storage, URL, logs ou cache de queries/mutations. A nova senha exige 10–256 code points, sem trim, diferença da atual e confirmação igual. O mínimo 10 está também declarado no OpenAPI atualizado. Os 422 de `senha_atual` e `senha_nova` usam o adaptador compartilhado para localização/foco, com mensagens locais por campo e código. Não há exibição de `msg`/`detail` brutos; códigos ou campos não reconhecidos geram erro global seguro.
+
+A política de refresh exclui somente os pares POST + pathname exatos de login, registro, refresh e logout; query não muda a classificação. Essas quatro operações usam a fila existente de cookies. Trocar senha fica fora dela: pode renovar em 401 e repetir uma única vez com CSRF relido, sem deadlock.
+
+Sucesso 204 não navega imediatamente: cancela `/me` antigo, espera nova consulta e cache atualizado, confere identidade e flag, libera a trava pela época esperada e navega. Se a verificação falhar, informa que a senha mudou e oferece apenas tentar `/me` novamente. Refetch com erro e sessão conhecida preserva o formulário.
+
+Validação: lint, 330 testes/12 arquivos, build e check de tipos com exportação do OpenAPI do backend atualizado passaram. O comando sem URL ainda depende de `.venv` do backend, ausente neste worktree. Para conferir contra a API real existente: `npm run api:generate -- --check http://127.0.0.1:8000/api/v1/openapi.json`. Build mantém os dois avisos conhecidos do Zod.
+
+E2E GESTOR aprovado com backend real, comando oficial para senha temporária, POST 204, `/me` 200 e `/equipe`; nenhuma credencial foi registrada. Axe e teclado passaram em 360×640, 360×800 e 1440×1024. Evidências sem senhas em `/tmp/trocar-senha-evidencias/`. E2E PACIENTE pendente por ausência de conta temporária utilizável; sem seed nem manipulação manual do banco. Warning MSW de `/filas` em Meus atendimentos permanece separado.

@@ -17,6 +17,7 @@ export function aplicarErrosDeValidacao<T extends FieldValues>(
   error: unknown,
   setError: UseFormSetError<T>,
   campos: readonly NoInfer<FieldPath<T>>[],
+  mensagemDoCampo?: (campo: NoInfer<FieldPath<T>>, erro: ErroDeCampo) => string | undefined,
 ): boolean {
   if (!(error instanceof ApiError) || error.problem.status !== 422) return false
   const errors: unknown[] = Array.isArray(error.problem.errors) ? error.problem.errors : []
@@ -36,7 +37,11 @@ export function aplicarErrosDeValidacao<T extends FieldValues>(
       continue
     }
     if (aplicados.has(campo)) continue
-    setError(cadastrado, { type: 'server', message: item.msg }, { shouldFocus: aplicados.size === 0 })
+    // Com mapeamento local, um código desconhecido vai ao erro global seguro.
+    // Não recuperar item.msg como fallback: pode conter texto técnico ou dados.
+    const mensagem = mensagemDoCampo ? mensagemDoCampo(cadastrado, item) : item.msg
+    if (!mensagem) { erroGlobal = true; continue }
+    setError(cadastrado, { type: 'server', message: mensagem }, { shouldFocus: aplicados.size === 0 })
     aplicados.add(campo)
   }
   if (erroGlobal) setError('root.server', { type: 'server', message: error.message })

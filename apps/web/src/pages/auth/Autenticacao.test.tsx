@@ -73,7 +73,7 @@ async function cadastrarAteTermo(email = '') {
 }
 
 describe('ADR-003 — entrar', () => {
-  it('encaminha senha temporária à rota provisória sem consultar a área do paciente', async () => {
+  it('encaminha senha temporária à troca protegida, consultando só a sessão', async () => {
     servidor.use(mockHttp.post('*/api/v1/auth/login', () => HttpResponse.json({ ...sucesso, trocar_senha: true } satisfies components['schemas']['LoginSaida'])))
     const consultar = vi.fn(() => HttpResponse.json(sessao))
     servidor.use(mockHttp.get('*/api/v1/me', consultar))
@@ -83,7 +83,9 @@ describe('ADR-003 — entrar', () => {
     await screen.findByRole('heading', { name: 'Troca de senha obrigatória' })
     expect(localizacao().pathname).toBe('/trocar-senha')
     expect(http.trocaDeSenhaObrigatoria()).toBe(true)
-    expect(consultar).not.toHaveBeenCalled()
+    expect(consultar).toHaveBeenCalledTimes(1)
+    expect(screen.getByLabelText('Senha atual')).toBeTruthy()
+    expect(screen.queryByRole('main', { name: 'Área do paciente' })).toBeNull()
   })
   it.each([undefined, null])('envia CPF sem máscara e senha sem alterações; login normal com trocar_senha %s', async (trocarSenha) => {
     let recebido: unknown

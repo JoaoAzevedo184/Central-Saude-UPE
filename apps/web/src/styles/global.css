@@ -174,3 +174,13 @@ input:disabled { cursor: default; }
   .paciente-nav, .paciente-nav.aberto { display: flex; flex-direction: row; align-items: center; width: auto; border: 0; padding: 0; }
   .paciente-nav .botao { width: auto; min-height: 44px; padding: 8px 16px; }
 }
+
+/* Troca obrigatória: sem navegação que consulte recursos bloqueados. */
+.troca-senha { min-height: 100svh; background: var(--color-surface-soft); padding: 24px 16px; }
+.troca-senha-marca { max-width: 28rem; margin: 0 auto 24px; text-align: center; }
+.troca-senha-marca strong, .troca-senha-marca span { display: block; }
+.troca-senha-marca span { font-size: .875rem; color: var(--color-text-muted); }
+.troca-senha-conteudo { width: 100%; max-width: 28rem; padding: 24px 20px; background: var(--color-surface); border-radius: var(--radius-control); }
+.troca-senha-conteudo h1 { font-size: 1.75rem; }
+.troca-senha-saida { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--color-divider); }
+@media (min-width: 900px) { .troca-senha { padding-top: 64px; } }

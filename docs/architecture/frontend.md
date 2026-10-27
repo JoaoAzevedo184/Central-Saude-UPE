@@ -39,6 +39,8 @@ Cada operação coordenada tem limite de **15 segundos**, centralizado em `limit
 
 ## Sessão e rotas
 
+A rota `/` consulta a sessão usando a guarda existente: sem sessão, encaminha para `/entrar`; com sessão, usa a mesma função `rotaInicial` do login (`/paciente` para PACIENTE, `/equipe` para ATENDENTE/GESTOR/ADMIN). A troca obrigatória de senha tem prioridade e encaminha para `/trocar-senha`. Esses redirecionamentos substituem a entrada no histórico (`replace`), para que voltar não retorne à raiz.
+
 `GET /me` fornece a sessão; o papel é validado contra `PACIENTE`, `ATENDENTE`, `GESTOR` e `ADMIN`. Papel desconhecido ou erro de consulta sem sessão conhecida fecha o acesso; erro de refetch com sessão válida em cache preserva a árvore. A consulta não persiste em storage, não usa retries automáticos e é revalidada nas montagens e eventos de foco/reconexão tratados pelo TanStack Query. A guarda mostra espera na consulta inicial; `isFetching` com sessão conhecida mantém a árvore protegida montada, preservando diálogo, foco e escrita em andamento. O resultado concluído de `/me` pode revogar o acesso, mudar o papel ou encaminhar deliberadamente para troca de senha.
 
 `trocar_senha === true` no login ou em `/me` encaminha para `/trocar-senha`, a tela protegida de troca obrigatória, com formulário e layout próprio, sem navegação das áreas de paciente/equipe. O campo gerado é opcional (`true | null`): ausência ou `null` preservam o fluxo habitual; `false` não pertence ao contrato. O payload de `/me` mantém o campo tipado ao validar o papel. O HTTP também mantém em memória o bloqueio informado no login ou pelo Problem Details `403 /problemas/troca-de-senha-obrigatoria`. Esse `403`, inclusive se vier do refresh, encaminha ao fluxo de troca sem expirar a sessão, limpar o cache ou iniciar outra renovação. A sessão consultada permanece em memória ao desmontar a área protegida; sua limpeza ocorre explicitamente na saída, expiração ou nova entrada. `422` de `/auth/trocar-senha` não renova a sessão, e o adaptador de validação associa `errors[].loc = ['body', 'senha_atual']` ao campo `senha_atual`.
@@ -47,7 +49,7 @@ Cada operação coordenada tem limite de **15 segundos**, centralizado em `limit
 
 | Rota | Acesso | Conteúdo atual |
 | --- | --- | --- |
-| `/` | Público | Identificação mínima da base |
+| `/` | Consulta a sessão | Redireciona para entrada, início do papel ou troca obrigatória de senha, com `replace` |
 | `/entrar` | Público | CPF ou e-mail e senha |
 | `/criar-conta` | Público | Cadastro do paciente em três etapas |
 | `/trocar-senha` | Todos os papéis autenticados com troca obrigatória | Formulário próprio e Sair; sem bloqueio, retorna ao início do papel |

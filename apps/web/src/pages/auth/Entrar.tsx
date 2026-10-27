@@ -5,7 +5,7 @@ import { Link, useLocation, useNavigate } from 'react-router'
 import { http } from '../../shared/api/http'
 import { ApiError } from '../../shared/api/problem-details'
 import { aplicarErrosDeValidacao } from '../../shared/api/form-errors'
-import { rotaAposLogin } from '../../shared/auth/retorno'
+import { rotaAposLogin, rotaInicial } from '../../shared/auth/retorno'
 import { soDigitos } from '../../shared/mascaras'
 import { CampoSenha } from '../../shared/ui/Campo'
 import { CampoIdentificador } from '../../shared/ui/CampoIdentificador'
@@ -41,7 +41,7 @@ export function Entrar() {
         await navigate(rotaTrocarSenha, { replace: true })
         return
       }
-      const home = papel === 'PACIENTE' ? '/paciente' : '/equipe'
+      const home = rotaInicial(papel)
       const origem = rotaAposLogin(location.state)
       // Origem de outra área (ex.: paciente com /equipe) cai na home do papel, sem "Acesso não permitido".
       const daMinhaArea = origem === home || origem.startsWith(`${home}/`)

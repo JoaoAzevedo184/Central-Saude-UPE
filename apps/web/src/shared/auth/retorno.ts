@@ -1,4 +1,9 @@
 import type { Location } from 'react-router'
+import type { Papel } from './session'
+
+export function rotaInicial(papel: Papel): string {
+  return papel === 'PACIENTE' ? '/paciente' : '/equipe'
+}
 
 // Guarda só o pathname: query e hash não vão para o history.state (AM-003).
 export function estadoParaEntrar(location: Pick<Location, 'pathname'>) {

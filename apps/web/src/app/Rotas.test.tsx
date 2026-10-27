@@ -1,6 +1,7 @@
 import { QueryClientProvider } from '@tanstack/react-query'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router'
+import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Rotas } from './Rotas'
 import { criarQueryClient } from './query-client'
@@ -12,11 +13,11 @@ import type { components } from '../shared/api/generated/schema'
 
 afterEach(() => { vi.unstubAllGlobals(); http.iniciarSessao() })
 
-function abrir(path: string) {
+function abrir(path: string, anteriores: string[] = []) {
   const client = criarQueryClient()
   render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[path]}><Rotas /><Localizacao /></MemoryRouter>
+      <MemoryRouter initialEntries={[...anteriores, path]}><Rotas /><Localizacao /></MemoryRouter>
     </QueryClientProvider>,
   )
   return client
@@ -24,7 +25,11 @@ function abrir(path: string) {
 
 function Localizacao() {
   const location = useLocation()
-  return <div data-testid="localizacao">{JSON.stringify({ pathname: location.pathname, state: location.state })}</div>
+  const navigate = useNavigate()
+  return <>
+    <div data-testid="localizacao">{JSON.stringify({ pathname: location.pathname, state: location.state })}</div>
+    <button onClick={() => void navigate(-1)}>Voltar no histórico</button>
+  </>
 }
 
 function responderPapel(papel: string, trocarSenha?: components['schemas']['EuSaida']['trocar_senha']) {
@@ -90,12 +95,25 @@ describe('ADR-003/ADR-025/ADR-028 — rotas e proteção por papel', () => {
     expect(fetcher).toHaveBeenCalledTimes(1)
     expect(fetcher.mock.calls[0]?.[0]).toBe(`/api/v1${path}`)
   })
-  it('mantém a entrada pública sem consultar sessão nem renderizar telas de negócio', () => {
-    const fetcher = vi.fn<typeof fetch>()
-    vi.stubGlobal('fetch', fetcher)
-    abrir('/')
-    expect(screen.getByRole('heading', { name: 'Central de Teleagendamento' })).toBeTruthy()
-    expect(fetcher).not.toHaveBeenCalled()
+  it.each([
+    [null, undefined, '/entrar', 'Entrar'],
+    ['PACIENTE', undefined, '/paciente', 'Meus atendimentos'],
+    ['ATENDENTE', undefined, '/equipe', null],
+    ['GESTOR', undefined, '/equipe', null],
+    ['ADMIN', undefined, '/equipe', null],
+    ['PACIENTE', true, '/trocar-senha', 'Troca de senha obrigatória'],
+    ['GESTOR', true, '/trocar-senha', 'Troca de senha obrigatória'],
+  ] as const)('redireciona / com papel %s e trocar_senha %s para %s substituindo o histórico', async (papel, trocarSenha, destino, titulo) => {
+    if (papel) responderPapel(papel, trocarSenha)
+    else vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockImplementation(async () => new Response(null, { status: 401 })))
+    const user = userEvent.setup()
+    abrir('/', ['/anterior'])
+    await waitFor(() => expect(JSON.parse(screen.getByTestId('localizacao').textContent!).pathname).toBe(destino))
+    if (titulo) await screen.findByRole('heading', { name: titulo })
+    expect(screen.queryByText('Base do frontend. Telas em desenvolvimento.')).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'Voltar no histórico' }))
+    await waitFor(() => expect(JSON.parse(screen.getByTestId('localizacao').textContent!).pathname).toBe('/anterior'))
   })
 
   it.each([

@@ -1,4 +1,4 @@
-import { Route, Routes } from 'react-router'
+import { Navigate, Route, Routes, useOutletContext } from 'react-router'
 import { EquipeLayout } from '../layouts/EquipeLayout'
 import { PacienteLayout } from '../layouts/PacienteLayout'
 import { ExigirPapel } from '../shared/auth/ExigirPapel'
@@ -9,15 +9,22 @@ import { NovaSolicitacao } from '../pages/paciente/NovaSolicitacao'
 import { CriarConta } from '../pages/auth/CriarConta'
 import { TrocarSenha } from '../pages/auth/TrocarSenha'
 import { rotaTrocarSenha } from '../shared/auth/troca-de-senha'
+import { rotaInicial } from '../shared/auth/retorno'
+import type { Sessao } from '../shared/auth/session'
+
+function Inicio() {
+  const sessao = useOutletContext<Sessao>()
+  return <Navigate to={rotaInicial(sessao.papel)} replace />
+}
 
 export function Rotas() {
   return (
     <>
       <GerenciarSessao />
       <Routes>
-        <Route path="/" element={
-          <main><h1>Central de Teleagendamento</h1><p>Base do frontend. Telas em desenvolvimento.</p></main>
-        } />
+        <Route element={<ExigirPapel papeis={['PACIENTE', 'ATENDENTE', 'GESTOR', 'ADMIN']} />}>
+          <Route path="/" element={<Inicio />} />
+        </Route>
         <Route path="/entrar" element={<Entrar />} />
         <Route path="/criar-conta" element={<CriarConta />} />
         <Route element={<ExigirPapel papeis={['PACIENTE', 'ATENDENTE', 'GESTOR', 'ADMIN']} permitirTrocaDeSenha />}>

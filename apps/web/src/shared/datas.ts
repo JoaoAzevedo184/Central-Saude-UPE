@@ -19,6 +19,7 @@ export function formatarPrazo(valor: string) {
   return `${diaMes.format(instante)} às ${hora.format(instante)}`
 }
 export function formatarDataCompleta(valor: string) { return data.format(new Date(valor)) }
+export function formatarDataHoraCompleta(valor: string) { const instante = new Date(valor); return `${data.format(instante)}, às ${hora.format(instante)}` }
 export function formatarConsulta(valor: string) { const instante = new Date(valor); return `${extensa.format(instante)}, às ${hora.format(instante)}` }
 export function avisoPrazo(expiraEm: string, agora: number): string | undefined {
   const restante = new Date(expiraEm).getTime() - agora

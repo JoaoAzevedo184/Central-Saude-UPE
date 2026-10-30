@@ -9,8 +9,10 @@ import ast
 import json
 import logging
 import os
+import re
 import smtplib
 import threading
+import unicodedata
 import urllib.request
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -23,6 +25,9 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
+from app.dominio.agendamento.estados import Agendamento as AgendamentoDominio
+from app.dominio.agendamento.estados import confirmar
+from app.dominio.erros import PropostaExpirada
 from app.dominio.notificacoes.avisos import (
     TIPO_LEMBRETE,
     TIPOS_EVENTO_OUTBOX,
@@ -31,6 +36,7 @@ from app.dominio.notificacoes.avisos import (
 )
 from app.dominio.notificacoes.canal import Mensagem
 from app.dominio.notificacoes.textos import TEXTOS
+from app.dominio.solicitacao import MOTIVOS_REENTRADA
 from app.infra.db import SessionLocal
 from app.infra.email import CanalEmailSmtp
 from app.infra.modelos import (
@@ -135,6 +141,54 @@ def test_adr006_todo_tipo_da_lista_tem_aviso_definido():
     assert set(TEXTOS) == TIPOS_EVENTO_OUTBOX | {TIPO_LEMBRETE}
 
 
+PROIBIDAS_PACIENTE = re.compile(
+    r"\b(posicao|fim da fila|tamanho da fila|nota|risco|prioridade)\b", re.IGNORECASE
+)
+
+
+def _sem_acento(texto: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFD", texto) if not unicodedata.combining(c))
+
+
+def _termos_proibidos(*textos: str) -> list[str]:
+    """Confere cada texto separado: juntar título e corpo apagaria a fronteira entre palavras."""
+    return [m.group(0) for t in textos for m in PROIBIDAS_PACIENTE.finditer(_sem_acento(t))]
+
+
+@pytest.mark.parametrize(
+    ("textos", "achados"),
+    [
+        (("Seu pedido voltou para o fim da fila", "Quando houver vaga"), ["fim da fila"]),
+        (("Aviso", "Nota do pedido"), ["Nota"]),
+        (("Aviso", "Tudo anotado. Veja a notificação."), []),
+    ],
+)
+def test_adr007_protecao_do_texto_do_paciente_acha_so_a_palavra_inteira(textos, achados):
+    assert _termos_proibidos(*textos) == achados
+
+
+@pytest.mark.parametrize("tipo", sorted(TEXTOS))
+def test_adr007_nenhum_aviso_nem_email_do_paciente_cita_fila_nota_ou_risco(tipo):
+    contexto = Contexto(
+        inicio=datetime(2026, 10, 29, 12, tzinfo=UTC),
+        expira_em=datetime(2026, 10, 21, 12, tzinfo=UTC),
+        unidade="Unidade Sintética 1",
+        profissional="Dra. Sintética Exemplo",
+    )
+    avisos = montar_avisos(tipo, contexto, com_email=True, link="https://central", fuso=RECIFE)
+    for a in avisos:
+        assert not _termos_proibidos(a.titulo, a.corpo), (tipo, a.canal)
+
+
+def test_adr007_motivos_de_reentrada_e_erro_409_nao_citam_fila_nota_ou_risco():
+    agora = datetime(2026, 10, 29, 12, tzinfo=UTC)
+    with pytest.raises(PropostaExpirada) as erro:
+        confirmar(AgendamentoDominio(id=uuid4(), status="PROPOSTO", expira_em=agora), agora)
+    textos = [erro.value.args[0], *(texto for _, texto in MOTIVOS_REENTRADA.values())]
+    for texto in textos:
+        assert not _termos_proibidos(texto), texto
+
+
 PROIBIDAS_EMAIL = (
     "posição",
     "posicao",
@@ -154,19 +208,19 @@ def test_am008_email_minimo_sem_dado_pessoal_nem_local(tipo):
         expira_em=datetime(2026, 10, 21, 12, tzinfo=UTC),
         unidade="Unidade Sintética 1",
         profissional="Dra. Sintética Exemplo",
-        fim_da_fila=True,
     )
     avisos = montar_avisos(tipo, contexto, com_email=True, link="https://central", fuso=RECIFE)
     site = avisos[0]
     assert site.canal == "IN_APP"
-    assert "{" not in site.titulo + site.corpo  # todo campo preenchido
-    assert "posição" not in (site.titulo + site.corpo).lower()
+    for campo in (site.titulo, site.corpo):
+        assert "{" not in campo  # todo campo preenchido
+        assert "posição" not in campo.lower()
     emails = [a for a in avisos if a.canal == "EMAIL"]
     assert len(emails) == (tipo in COM_EMAIL)
     for e in emails:
-        texto = (e.titulo + e.corpo).lower()
-        assert "unidade sintética" not in texto and "dra. sintética" not in texto
-        assert all(p not in texto for p in PROIBIDAS_EMAIL)
+        for texto in (e.titulo.lower(), e.corpo.lower()):
+            assert "unidade sintética" not in texto and "dra. sintética" not in texto
+            assert all(p not in texto for p in PROIBIDAS_EMAIL)
         assert "https://central" in e.corpo
         assert e.titulo == "Central de Agendamento: você tem uma atualização"
 
@@ -278,7 +332,7 @@ def canal():
 @pytest.mark.integracao
 @pytest.mark.parametrize("tipo", sorted(TIPOS_EVENTO_OUTBOX))
 def test_adr006_processar_outbox_cria_os_avisos_de_cada_tipo(sessao, cenario, rodar, tipo):
-    evento = gravar_evento(sessao, cenario, tipo, fim_da_fila=True)
+    evento = gravar_evento(sessao, cenario, tipo)
 
     assert rodar(jobs.processar_outbox) == 1
 
@@ -290,7 +344,6 @@ def test_adr006_processar_outbox_cria_os_avisos_de_cada_tipo(sessao, cenario, ro
     for e in email:
         assert e.status_envio == "PENDENTE"
         # AM-008: nada que identifique o paciente, o local ou a fila.
-        texto = (e.titulo + e.corpo).lower()
         proibidas = [
             cenario.paciente.nome,
             cenario.paciente.cpf,
@@ -300,7 +353,8 @@ def test_adr006_processar_outbox_cria_os_avisos_de_cada_tipo(sessao, cenario, ro
             "Dra. Sintética",
             *PROIBIDAS_EMAIL,
         ]
-        assert all(p.lower() not in texto for p in proibidas)
+        for texto in (e.titulo.lower(), e.corpo.lower()):
+            assert all(p.lower() not in texto for p in proibidas)
     assert sessao.get(Outbox, evento).status == "PROCESSADO"
 
 
@@ -316,13 +370,14 @@ def test_adr007_aviso_do_site_traz_local_e_horario_sem_posicao(sessao, cenario, 
 
 
 @pytest.mark.integracao
-@pytest.mark.parametrize(("fim", "efeito"), [(True, "fim da fila"), (False, "continua na fila")])
-def test_uc005_aviso_da_recusa_diz_o_efeito_sem_posicao(sessao, cenario, rodar, fim, efeito):
+@pytest.mark.parametrize("fim", [True, False])
+def test_uc005_aviso_da_recusa_diz_o_efeito_sem_posicao(sessao, cenario, rodar, fim):
     gravar_evento(sessao, cenario, "PROPOSTA_RECUSADA", fim_da_fila=fim)
     rodar(jobs.processar_outbox)
 
     (site,) = avisos_de(sessao, cenario.usuario.id, "IN_APP")
-    assert efeito in site.corpo
+    assert "continua aguardando uma nova vaga" in site.corpo
+    assert not _termos_proibidos(site.titulo, site.corpo)
 
 
 @pytest.mark.integracao

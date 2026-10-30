@@ -7,6 +7,7 @@ import { Entrar } from '../pages/auth/Entrar'
 import { MeusAtendimentos } from '../pages/paciente/MeusAtendimentos'
 import { NovaSolicitacao } from '../pages/paciente/NovaSolicitacao'
 import { DetalhePedido } from '../pages/paciente/DetalhePedido'
+import { Avisos } from '../pages/paciente/Avisos'
 import { CriarConta } from '../pages/auth/CriarConta'
 import { TrocarSenha } from '../pages/auth/TrocarSenha'
 import { rotaTrocarSenha } from '../shared/auth/troca-de-senha'
@@ -36,7 +37,7 @@ export function Rotas() {
             <Route index element={<MeusAtendimentos />} />
             <Route path="novo" element={<NovaSolicitacao />} />
             <Route path="solicitacoes/:id" element={<DetalhePedido />} />
-            <Route path="avisos" element={<h1>Avisos</h1>} />
+            <Route path="avisos" element={<Avisos />} />
           </Route>
         </Route>
         <Route element={<ExigirPapel papeis={['ATENDENTE', 'GESTOR', 'ADMIN']} />}>

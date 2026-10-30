@@ -54,9 +54,9 @@ def _destinatario(session: Session, solicitacao_id: UUID) -> tuple[UUID, UUID, s
     ).one()
 
 
-def _contexto(session: Session, agendamento_id: UUID | None, fim_da_fila: bool) -> Contexto:
+def _contexto(session: Session, agendamento_id: UUID | None) -> Contexto:
     if agendamento_id is None:
-        return Contexto(fim_da_fila=fim_da_fila)
+        return Contexto()
     a, inicio, profissional, unidade = session.execute(
         select(Agendamento, Vaga.inicio, Agenda.profissional, Unidade.nome)
         .join(Vaga, Vaga.id == Agendamento.vaga_id)
@@ -70,7 +70,6 @@ def _contexto(session: Session, agendamento_id: UUID | None, fim_da_fila: bool) 
         expira_em=a.expira_em,
         unidade=unidade,
         profissional=profissional,
-        fim_da_fila=fim_da_fila,
     )
 
 
@@ -169,7 +168,7 @@ def _criar_avisos_do_evento(session: Session, evento: Outbox, agora: datetime, c
     _, usuario_id, email = _destinatario(session, solicitacao_id)
     avisos = montar_avisos(
         evento.tipo_evento,
-        _contexto(session, agendamento_id, bool(payload.get("fim_da_fila"))),
+        _contexto(session, agendamento_id),
         com_email=email is not None,  # finalidade AGENDAMENTO (data-protection.md)
         link=cfg.app_url_publica,
         fuso=ZoneInfo(cfg.timezone_exibicao),
@@ -334,7 +333,7 @@ def criar_lembrete(session: Session, agendamento_id: UUID, agora: datetime, cfg:
     paciente_id, usuario_id, email = _destinatario(session, a.solicitacao_id)
     avisos = montar_avisos(
         TIPO_LEMBRETE,
-        _contexto(session, a.id, fim_da_fila=False),
+        _contexto(session, a.id),
         com_email=email is not None and _consentiu_lembrete(session, paciente_id),
         link=cfg.app_url_publica,
         fuso=ZoneInfo(cfg.timezone_exibicao),

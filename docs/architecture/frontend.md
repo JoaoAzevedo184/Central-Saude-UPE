@@ -1,6 +1,6 @@
 # Frontend
 
-Implementada em `apps/web`, conforme a autorização de 2026-10-21 para a base do [ADR-001](../decisions/ADR-001-stack.md). Inclui Entrar/Criar conta e, na entrega de 2026-10-24, o layout do paciente e Meus atendimentos com resposta à proposta de vaga. A tela de novo pedido foi implementada em 2026-10-25; o detalhe foi implementado em 2026-10-29; avisos continuam pendentes.
+Implementada em `apps/web`, conforme a autorização de 2026-10-21 para a base do [ADR-001](../decisions/ADR-001-stack.md). Inclui Entrar/Criar conta e, na entrega de 2026-10-24, o layout do paciente e Meus atendimentos com resposta à proposta de vaga. A tela de novo pedido foi implementada em 2026-10-25; o detalhe e a lista de avisos foram implementados em 2026-10-29.
 
 ## Organização e dependências
 
@@ -56,7 +56,7 @@ A rota `/` consulta a sessão usando a guarda existente: sem sessão, encaminha 
 | `/paciente` | PACIENTE | Meus atendimentos, propostas em destaque, abas e paginação |
 | `/paciente/novo` | PACIENTE | Novo pedido em três etapas: Atendimento, Informações e Revisar |
 | `/paciente/solicitacoes/:id` | PACIENTE | Status, proposta/consulta, linha do tempo, respostas e cancelamento com motivo |
-| `/paciente/avisos` | PACIENTE | Provisória: apenas o título Avisos |
+| `/paciente/avisos` | PACIENTE | Lista de avisos, Ver pedido e Marcar todos como lidos |
 | `/equipe` | ATENDENTE, GESTOR, ADMIN | Layout vazio |
 | Outros caminhos | Público | Mensagem de página inexistente |
 
@@ -141,3 +141,15 @@ Falha de refetch com dados conhecidos preserva conteúdo e diálogos, com alerta
 O relógio do detalhe sincroniza `inicio` e `expira_em` em layout effect, antes da pintura. Até sincronizar novos limites, impede ações baseadas no instante da leitura anterior. Os timers reconferem o relógio e se reagendam se dispararem antes do limite. O `useProposta` recebe referência atual somente no detalhe: fora de um POST em andamento, descarta o diálogo antigo quando status, ID do agendamento, início ou prazo mudam, ou o prazo termina. A lista mantém a assinatura sem referência e os testes existentes intactos. A cobertura de sessão inclui o fluxo central de Sair, novo login e resposta tardia do cancelamento, com conferência da tela e de todo o cache da nova sessão. O erro 404 do POST possui teste próprio, separado do GET 404 durante envio.
 
 O bloqueio provisório durante a sincronização não é tratado como perda definitiva da possibilidade de cancelar: preserva o diálogo aberto, o motivo selecionado e o acionador para restaurar o foco. Se o novo horário continuar futuro, o diálogo permanece aberto; horário ultrapassado ou estado encerrado continuam fechando com mensagem neutra.
+
+## Avisos (RF-019 — 29/10/2026)
+
+`/paciente/avisos` usa `GET /avisos?limit=10&offset=…` com `useInfiniteQuery`, sem filtro `somente_nao_lidos`. A lista mantém lidos e não lidos, deduplica por `id` e oferece “Carregar mais”. O offset avança pela quantidade recebida da API, antes da deduplicação. Falhas de leitura e de página adicional oferecem nova tentativa, preservando os itens carregados. A tela inclui estados de espera e vazio, data e hora em Recife. Não lidos mostram “Novo”, acessível ao leitor de tela, e título/corpo em negrito; lidos não mostram rótulo.
+
+Título e corpo vêm diretamente da API, escapados pelo React, sem HTML executável nem filtro de palavras. Textos antigos permanecem como recebidos. Somente campos ausentes, vazios ou com espaços usam fallback por tipo; tipos desconhecidos têm fallback genérico, preservando campos preenchidos. A página não interpreta a regra de reentrada nem acrescenta campos internos ao aviso.
+
+“Ver pedido” é um `<a href="/paciente/solicitacoes/{id}">`. No clique normal ou Enter, um aviso não lido envia `POST /avisos/{id}/lido` com CSRF pelo HTTP compartilhado antes de navegar. Enquanto aguarda, o link mostra “Abrindo…”, `aria-busy` e bloqueia cliques repetidos. Se o POST falhar, navega mesmo assim, sem alerta na lista nem marcação local. Após 3 segundos, aborta a tentativa no cliente e navega, sem marcar localmente nem aplicar resultados tardios. O servidor pode já ter processado a escrita antes do aborto; uma nova busca reconcilia lista e contador. Links já lidos abrem diretamente; abrir em outra aba/janela e copiar endereço preservam a semântica nativa do link.
+
+Avisos sem `solicitacao_id` não têm link ou ação individual. Só “Marcar todos como lidos” os marca, via `POST /avisos/lidos`, incluindo avisos fora das páginas carregadas. Não há marcação automática na abertura da tela nem atualização otimista. Após sucesso, cancela leituras anteriores e invalida lista e contador, mantendo as páginas carregadas. A visibilidade do botão depende exclusivamente de `nao_lidos > 0` na consulta compartilhada `['avisos', 'contagem']`, também usada pelo menu. Durante o POST, fica desabilitado com `aria-busy`. No sucesso, a mensagem `role="status"` com `tabIndex={-1}` recebe o foco.
+
+Escritas usam uma trava compartilhada na página, AbortController e época da sessão. Desmontar aborta a tentativa e remove o temporizador; respostas de outra sessão não invalidam cache nem navegam. Erro em “Marcar todos” exibe mensagem local e permite nova tentativa pelo mesmo acionador; erro na marcação individual apenas segue para o pedido. A política atual de refresh em 401 permanece: renovação compartilhada, uma repetição e releitura do CSRF. Não há retry automático de falha de rede. Os dados ficam só em memória, sem storage ou logs de payloads.

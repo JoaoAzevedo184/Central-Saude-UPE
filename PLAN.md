@@ -44,19 +44,19 @@ Autenticação com papéis e cookies (CSRF, refresh, troca obrigatória de senha
 ### Frontend (`apps/web`)
 
 
-| Tela                                                                        | Estado                                   |
-| --------------------------------------------------------------------------- | ---------------------------------------- |
-| Entrar, Criar conta (3 etapas)                                              | Pronto                                   |
-| Trocar senha (obrigatória)                                                  | Pronto                                   |
-| "/" redireciona conforme a sessão                                           | Pronto                                   |
-| Meus atendimentos, com a proposta de vaga (confirmar / esta data não serve) | Pronto                                   |
-| Novo pedido (3 etapas)                                                      | Pronto                                   |
-| **Detalhe do pedido, linha do tempo e cancelamento (paciente)**             | **Falta**                                |
-| **Avisos (lista simples)**                                                  | **Falta** (o contador no menu já existe) |
-| **Layout da equipe**                                                        | **Falta**                                |
-| **Fila (equipe)**                                                           | **Falta**                                |
-| **Detalhe do pedido e classificação de risco (equipe)**                     | **Falta**                                |
-| Indicadores (gestor)                                                        | Opcional                                 |
+| Tela                                                                        | Estado                                |
+| --------------------------------------------------------------------------- | ------------------------------------- |
+| Entrar, Criar conta (3 etapas)                                              | Pronto                                |
+| Trocar senha (obrigatória)                                                  | Pronto                                |
+| "/" redireciona conforme a sessão                                           | Pronto                                |
+| Meus atendimentos, com a proposta de vaga (confirmar / esta data não serve) | Pronto                                |
+| Novo pedido (3 etapas)                                                      | Pronto                                |
+| **Detalhe do pedido, linha do tempo e cancelamento (paciente)**             | **Pronto**, com “Ver detalhes” ligado |
+| **Avisos (lista simples)**                                                  | **Pronto**                            |
+| **Layout da equipe**                                                        | **Falta**                             |
+| **Fila (equipe)**                                                           | **Falta**                             |
+| **Detalhe do pedido e classificação de risco (equipe)**                     | **Falta**                             |
+| Indicadores (gestor)                                                        | Opcional                              |
 
 
 ### Infra
@@ -75,32 +75,32 @@ As datas são propostas; o grupo ajusta.
 
 ### Semana 1 — 30/10 a 05/11: paciente completo
 
-- \[ \] **Detalhe do pedido (paciente):** status em linguagem simples, linha do tempo (só datas), dados da consulta quando agendada, **cancelar com motivo** (lista fechada). Rotas: `GET /solicitacoes/{id}`, `POST /solicitacoes/{id}/cancelar`.
-- \[ \] **Avisos:** lista, marcar como lido, marcar todos. Rotas: `GET /avisos`, `POST /avisos/{id}/lido`, `POST /avisos/lidos`.
-- \[ \] Ligar "Ver detalhes" de Meus atendimentos ao detalhe.
-- \[ \] **VM, fases 0 e 1** (inventário e segurança básica), em paralelo.
+- [x] **Detalhe do pedido (paciente):** status em linguagem simples, linha do tempo (só datas), dados da consulta quando agendada, **cancelar com motivo** (lista fechada). Rotas: `GET /solicitacoes/{id}`, `POST /solicitacoes/{id}/cancelar`.
+- [x] **Avisos:** lista, marcar como lido, marcar todos. Rotas: `GET /avisos`, `POST /avisos/{id}/lido`, `POST /avisos/lidos`.
+- [x] Ligar "Ver detalhes" de Meus atendimentos ao detalhe.
+- [ ] **VM, fases 0 e 1** (inventário e segurança básica), em paralelo.
 
 ### Semana 2 — 06/11 a 12/11: equipe
 
-- \[ \] **Layout da equipe:** menu lateral (Fila; Indicadores só para gestor, se existir), nome e papel, Sair.
-- \[ \] **Fila:** escolha da fila do escopo, tabela com posição, risco (3 cores, sempre com texto), nome abreviado, CPF mascarado, chegada, status e tipo/data da última mudança; ordenação por prioridade ou chegada; filtro por status. Rotas: `GET /equipe/filas`, `GET /equipe/filas/{id}/solicitacoes`.
-- \[ \] **Detalhe e classificação:** respostas, histórico completo (com motivo), critérios da regulação, **classificar** (risco + motivo). Rotas: `GET /equipe/solicitacoes/{id}`, `GET /equipe/filas/{id}/criterios`, `PUT /equipe/solicitacoes/{id}/respostas`, `POST /equipe/solicitacoes/{id}/classificar`.
-- \[ \] **VM, fases 2 e 3** (Docker e aplicação).
+- [ ] **Layout da equipe:** menu lateral (Fila; Indicadores só para gestor, se existir), nome e papel, Sair.
+- [ ] **Fila:** escolha da fila do escopo, tabela com posição, risco (3 cores, sempre com texto), nome abreviado, CPF mascarado, chegada, status e tipo/data da última mudança; ordenação por prioridade ou chegada; filtro por status. Rotas: `GET /equipe/filas`, `GET /equipe/filas/{id}/solicitacoes`.
+- [ ] **Detalhe e classificação:** respostas, histórico completo (com motivo), critérios da regulação, **classificar** (risco + motivo). Rotas: `GET /equipe/solicitacoes/{id}`, `GET /equipe/filas/{id}/criterios`, `PUT /equipe/solicitacoes/{id}/respostas`, `POST /equipe/solicitacoes/{id}/classificar`.
+- [ ] **VM, fases 2 e 3** (Docker e aplicação).
 
 ### Semana 3 — 13/11 a 19/11: demo de verdade
 
-- \[ \] **VM, fases 4 e 5:** nginx com HTTPS e cabeçalhos de segurança, limite de taxa, backup e [`deploy.sh`](http://deploy.sh). Configuração final salva em `deploy/nginx/`.
-- \[ \] Chave JWT de produção com 32 bytes ou mais; de preferência, a API recusa subir com chave curta (tarefa pequena de backend).
-- \[ \] **Seed de demonstração na VM** (roteiro na seção 6 do README: parar API e Worker, ligar `DEMO_SEED_PERMITIDO`, rodar, desligar, subir).
-- \[ \] **Ensaio ponta a ponta** com dois navegadores (seção 7), no celular e no computador.
-- \[ \] Teste rápido de usabilidade com 2 ou 3 pessoas de fora do grupo, no celular; anotar para o relatório.
-- \[ \] Se sobrar tempo: tela de indicadores.
+- [ ] **VM, fases 4 e 5:** nginx com HTTPS e cabeçalhos de segurança, limite de taxa, backup e [`deploy.sh`](http://deploy.sh). Configuração final salva em `deploy/nginx/`.
+- [ ] Chave JWT de produção com 32 bytes ou mais; de preferência, a API recusa subir com chave curta (tarefa pequena de backend).
+- [ ] **Seed de demonstração na VM** (roteiro na seção 6 do README: parar API e Worker, ligar `DEMO_SEED_PERMITIDO`, rodar, desligar, subir).
+- [ ] **Ensaio ponta a ponta** com dois navegadores (seção 7), no celular e no computador.
+- [ ] Teste rápido de usabilidade com 2 ou 3 pessoas de fora do grupo, no celular; anotar para o relatório.
+- [ ] Se sobrar tempo: tela de indicadores.
 
 ### Semana 4 — 20/11 a 26/11: congelamento
 
-- \[ \] **Congelar a** `main`: só correções de defeito.
-- \[ \] Ensaio da apresentação (quem fala o quê; plano B com vídeo gravado caso a VM caia).
-- \[ \] Relatório do Projeto de Intervenção: problema, solução, resultados do teste de usabilidade e próximos passos (incluindo o módulo de documentos como projeto futuro).
+- [ ] **Congelar a** `main`: só correções de defeito.
+- [ ] Ensaio da apresentação (quem fala o quê; plano B com vídeo gravado caso a VM caia).
+- [ ] Relatório do Projeto de Intervenção: problema, solução, resultados do teste de usabilidade e próximos passos (incluindo o módulo de documentos como projeto futuro).
 
 ## 5. Como trabalhamos
 

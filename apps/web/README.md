@@ -167,3 +167,14 @@ O relógio sincroniza novos horários antes da pintura e impede ações com uma 
 As regressões cobrem GET atrasado sem inserir o botão no DOM, início alterado, passagem do relógio pelo início e pela expiração, mudanças da proposta, 404 recebido pelo POST e logout pelo botão Sair com cancelamento pendente, seguido de novo login e resposta antiga. O teste do GET 404 durante envio foi mantido com nome explícito. Os testes verificam que a resposta antiga não altera a tela nem o cache da sessão nova.
 
 Durante a sincronização provisória do relógio, um diálogo de cancelamento já aberto preserva o motivo e seu acionador. Se os novos horários continuarem futuros, ele permanece aberto e Esc restaura o foco; há testes para mudança de início e de prazo.
+
+
+## Avisos — 29/10/2026
+
+`/paciente/avisos` lista avisos lidos e não lidos, com dez por página, deduplicação por ID e “Carregar mais”. Título e corpo são exibidos como texto escapado da API, sem filtro de palavras. Fallbacks preenchem somente campos ausentes/vazios, com opção genérica para tipo desconhecido. Não lidos mostram “Novo” e texto em negrito; lidos não têm rótulo.
+
+“Ver pedido” é um link real. No clique normal ou Enter, tenta marcar o aviso antes de navegar e mostra “Abrindo…” com `aria-busy`, ignorando repetição. Falha do POST ou espera de 3 segundos também levam ao pedido, sem marcar localmente nem exibir alerta na lista. Avisos já lidos abrem diretamente; modificadores preservam a abertura nativa em outra aba/janela.
+
+“Marcar todos como lidos” aparece somente quando a contagem compartilhada é maior que zero, inclusive para avisos sem pedido ou fora das páginas carregadas. Durante o POST, fica desabilitado com `aria-busy`; no sucesso, o foco vai para a mensagem de confirmação. Lista e contador são revalidados sem atualização otimista. CSRF, refresh em 401, abort e época da sessão seguem o cliente compartilhado, sem persistência em storage ou retry automático de falha de rede.
+
+Os comandos de desenvolvimento e verificação estão em [Executar](#executar) e [Validar](#validar). O fluxo de cache e navegação está descrito na [arquitetura da tela](../../docs/architecture/frontend.md#avisos-rf-019--29102026).

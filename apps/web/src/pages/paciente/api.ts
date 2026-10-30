@@ -54,6 +54,16 @@ export const avisosOptions = queryOptions({
   refetchOnWindowFocus: 'always',
 })
 
+export type Aviso = components['schemas']['AvisoSaida']
+export const listaAvisosKey = ['avisos', 'lista'] as const
+export const limiteAvisos = 10
+export const listaAvisosOptions = infiniteQueryOptions({
+  queryKey: listaAvisosKey,
+  initialPageParam: 0,
+  queryFn: ({ pageParam, signal }) => http.request<components['schemas']['PaginaAvisos']>(`/avisos?limit=${limiteAvisos}&offset=${pageParam}`, { signal }),
+  getNextPageParam: (ultima, _paginas, offset) => ultima.itens.length && offset + ultima.itens.length < ultima.total ? offset + ultima.itens.length : undefined,
+})
+
 export type Fila = components['schemas']['FilaSaida']
 export type DetalheFila = components['schemas']['FilaDetalheSaida']
 export type CriterioPaciente = components['schemas']['CriterioPacienteSaida']

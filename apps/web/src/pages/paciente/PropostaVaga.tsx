@@ -7,8 +7,9 @@ import { SeloStatus } from '../../shared/ui/SeloStatus'
 import type { Pedido } from './api'
 
 export type AcaoProposta = 'confirmar' | 'recusar'
-export function PropostaVaga({ pedido, agora, enviando, aoResponder, aoAtualizar }: {
+export function PropostaVaga({ pedido, agora, enviando, aoResponder, aoAtualizar, noDetalhe = false }: {
   pedido: Pedido; agora: number; enviando: boolean; aoResponder: (acao: AcaoProposta) => void; aoAtualizar: () => void
+  noDetalhe?: boolean
 }) {
   const id = useId()
   const proposta = pedido.agendamento_ativo!
@@ -27,6 +28,6 @@ export function PropostaVaga({ pedido, agora, enviando, aoResponder, aoAtualizar
       <Botao disabled={enviando} onClick={() => aoResponder('confirmar')}>Confirmar consulta</Botao>
       <Botao variante="secundario" disabled={enviando} onClick={() => aoResponder('recusar')}>Esta data não serve</Botao>
     </div>}
-    <Link className="link-detalhes" to={`/paciente/solicitacoes/${pedido.id}`}>Ver detalhes<span className="sr-only">: {pedido.fila.nome}</span></Link>
+    {!noDetalhe && <Link className="link-detalhes" to={`/paciente/solicitacoes/${pedido.id}`}>Ver detalhes<span className="sr-only">: {pedido.fila.nome}</span></Link>}
   </Cartao>
 }

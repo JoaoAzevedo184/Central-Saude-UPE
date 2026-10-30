@@ -18,7 +18,8 @@ export function Dialogo({ titulo, children, aoFechar }: { titulo: string; childr
     onKeyDown={(event) => {
       if (event.key === 'Escape') { event.preventDefault(); aoFechar(); return }
       if (event.key !== 'Tab') return
-      const alvos = Array.from(ref.current!.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], [tabindex="0"]'))
+      const alvos = Array.from(ref.current!.querySelectorAll<HTMLElement>('button, a[href], input, select, textarea, [tabindex]'))
+        .filter((alvo) => alvo.tabIndex >= 0 && !alvo.matches(':disabled, [hidden], input[type="hidden"]'))
       const primeiro = alvos[0], ultimo = alvos.at(-1)
       if (event.shiftKey && document.activeElement === primeiro) { event.preventDefault(); ultimo?.focus() }
       else if (!event.shiftKey && document.activeElement === ultimo) { event.preventDefault(); primeiro?.focus() }

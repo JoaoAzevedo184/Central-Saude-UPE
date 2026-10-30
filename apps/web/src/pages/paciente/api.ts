@@ -1,4 +1,4 @@
-import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query'
+import { infiniteQueryOptions, queryOptions, type QueryClient } from '@tanstack/react-query'
 import type { components, operations } from '../../shared/api/generated/schema'
 import { http } from '../../shared/api/http'
 
@@ -8,6 +8,26 @@ export type Situacao = NonNullable<operations['listar_api_v1_solicitacoes_get'][
 export const limitePedidos = 5
 const base = ['pedidos-paciente'] as const
 export const pedidosKey = base
+export const detalhePedidoOptions = (id: string) => queryOptions({
+  queryKey: ['pedido-paciente', id],
+  queryFn: ({ signal }) => http.request<DetalhePedido>(`/solicitacoes/${encodeURIComponent(id)}`, { signal }),
+})
+
+// Leituras anteriores não podem sobrescrever a transição nem preencher uma sessão nova.
+export async function incorporarPedido(client: QueryClient, atualizado: DetalhePedido, signal: AbortSignal, epoca: number) {
+  const detalhe = detalhePedidoOptions(atualizado.id)
+  await Promise.all([client.cancelQueries({ queryKey: pedidosKey }), client.cancelQueries({ queryKey: detalhe.queryKey })])
+  if (signal.aborted || epoca !== http.geracaoSessao()) return
+  client.setQueryData(detalhe.queryKey, atualizado)
+  client.setQueryData<Pedido[]>(propostasOptions.queryKey, (antigos) => antigos?.filter((item) => item.id !== atualizado.id))
+  client.setQueriesData<{ total: number; itens: Pedido[] }>({ queryKey: pedidosKey,
+    predicate: (query) => query.queryKey[1] !== 'propostas' }, (antiga) => antiga ? {
+      ...antiga, itens: antiga.itens.map((item) => item.id === atualizado.id ? atualizado : item),
+    } : antiga)
+  void client.invalidateQueries({ queryKey: pedidosKey })
+  void client.invalidateQueries({ queryKey: detalhe.queryKey })
+  void client.invalidateQueries({ queryKey: ['avisos', 'contagem'] })
+}
 export function listarPedidos(situacao: Situacao, limit: number, offset: number, signal: AbortSignal) {
   return http.request<components['schemas']['PaginaSolicitacoes']>(`/solicitacoes?situacao=${situacao}&limit=${limit}&offset=${offset}`, { signal })
 }

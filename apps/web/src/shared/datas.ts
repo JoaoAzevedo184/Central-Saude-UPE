@@ -3,6 +3,7 @@ const data = new Intl.DateTimeFormat('pt-BR', { timeZone: fuso, day: '2-digit', 
 const diaMes = new Intl.DateTimeFormat('pt-BR', { timeZone: fuso, day: '2-digit', month: '2-digit' })
 const hora = new Intl.DateTimeFormat('pt-BR', { timeZone: fuso, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
 const semana = new Intl.DateTimeFormat('pt-BR', { timeZone: fuso, weekday: 'long' })
+const extensa = new Intl.DateTimeFormat('pt-BR', { timeZone: fuso, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
 // data_pedido é uma data civil, sem horário: não interpretar como meia-noite UTC.
 export function formatarDataPedido(valor: string) {
@@ -18,6 +19,7 @@ export function formatarPrazo(valor: string) {
   return `${diaMes.format(instante)} às ${hora.format(instante)}`
 }
 export function formatarDataCompleta(valor: string) { return data.format(new Date(valor)) }
+export function formatarConsulta(valor: string) { const instante = new Date(valor); return `${extensa.format(instante)}, às ${hora.format(instante)}` }
 export function avisoPrazo(expiraEm: string, agora: number): string | undefined {
   const restante = new Date(expiraEm).getTime() - agora
   if (restante <= 0) return 'O prazo para responder terminou.'

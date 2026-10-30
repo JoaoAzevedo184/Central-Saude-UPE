@@ -25,7 +25,7 @@ FRASE_NEUTRA = "Há uma atualização no seu atendimento."
 
 # tipo -> (título no site, corpo no site, frase do e-mail ou None se não vai por e-mail).
 # Campos: {inicio} e {prazo} em "DD/MM às HH:MM"; {dia} em "DD/MM"; {local} = unidade e
-# profissional; {efeito} = o que aconteceu com o pedido na fila.
+# profissional; {efeito} = o que acontece com o pedido (igual em todos os casos: não revela a fila).
 TEXTOS: dict[str, tuple[str, str, str | None]] = {
     "SOLICITACAO_CRIADA": (
         "Recebemos seu pedido",
@@ -87,6 +87,5 @@ TEXTOS: dict[str, tuple[str, str, str | None]] = {
     ),
 }
 
-EFEITO_FIM_DA_FILA = "Seu pedido voltou para o fim da fila."
-EFEITO_CONTINUA_NA_FILA = "Seu pedido continua na fila e você receberá outra data."
+EFEITO_AGUARDANDO_NOVA_VAGA = "Seu pedido continua aguardando uma nova vaga."
 SEM_DATA = "a combinar"

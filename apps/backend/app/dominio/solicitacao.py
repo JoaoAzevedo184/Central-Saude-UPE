@@ -34,15 +34,15 @@ class EventoHistorico:
 MOTIVOS_REENTRADA = {
     "PROPOSTA_EXPIRADA": (
         "EM_PROPOSTA",
-        "Você não confirmou a vaga no prazo. Sua solicitação voltou para a fila.",
+        "Você não confirmou a vaga no prazo. Seu pedido continua aguardando uma nova vaga.",
     ),
     "FALTOU": (
         "AGENDADA",
-        "Você não compareceu à consulta. Sua solicitação voltou para a fila.",
+        "Você não compareceu à consulta. Seu pedido continua aguardando uma nova vaga.",
     ),
     "RECUSOU_MAIS_DE_UMA_DATA": (
         "EM_PROPOSTA",
-        "Você recusou outras datas. Sua solicitação voltou para a fila.",
+        "Você recusou outras datas. Seu pedido continua aguardando uma nova vaga.",
     ),
 }
 

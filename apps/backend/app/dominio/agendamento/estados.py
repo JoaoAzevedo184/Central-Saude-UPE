@@ -24,7 +24,7 @@ def _exigir_proposta_no_prazo(agendamento: Agendamento, agora: datetime) -> None
     # UC-004: o prazo é conferido aqui, sem depender de o Worker já ter expirado a proposta.
     if agora >= agendamento.expira_em:
         raise PropostaExpirada(
-            "O prazo para responder acabou. Sua solicitação volta para o fim da fila."
+            "O prazo para confirmar terminou. Seu pedido continua aguardando uma nova vaga."
         )
 
 

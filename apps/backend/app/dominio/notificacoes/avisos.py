@@ -7,8 +7,7 @@ from zoneinfo import ZoneInfo
 from app.dominio.notificacoes.textos import (
     ASSUNTO_EMAIL,
     CORPO_EMAIL,
-    EFEITO_CONTINUA_NA_FILA,
-    EFEITO_FIM_DA_FILA,
+    EFEITO_AGUARDANDO_NOVA_VAGA,
     SEM_DATA,
     TEXTOS,
 )
@@ -50,7 +49,6 @@ class Contexto:
     expira_em: datetime | None = None  # prazo da proposta
     unidade: str | None = None
     profissional: str | None = None
-    fim_da_fila: bool = False
 
 
 @dataclass(frozen=True)
@@ -76,7 +74,7 @@ def montar_avisos(
         "inicio": quando(contexto.inicio, "%d/%m às %H:%M"),
         "prazo": quando(contexto.expira_em, "%d/%m às %H:%M"),
         "dia": quando(contexto.inicio, "%d/%m"),
-        "efeito": EFEITO_FIM_DA_FILA if contexto.fim_da_fila else EFEITO_CONTINUA_NA_FILA,
+        "efeito": EFEITO_AGUARDANDO_NOVA_VAGA,
         "local": "".join(
             f", {rotulo} {valor}"
             for rotulo, valor in (("na unidade", contexto.unidade), ("com", contexto.profissional))

@@ -1,6 +1,6 @@
 # Frontend
 
-Implementada em `apps/web`, conforme a autorização de 2026-10-21 para a base do [ADR-001](../decisions/ADR-001-stack.md). Inclui Entrar/Criar conta e, na entrega de 2026-10-24, o layout do paciente e Meus atendimentos com resposta à proposta de vaga. A tela de novo pedido foi implementada em 2026-10-25; detalhe e avisos continuam pendentes.
+Implementada em `apps/web`, conforme a autorização de 2026-10-21 para a base do [ADR-001](../decisions/ADR-001-stack.md). Inclui Entrar/Criar conta e, na entrega de 2026-10-24, o layout do paciente e Meus atendimentos com resposta à proposta de vaga. A tela de novo pedido foi implementada em 2026-10-25; o detalhe foi implementado em 2026-10-29; avisos continuam pendentes.
 
 ## Organização e dependências
 
@@ -55,7 +55,7 @@ A rota `/` consulta a sessão usando a guarda existente: sem sessão, encaminha 
 | `/trocar-senha` | Todos os papéis autenticados com troca obrigatória | Formulário próprio e Sair; sem bloqueio, retorna ao início do papel |
 | `/paciente` | PACIENTE | Meus atendimentos, propostas em destaque, abas e paginação |
 | `/paciente/novo` | PACIENTE | Novo pedido em três etapas: Atendimento, Informações e Revisar |
-| `/paciente/solicitacoes/:id` | PACIENTE | Provisória: apenas o título Detalhes do pedido |
+| `/paciente/solicitacoes/:id` | PACIENTE | Status, proposta/consulta, linha do tempo, respostas e cancelamento com motivo |
 | `/paciente/avisos` | PACIENTE | Provisória: apenas o título Avisos |
 | `/equipe` | ATENDENTE, GESTOR, ADMIN | Layout vazio |
 | Outros caminhos | Público | Mensagem de página inexistente |
@@ -123,3 +123,21 @@ Vitest passou com 330 testes em 12 arquivos, incluindo B1/B2, erro de refetch, r
 O E2E real de GESTOR usou comando administrativo oficial, login com troca obrigatória, POST 204 com CSRF, `/me` 200 sem bloqueio e destino `/equipe`. Sem mocks/interceptações, sem registro de senhas e sem escrita em storage. Axe passou com contraste ativo e teclado percorreu os três campos, submit e Sair em 360×640, 360×800 e 1440×1024, sem overflow horizontal. O navegador registrou apenas o recurso `/favicon.ico` ausente. Evidências sem credenciais: `/tmp/trocar-senha-evidencias/relatorio.json` e capturas com campos vazios.
 
 **E2E PACIENTE: PENDENTE.** Os dois pacientes de apresentação não existem no banco consultado e não há credencial temporária de paciente disponível. Nenhum seed ou alteração manual do banco foi feito para forçar o cenário. 422 de senha atual, 429 e CSRF foram exercitados apenas em testes automatizados. O warning MSW de `/filas` em testes de Meus atendimentos continua como tarefa separada, sem alteração nesta feature.
+
+## Detalhe do pedido (UC-002/004/005, RN-005/007) — 29/10/2026
+
+`DetalhePedido` consulta o contrato `SolicitacaoDetalhe` em `GET /solicitacoes/{id}`, com chave própria por ID, sinal de cancelamento e guarda PACIENTE existente. Trocar o ID remonta o conteúdo e aborta operações da página anterior. Falha de leitura oferece nova tentativa; 404 usa a mesma mensagem para recurso inexistente ou de outro paciente. B1/B2 permanecem no cliente e na guarda existentes.
+
+O topo usa o mesmo `SeloStatus` da lista. As situações EM_ANALISE/NA_FILA têm orientações simples sem informação de prioridade. EM_PROPOSTA reutiliza `PropostaVaga`, `useProposta`, `DialogoProposta` e `MensagensProposta`, também usados em Meus atendimentos. AGENDADA mostra início por extenso em America/Recife, unidade, endereço, profissional e lembretes. Endereço nulo orienta confirmar com a unidade. ATENDIDA/CANCELADA têm resumo sem ações; o contrato não traz agendamentos históricos.
+
+A página transforma os eventos em uma lista de data/texto antes de passá-los a `shared/ui/LinhaDoTempo`. O mapeamento exclui CLASSIFICADA e RECLASSIFICADA, ignora `motivo` e não renderiza campos extras. A ordenação é estável por data; o backend já calcula o dia em Recife e fornece a ordem entre eventos do mesmo dia. Não se converte YYYY-MM-DD em instante UTC. As respostas são somente as de origem PACIENTE fornecidas pelo contrato, com true/false e números preservados, omitindo valores vazios.
+
+`CancelarPedido` envia `CancelamentoEntrada` por `POST /solicitacoes/{id}/cancelar`, com um dos cinco códigos do enum, CSRF e sem texto livre. A disponibilidade segue EM_ANALISE, NA_FILA, EM_PROPOSTA ou AGENDADA e, com agendamento ativo, início futuro. Um timer atualiza a disponibilidade no início; mudanças simultâneas continuam sendo decididas pelo backend. O diálogo explica o encerramento antes do envio, inicia no select e usa o componente compartilhado com contenção de foco expandida para controles de formulário. Esc e restauração são preservados.
+
+`incorporarPedido` cancela leituras antigas de detalhe/listas, confere abort e época da sessão, incorpora a resposta e invalida detalhe, listas, propostas e contador. Conflitos recarregam detalhe/listas com mensagem neutra; proposta expirada mantém a mensagem existente da lista. Não há retry automático por transporte/409/422 nem mudanças na coordenação de autenticação. Os testes existentes de Meus atendimentos não foram editados e continuaram passando após a extração. A documentação de execução e evidências fica no README web.
+
+Falha de refetch com dados conhecidos preserva conteúdo e diálogos, com alerta e nova tentativa; 404 oculta o detalhe. Se o status/início retirar a possibilidade de cancelamento fora de um envio, o diálogo fecha com explicação. A trava de envio é liberada na desmontagem e na conclusão, inclusive após mudança de época, sem aplicar resultado/cache da sessão antiga. Após falha de transporte com Esc, o recarregamento que confirma encerramento remove o alerta inconclusivo. Esses casos têm testes de regressão.
+
+O relógio do detalhe sincroniza `inicio` e `expira_em` em layout effect, antes da pintura. Até sincronizar novos limites, impede ações baseadas no instante da leitura anterior. Os timers reconferem o relógio e se reagendam se dispararem antes do limite. O `useProposta` recebe referência atual somente no detalhe: fora de um POST em andamento, descarta o diálogo antigo quando status, ID do agendamento, início ou prazo mudam, ou o prazo termina. A lista mantém a assinatura sem referência e os testes existentes intactos. A cobertura de sessão inclui o fluxo central de Sair, novo login e resposta tardia do cancelamento, com conferência da tela e de todo o cache da nova sessão. O erro 404 do POST possui teste próprio, separado do GET 404 durante envio.
+
+O bloqueio provisório durante a sincronização não é tratado como perda definitiva da possibilidade de cancelar: preserva o diálogo aberto, o motivo selecionado e o acionador para restaurar o foco. Se o novo horário continuar futuro, o diálogo permanece aberto; horário ultrapassado ou estado encerrado continuam fechando com mensagem neutra.

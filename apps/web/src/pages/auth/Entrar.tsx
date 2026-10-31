@@ -44,7 +44,9 @@ export function Entrar() {
       const home = rotaInicial(papel)
       const origem = rotaAposLogin(location.state)
       // Origem de outra área (ex.: paciente com /equipe) cai na home do papel, sem "Acesso não permitido".
-      const daMinhaArea = origem === home || origem.startsWith(`${home}/`)
+      const area = papel === 'PACIENTE' ? '/paciente' : '/equipe'
+      const pathname = new URL(origem, 'http://app.local').pathname
+      const daMinhaArea = pathname === area || pathname.startsWith(`${area}/`)
       await navigate(daMinhaArea ? origem : home, { replace: true })
     } catch (error) {
       if (aplicarErrosDeValidacao(error, setError, ['identificador', 'senha'])) return

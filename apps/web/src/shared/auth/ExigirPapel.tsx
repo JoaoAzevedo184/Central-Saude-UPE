@@ -1,7 +1,7 @@
 import { Navigate, Outlet, useLocation } from 'react-router'
 import { useSessao } from './session'
 import type { Papel } from './session'
-import { estadoParaEntrar } from './retorno'
+import { estadoParaEntrar, rotaInicial } from './retorno'
 import { http } from '../api/http'
 import { exigeTrocaDeSenha, rotaTrocarSenha } from './troca-de-senha'
 
@@ -14,6 +14,6 @@ export function ExigirPapel({ papeis, permitirTrocaDeSenha = false }: { papeis: 
   if (sessao.isPending) return <p role="status">Verificando sessão…</p>
   if (sessao.isError && !sessao.data) return <p role="alert">Não foi possível verificar a sessão.</p>
   if (!sessao.data) return <Navigate to="/entrar" replace state={estadoParaEntrar(location)} />
-  if (!papeis.includes(sessao.data.papel)) return <p role="alert">Acesso não permitido.</p>
+  if (!papeis.includes(sessao.data.papel)) return <Navigate to={rotaInicial(sessao.data.papel)} replace />
   return <Outlet context={sessao.data} />
 }

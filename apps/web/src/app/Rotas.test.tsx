@@ -34,7 +34,7 @@ function Localizacao() {
 
 function responderPapel(papel: string, trocarSenha?: components['schemas']['EuSaida']['trocar_senha']) {
   vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockImplementation(async (url) => new Response(
-    JSON.stringify(String(url).includes('/solicitacoes') ? { total: 0, itens: [] } : String(url).endsWith('/avisos/contagem') ? { nao_lidos: 0 } : { id: '00000000-0000-4000-8000-000000000001', papel, nome: null, filas: [], ...(trocarSenha === undefined ? {} : { trocar_senha: trocarSenha }) }),
+    JSON.stringify(String(url).includes('/solicitacoes') || String(url).includes('/equipe/filas') ? { total: 0, itens: [] } : String(url).endsWith('/avisos/contagem') ? { nao_lidos: 0 } : { id: '00000000-0000-4000-8000-000000000001', papel, nome: null, filas: [], ...(trocarSenha === undefined ? {} : { trocar_senha: trocarSenha }) }),
     { status: 200, headers: { 'Content-Type': 'application/json' } },
   )))
 }
@@ -98,9 +98,9 @@ describe('ADR-003/ADR-025/ADR-028 — rotas e proteção por papel', () => {
   it.each([
     [null, undefined, '/entrar', 'Entrar'],
     ['PACIENTE', undefined, '/paciente', 'Meus atendimentos'],
-    ['ATENDENTE', undefined, '/equipe', null],
-    ['GESTOR', undefined, '/equipe', null],
-    ['ADMIN', undefined, '/equipe', null],
+    ['ATENDENTE', undefined, '/equipe/fila', 'Fila'],
+    ['GESTOR', undefined, '/equipe/fila', 'Fila'],
+    ['ADMIN', undefined, '/equipe/fila', 'Fila'],
     ['PACIENTE', true, '/trocar-senha', 'Troca de senha obrigatória'],
     ['GESTOR', true, '/trocar-senha', 'Troca de senha obrigatória'],
   ] as const)('redireciona / com papel %s e trocar_senha %s para %s substituindo o histórico', async (papel, trocarSenha, destino, titulo) => {
@@ -126,17 +126,17 @@ describe('ADR-003/ADR-025/ADR-028 — rotas e proteção por papel', () => {
     abrir(path)
     const layout = await screen.findByRole('main', { name: label })
     if (papel === 'PACIENTE') expect(within(layout).getByRole('heading', { name: 'Meus atendimentos' })).toBeTruthy()
-    else expect(layout.childElementCount).toBe(0)
+    else expect(await within(layout).findByRole('heading', { name: 'Fila' })).toBeTruthy()
   })
 
   it.each([
     ['PACIENTE', '/equipe'], ['ATENDENTE', '/paciente'],
     ['GESTOR', '/paciente'], ['ADMIN', '/paciente'],
-  ])('nega %s em %s', async (papel, path) => {
+  ])('redireciona %s em %s para sua área', async (papel, path) => {
     responderPapel(papel)
     abrir(path)
-    expect((await screen.findByRole('alert')).textContent).toBe('Acesso não permitido.')
-    expect(screen.queryByRole('main')).toBeNull()
+    await screen.findByRole('heading', { name: papel === 'PACIENTE' ? 'Meus atendimentos' : 'Fila' })
+    expect(JSON.parse(screen.getByTestId('localizacao').textContent!).pathname).toBe(papel === 'PACIENTE' ? '/paciente' : '/equipe/fila')
   })
 
   it('falha fechada para papel desconhecido recebido do servidor', async () => {
@@ -243,8 +243,8 @@ describe('ADR-003/ADR-025/ADR-028 — rotas e proteção por papel', () => {
     await screen.findByRole('main', { name: 'Área do paciente' })
     responderPapel('ATENDENTE')
     await client.invalidateQueries({ queryKey: sessaoOptions.queryKey })
-    await waitFor(() => expect(screen.queryByRole('main')).toBeNull())
-    expect((await screen.findByRole('alert')).textContent).toBe('Acesso não permitido.')
+    await screen.findByRole('heading', { name: 'Fila' })
+    expect(screen.queryByRole('main', { name: 'Área do paciente' })).toBeNull()
   })
 
   it('não abre layouts para rotas não cadastradas', () => {

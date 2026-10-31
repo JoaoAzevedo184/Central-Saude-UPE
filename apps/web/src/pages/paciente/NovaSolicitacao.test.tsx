@@ -30,6 +30,7 @@ const sessao = { id: uuid(40), papel: 'PACIENTE', nome: null, filas: null }
 let pedidos = false
 let payloads: NovoPedido[] = []
 const servidor = setupServer(
+  msw.get('*/api/v1/equipe/filas', () => HttpResponse.json({ total: 0, itens: [] })),
   msw.get('*/api/v1/me', () => HttpResponse.json(sessao)),
   msw.get('*/api/v1/avisos/contagem', () => HttpResponse.json({ nao_lidos: 0 })),
   msw.get('*/api/v1/filas', () => HttpResponse.json({ total: 3, itens: [filaA, filaB, inelegivel] })),
@@ -71,10 +72,10 @@ async function revisar(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('UC-002 — atendimento e contrato', () => {
-  it.each(['ATENDENTE', 'GESTOR', 'ADMIN'])('rota nega papel %s sem consultar filas', async (papel) => {
+  it.each(['ATENDENTE', 'GESTOR', 'ADMIN'])('rota redireciona papel %s sem consultar filas do paciente', async (papel) => {
     const lista = vi.fn(() => HttpResponse.json({ total: 0, itens: [] }))
     servidor.use(msw.get('*/api/v1/me', () => HttpResponse.json({ ...sessao, papel })), msw.get('*/api/v1/filas', lista))
-    abrir(); await screen.findByText('Acesso não permitido.'); expect(lista).not.toHaveBeenCalled()
+    abrir(); await screen.findByRole('heading', { name: 'Fila' }); expect(lista).not.toHaveBeenCalled()
   })
   it('rota anônima guarda origem e não abre formulário', async () => {
     servidor.use(msw.get('*/api/v1/me', () => problema(401, '/problemas/nao-autenticado')), msw.post('*/api/v1/auth/refresh', () => problema(401, '/problemas/nao-autenticado')))
@@ -381,7 +382,7 @@ describe('UC-002 — sessão, acessibilidade e privacidade', () => {
     const { user, client } = abrir(); await revisar(user)
     servidor.use(msw.get('*/api/v1/me', () => tipo === 'revogada' ? problema(401, '/problemas/nao-autenticado') : HttpResponse.json({ ...sessao, ...(tipo === 'papel' ? { papel: 'GESTOR' } : { trocar_senha: true }) })), msw.post('*/api/v1/auth/refresh', () => problema(401, '/problemas/nao-autenticado')))
     await act(async () => { await client.invalidateQueries({ queryKey: sessaoOptions.queryKey }) })
-    await screen.findByText(tipo === 'revogada' ? 'Entrar' : tipo === 'papel' ? 'Acesso não permitido.' : 'Troca de senha obrigatória', { selector: tipo === 'papel' ? 'p' : 'h1' })
+    await screen.findByRole('heading', { name: tipo === 'revogada' ? 'Entrar' : tipo === 'papel' ? 'Fila' : 'Troca de senha obrigatória' })
     expect(screen.queryByRole('heading', { name: 'Revisar' })).toBeNull()
   })
   it('403 troca obrigatória no POST redireciona sem refresh', async () => {

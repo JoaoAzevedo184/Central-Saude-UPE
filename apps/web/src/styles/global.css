@@ -1,4 +1,5 @@
 @import './tokens.css';
+@import './equipe.css';
 
 :root {
   font-family: var(--font-body);

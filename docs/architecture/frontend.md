@@ -7,11 +7,12 @@ Implementada em `apps/web`, conforme a autorização de 2026-10-21 para a base d
 React e TypeScript com Vite; React Router no modo declarativo; TanStack Query para consultas em memória; React Hook Form e Zod para os formulários de login/cadastro. O transporte usa `fetch` nativo. ESLint, TypeScript e Vitest verificam o frontend; Testing Library, user-event, MSW e vitest-axe cobrem as telas com dados sintéticos. `openapi-typescript` gera os tipos do contrato real do FastAPI.
 
 - `src/app`: rotas e criação do QueryClient.
-- `src/layouts`: cabeçalho, navegação responsiva, contador de avisos e saída da área do paciente; layout da equipe ainda vazio. Ambos usam `Outlet` para rotas filhas.
+- `src/layouts`: cabeçalho, navegação responsiva, contador de avisos e saída da área do paciente; menu lateral da equipe com papel e saída. Ambos usam `Outlet` para rotas filhas.
 - `src/shared/api`: HTTP, CSRF, Problem Details e tipos gerados.
 - `src/shared/auth`: consulta da sessão e guarda por papel.
 - `src/pages/auth`: Entrar, CriarConta, etapas, termo, layout público e validação.
 - `src/pages/paciente`: consultas tipadas, MeusAtendimentos, CartaoPedido, PropostaVaga e o wizard NovaSolicitacao.
+- `src/pages/equipe`: Fila, consultas do escopo, filtros na URL, tabela/cartões e destino provisório do detalhe.
 - `src/shared/ui`: campos, botão, alerta, indicador de etapas, cartão, selo de status, diálogo, abas, paginação e estado vazio.
 - `src/shared/mascaras.ts`: funções pequenas de formatação, sem biblioteca de máscaras.
 - `src/shared/datas.ts`: datas civis do pedido e horários em `America/Recife`, incluindo prazo e aviso de menos de 24 horas.
@@ -39,7 +40,7 @@ Cada operação coordenada tem limite de **15 segundos**, centralizado em `limit
 
 ## Sessão e rotas
 
-A rota `/` consulta a sessão usando a guarda existente: sem sessão, encaminha para `/entrar`; com sessão, usa a mesma função `rotaInicial` do login (`/paciente` para PACIENTE, `/equipe` para ATENDENTE/GESTOR/ADMIN). A troca obrigatória de senha tem prioridade e encaminha para `/trocar-senha`. Esses redirecionamentos substituem a entrada no histórico (`replace`), para que voltar não retorne à raiz.
+A rota `/` consulta a sessão usando a guarda existente: sem sessão, encaminha para `/entrar`; com sessão, usa a mesma função `rotaInicial` do login (`/paciente` para PACIENTE, `/equipe/fila` para ATENDENTE/GESTOR/ADMIN). A troca obrigatória de senha tem prioridade e encaminha para `/trocar-senha`. Esses redirecionamentos substituem a entrada no histórico (`replace`), para que voltar não retorne à raiz.
 
 `GET /me` fornece a sessão; o papel é validado contra `PACIENTE`, `ATENDENTE`, `GESTOR` e `ADMIN`. Papel desconhecido ou erro de consulta sem sessão conhecida fecha o acesso; erro de refetch com sessão válida em cache preserva a árvore. A consulta não persiste em storage, não usa retries automáticos e é revalidada nas montagens e eventos de foco/reconexão tratados pelo TanStack Query. A guarda mostra espera na consulta inicial; `isFetching` com sessão conhecida mantém a árvore protegida montada, preservando diálogo, foco e escrita em andamento. O resultado concluído de `/me` pode revogar o acesso, mudar o papel ou encaminhar deliberadamente para troca de senha.
 
@@ -57,10 +58,12 @@ A rota `/` consulta a sessão usando a guarda existente: sem sessão, encaminha 
 | `/paciente/novo` | PACIENTE | Novo pedido em três etapas: Atendimento, Informações e Revisar |
 | `/paciente/solicitacoes/:id` | PACIENTE | Status, proposta/consulta, linha do tempo, respostas e cancelamento com motivo |
 | `/paciente/avisos` | PACIENTE | Lista de avisos, Ver pedido e Marcar todos como lidos |
-| `/equipe` | ATENDENTE, GESTOR, ADMIN | Layout vazio |
+| `/equipe` | ATENDENTE, GESTOR, ADMIN | Redireciona para `/equipe/fila` |
+| `/equipe/fila` | ATENDENTE, GESTOR, ADMIN | Filas do escopo, pedidos, ordenação, filtro e paginação |
+| `/equipe/solicitacoes/:id` | ATENDENTE, GESTOR, ADMIN | Apenas título e Voltar para a fila, preservando filtros |
 | Outros caminhos | Público | Mensagem de página inexistente |
 
-Sem sessão, a guarda redireciona para `/entrar` e guarda a origem no mesmo formato usado por `GerenciarSessao`. Login usa a origem interna validada ou o destino do papel informado na resposta, validado também em runtime; registro vai para `/paciente`. Após sucesso, o cache anterior é limpo e a guarda consulta `/me`. Falha de `/me` não oferece reenvio do registro já concluído. Papel diferente exibe acesso negado. A guarda apenas controla a navegação: dono, papel, escopo e suspensão continuam sendo conferidos pelo servidor conforme a [matriz de permissões](../security/access-control.md). Não há regras de negócio ou cálculo de fila no frontend.
+Sem sessão, a guarda redireciona para `/entrar` e guarda a origem no mesmo formato usado por `GerenciarSessao`. Login usa a origem interna validada ou o destino do papel informado na resposta, validado também em runtime; registro vai para `/paciente`. Após sucesso, o cache anterior é limpo e a guarda consulta `/me`. Falha de `/me` não oferece reenvio do registro já concluído. Ao entrar na área de outro papel, a guarda redireciona para o início do papel autenticado, respeitando primeiro a troca obrigatória de senha. A guarda apenas controla a navegação: dono, papel, escopo e suspensão continuam sendo conferidos pelo servidor conforme a [matriz de permissões](../security/access-control.md). Não há regras de negócio ou cálculo de fila no frontend.
 
 O hook compartilhado `useSair`, usado pelo layout do paciente e pela troca obrigatória, chama `POST /auth/logout` pelo cliente HTTP com CSRF e captura a época de origem. Tanto no sucesso quanto na falha, cancela consultas pendentes, limpa o cache e navega para `/entrar`, desde que a época ainda seja a mesma; a limpeza confere novamente a época após aguardar cancelamentos, e o chamador confere a época de encerramento antes de navegar. Uma saída atrasada nunca limpa nem redireciona a sessão nova, inclusive quando ela exige troca de senha. Um bloqueio associado ao QueryClient, somente em memória, impede que voltar à rota reabra a sessão nesta instância após a saída; login ou cadastro bem-sucedido libera uma nova sessão. O cliente não lê nem apaga cookies `httpOnly` diretamente.
 
@@ -110,7 +113,7 @@ Os testes de UC-002 cobrem contrato, paginação, corridas, respostas opcionais,
 
 ## Troca de senha obrigatória — 26/10/2026
 
-`TrocarSenha` usa o contexto de sessão da guarda, evitando outra assinatura de `/me`. `ExigirPapel` permite o bloqueio somente nesta rota e mantém o Outlet durante falha de revalidação quando existe sessão conhecida. Sem sessão, encaminha à entrada; com sessão sem flag nem trava, retorna a `/paciente` para PACIENTE ou `/equipe` para ATENDENTE/GESTOR/ADMIN. A área da equipe continua vazia. O evento global não navega novamente quando já está em `/trocar-senha`.
+`TrocarSenha` usa o contexto de sessão da guarda, evitando outra assinatura de `/me`. `ExigirPapel` permite o bloqueio somente nesta rota e mantém o Outlet durante falha de revalidação quando existe sessão conhecida. Sem sessão, encaminha à entrada; com sessão sem flag nem trava, retorna a `/paciente` para PACIENTE ou `/equipe/fila` para ATENDENTE/GESTOR/ADMIN. O evento global não navega novamente quando já está em `/trocar-senha`.
 
 O layout contém identificação do sistema, formulário e Sair. Não monta menus, contador ou consultas de negócio. Os campos usam `password` e autocomplete current-password/new-password/new-password. React Hook Form mantém os valores apenas em memória; não há mutation com credenciais no cache. A confirmação é local; o POST recebe somente `senha_atual` e `senha_nova`. Validação local conta code points, sem trim: atual obrigatória até 256; nova com 10–256 e diferente da atual; confirmação igual. O contrato atualizado da main declara `minLength: 10` para a nova senha, mantendo mínimo 1 para a atual. Os tipos gerados foram conferidos contra o OpenAPI exportado do backend atualizado, sem edição manual de contrato ou tipos.
 
@@ -153,3 +156,17 @@ Título e corpo vêm diretamente da API, escapados pelo React, sem HTML executá
 Avisos sem `solicitacao_id` não têm link ou ação individual. Só “Marcar todos como lidos” os marca, via `POST /avisos/lidos`, incluindo avisos fora das páginas carregadas. Não há marcação automática na abertura da tela nem atualização otimista. Após sucesso, cancela leituras anteriores e invalida lista e contador, mantendo as páginas carregadas. A visibilidade do botão depende exclusivamente de `nao_lidos > 0` na consulta compartilhada `['avisos', 'contagem']`, também usada pelo menu. Durante o POST, fica desabilitado com `aria-busy`. No sucesso, a mensagem `role="status"` com `tabIndex={-1}` recebe o foco.
 
 Escritas usam uma trava compartilhada na página, AbortController e época da sessão. Desmontar aborta a tentativa e remove o temporizador; respostas de outra sessão não invalidam cache nem navegam. Erro em “Marcar todos” exibe mensagem local e permite nova tentativa pelo mesmo acionador; erro na marcação individual apenas segue para o pedido. A política atual de refresh em 401 permanece: renovação compartilhada, uma repetição e releitura do CSRF. Não há retry automático de falha de rede. Os dados ficam só em memória, sem storage ou logs de payloads.
+
+## Layout da equipe e Fila (RF-031/032)
+
+`EquipeLayout` atende ATENDENTE, GESTOR e ADMIN. No desktop, o menu lateral contém a marca, Fila e, no rodapé, apenas o papel em linguagem simples e Sair. A estrutura admite itens por papel; Indicadores não aparece enquanto a tela não existir. Abaixo de 900 px, a navegação vira barra superior com Menu, `aria-expanded`, fechamento com Esc e retorno de foco ao acionador. Navegar pelo menu fecha a lista e foca o conteúdo principal. Há link Pular para o conteúdo e indicação acessível da página atual. A identificação pessoal não é exibida, pois `/me` retorna nome nulo para equipe.
+
+`/equipe/fila` consulta `GET /equipe/filas?limit=100&offset=…` até completar o escopo. As filas ativas aparecem antes das inativas, identificadas com “(inativa)”; dentro de cada grupo, preserva-se a ordem recebida. Uma fila vira texto, várias usam seletor e nenhuma orienta procurar o gestor. O filtro de status usa `contagem_por_status` da fila escolhida; Todos soma as contagens. Atualizar e voltar à aba revalidam tanto filas/contadores quanto pedidos, sem polling. A hora exibida corresponde à última busca de pedidos bem-sucedida.
+
+O painel usa `GET /equipe/filas/{id}/solicitacoes`, com `ordenacao=prioridade|chegada`, filtro opcional `status`, `limit=20` e `offset`. A ordem e as posições vêm da API. A coluna de posição aparece preenchida somente em NA_FILA; os demais estados mostram traço com “sem posição” acessível. Ordem de chegada inclui a explicação de que a posição segue a prioridade da fila. A pontuação não é renderizada.
+
+A tabela tem caption e cabeçalhos com scope. Nome abreviado e CPF mascarado são apresentados literalmente como recebidos. O risco tem três níveis com texto e cor: Alto/vermelho, Médio/amarelo e Baixo/verde; ausência de classificação usa texto neutro. Entrada na fila usa `data_entrada_fila` em Recife, ou “Ainda não entrou na fila”. Última mudança mostra somente Entrou na fila, Voltou à fila ou Reclassificado com dia/mês em Recife; evento ausente ou desconhecido vira traço. Os status da equipe são Em análise, Aguardando vaga, Aguardando confirmação, Agendado, Atendimento realizado e Cancelado.
+
+Em telas estreitas, a tabela é substituída por cartões com os mesmos campos e links, sem rolagem horizontal da página. Fila, ordem, status e página são lidos da query string; trocar um filtro reinicia a página, e Voltar restaura o estado. Apenas UUIDs e filtros conhecidos são copiados para links. Uma página invalidada pela redução do total é corrigida antes de exibir a lista. Carregamento, vazio, falha com nova tentativa e acesso indisponível têm mensagens próprias; página, quantidade e filtro são anunciados por role=status.
+
+O link do nome abre `/equipe/solicitacoes/:id`, que contém somente Detalhe do pedido e Voltar para a fila com a query preservada, sem consultar o detalhe. As leituras ficam apenas no cache em memória do React Query e usam o sinal de cancelamento e o HTTP compartilhado. Sair reutiliza o fluxo de logout, limpeza e proteção por época de autenticação.

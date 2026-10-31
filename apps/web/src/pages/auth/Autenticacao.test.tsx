@@ -16,6 +16,7 @@ const sessao = { id: '00000000-0000-4000-8000-000000000001', papel: 'PACIENTE', 
 const sucesso = { papel: 'PACIENTE', expira_em: '2026-10-21T12:00:00-03:00' } satisfies components['schemas']['LoginSaida']
 const termo = { versao: 'teste-v7', texto: '# Termo sintético\n\nTexto completo do termo de teste.\n\nSua escolha sobre lembretes é opcional.' }
 const servidor = setupServer(
+  mockHttp.get('*/api/v1/equipe/filas', () => HttpResponse.json({ total: 0, itens: [] })),
   mockHttp.get('*/api/v1/solicitacoes', () => HttpResponse.json({ total: 0, itens: [] })),
   mockHttp.get('*/api/v1/avisos/contagem', () => HttpResponse.json({ nao_lidos: 0 })),
   mockHttp.get('*/api/v1/me', () => HttpResponse.json(sessao)),
@@ -110,7 +111,7 @@ describe('ADR-003 — entrar', () => {
     mudar('CPF ou e-mail', 'equipe@exemplo.test'); mudar('Senha', 'Sintetica!123')
     await user.click(screen.getByRole('button', { name: 'Entrar' }))
     await screen.findByRole('main', { name: 'Área da equipe' })
-    expect(localizacao().pathname).toBe('/equipe')
+    expect(localizacao().pathname).toBe('/equipe/fila')
   })
   it.each(['2026@exemplo.test', '1234.5@exemplo.test', '123456789012345@exemplo.test'])('preserva e-mail com início numérico durante a digitação: %s', async (email) => {
     let recebido: unknown
@@ -129,6 +130,15 @@ describe('ADR-003 — entrar', () => {
     await user.click(screen.getByRole('button', { name: 'Entrar' }))
     await screen.findByRole('main', { name: 'Área do paciente' })
     expect(localizacao().pathname).toBe('/paciente')
+  })
+  it('retorna ao detalhe da equipe após login, mesmo com a home em /equipe/fila', async () => {
+    servidor.use(mockHttp.post('*/api/v1/auth/login', () => HttpResponse.json({ ...sucesso, papel: 'GESTOR' })),
+      mockHttp.get('*/api/v1/me', () => HttpResponse.json({ ...sessao, papel: 'GESTOR', nome: null, filas: [] })))
+    const { user } = abrir('/entrar', { origem: '/equipe/solicitacoes/00000000-0000-4000-8000-000000000010' })
+    mudar('CPF ou e-mail', 'gestor.sintetico@exemplo.test'); mudar('Senha', 'Sintetica!123')
+    await user.click(screen.getByRole('button', { name: 'Entrar' }))
+    await screen.findByRole('heading', { name: 'Detalhe do pedido' })
+    expect(localizacao().pathname).toBe('/equipe/solicitacoes/00000000-0000-4000-8000-000000000010')
   })
   it('origem de outra área cai na home do papel, sem "Acesso não permitido"', async () => {
     const { user } = abrir('/entrar', { origem: '/equipe' })

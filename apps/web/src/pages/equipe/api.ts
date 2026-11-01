@@ -1,10 +1,28 @@
-import { queryOptions } from '@tanstack/react-query'
+import { queryOptions, type QueryClient } from '@tanstack/react-query'
 import type { components } from '../../shared/api/generated/schema'
 import { http } from '../../shared/api/http'
 import type { EstadoFila } from './estado-fila'
 
 export type FilaEquipe = components['schemas']['FilaEquipeSaida']
 export type PedidoEquipe = components['schemas']['ItemPainel']
+export type DetalheEquipe = components['schemas']['SolicitacaoEquipeSaida']
+export const detalheEquipeOptions = (id: string) => queryOptions({
+  queryKey: ['pedido-equipe', id],
+  queryFn: ({ signal }) => buscarDetalheEquipe(id, signal),
+  refetchOnWindowFocus: 'always',
+})
+export function buscarDetalheEquipe(id: string, signal: AbortSignal) {
+  return http.request<DetalheEquipe>(`/equipe/solicitacoes/${encodeURIComponent(id)}`, { signal })
+}
+export async function incorporarDetalheEquipe(client: QueryClient, pedido: DetalheEquipe, signal: AbortSignal, epoca: number) {
+  await client.cancelQueries({ queryKey: detalheEquipeOptions(pedido.id).queryKey })
+  if (signal.aborted || epoca !== http.geracaoSessao()) return
+  client.setQueryData(detalheEquipeOptions(pedido.id).queryKey, pedido)
+}
+export function invalidarFilaEquipe(client: QueryClient) {
+  void client.invalidateQueries({ queryKey: ['fila-equipe'] })
+  void client.invalidateQueries({ queryKey: ['filas-equipe'] })
+}
 export const limitePedidosEquipe = 20
 export const filasEquipeOptions = queryOptions({
   queryKey: ['filas-equipe'],

@@ -9,7 +9,7 @@ import { NovaSolicitacao } from '../pages/paciente/NovaSolicitacao'
 import { DetalhePedido } from '../pages/paciente/DetalhePedido'
 import { Avisos } from '../pages/paciente/Avisos'
 import { Fila } from '../pages/equipe/Fila'
-import { DetalheProvisorio } from '../pages/equipe/DetalheProvisorio'
+import { DetalhePedidoEquipe } from '../pages/equipe/DetalhePedidoEquipe'
 import { CriarConta } from '../pages/auth/CriarConta'
 import { TrocarSenha } from '../pages/auth/TrocarSenha'
 import { rotaTrocarSenha } from '../shared/auth/troca-de-senha'
@@ -46,7 +46,7 @@ export function Rotas() {
           <Route path="/equipe" element={<EquipeLayout />}>
             <Route index element={<Navigate to="/equipe/fila" replace />} />
             <Route path="fila" element={<Fila />} />
-            <Route path="solicitacoes/:id" element={<DetalheProvisorio />} />
+            <Route path="solicitacoes/:id" element={<DetalhePedidoEquipe />} />
           </Route>
         </Route>
         <Route path="*" element={<main><p role="alert">Página não encontrada.</p></main>} />

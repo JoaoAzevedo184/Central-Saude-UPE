@@ -189,4 +189,15 @@ São vinte pedidos por página, com posição somente em NA_FILA, risco com text
 
 Fila, ordenação, status e página ficam na URL, permitindo restaurar o estado com Voltar. Só identificadores e filtros conhecidos entram nos links. Atualizar e voltar à aba revalidam pedidos e contagens, sem polling; a hora da última busca aparece junto do botão. Há estados de carregamento, erro com nova tentativa, acesso indisponível e vazio do filtro, além do anúncio acessível da quantidade e página.
 
-O nome abre `/equipe/solicitacoes/:id`, destino provisório com apenas o título e “‹ Voltar para a fila”, preservando os filtros. Detalhe e classificação ficam para a próxima tela. As leituras e o logout usam o cliente HTTP e a proteção de sessão existentes, sem dados pessoais em storage, console ou URL. O contrato e o fluxo estão descritos na [arquitetura da equipe](../../docs/architecture/frontend.md#layout-da-equipe-e-fila-rf-031032).
+O nome abre `/equipe/solicitacoes/:id`, com “‹ Voltar para a fila” preservando os filtros e Fila destacada no menu. Os padrões de fila, ordem, status e página são gravados na URL com replace, para Voltar não passar por uma entrada vazia. O contrato e o fluxo estão descritos na [arquitetura da equipe](../../docs/architecture/frontend.md#layout-da-equipe-e-fila-rf-031032).
+
+
+## Detalhe e classificação da equipe
+
+O detalhe mostra nome e CPF como recebidos da API, fila e unidade quando disponíveis, data do pedido, status e risco. Respostas do paciente ficam separadas dos critérios já respondidos pela equipe, que são somente leitura. Valores vazios aparecem como “Não respondida”; false e zero como “Não” e “0”. O histórico inclui todos os eventos, com motivo quando houver e data e hora em Recife. Não são exibidos nota, pontos, autor, posição ou agendamento ativo.
+
+Atendente pode classificar em Em análise e reclassificar em Aguardando vaga. Gestor e administrador só leem. O formulário tem três riscos com cor e texto e motivo obrigatório de 3 a 500 caracteres após trim. Antes da confirmação, a tela busca o pedido novamente: se status ou risco mudaram, avisa, atualiza os dados e preserva o motivo. O diálogo explica a entrada na fila ou a mudança do risco. O servidor ainda decide a operação, pois a API não oferece controle de versão.
+
+Sucesso anuncia o risco e atualiza o detalhe e a Fila. Conflito de estado recarrega sem perder o motivo. Validação localizada associa erro e foco ao campo; erros sem localização ficam no alerta global. Escritas usam CSRF, não repetem falhas automaticamente e bloqueiam clique duplo. Dados e motivo ficam somente em memória, com proteção contra respostas de sessões antigas. O formulário fica ao lado das respostas no desktop e abaixo delas no celular.
+
+“Critérios da regulação”, com consulta de perguntas e edição das respostas da equipe, fica para depois do MVP. Também ficam pendentes no contrato posição e agendamento ativo no detalhe, perguntas não respondidas, critérios por nível de risco e controle de versão. A tela não inventa esses dados.

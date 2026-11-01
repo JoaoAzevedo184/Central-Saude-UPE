@@ -84,7 +84,7 @@ As datas são propostas; o grupo ajusta.
 
 - [x] **Layout da equipe:** menu lateral (Fila; Indicadores só para gestor, se existir), nome e papel, Sair.
 - [x] **Fila:** escolha da fila do escopo, tabela com posição, risco (3 cores, sempre com texto), nome abreviado, CPF mascarado, chegada, status e tipo/data da última mudança; ordenação por prioridade ou chegada; filtro por status. Rotas: `GET /equipe/filas`, `GET /equipe/filas/{id}/solicitacoes`.
-- [ ] **Detalhe e classificação:** respostas, histórico completo (com motivo), critérios da regulação, **classificar** (risco + motivo). Rotas: `GET /equipe/solicitacoes/{id}`, `GET /equipe/filas/{id}/criterios`, `PUT /equipe/solicitacoes/{id}/respostas`, `POST /equipe/solicitacoes/{id}/classificar`.
+- [x] **Detalhe e classificação:** respostas em leitura, histórico completo (com motivo), **classificar/reclassificar** (risco + motivo), com checagem antes da confirmação (critérios da regulação e respostas da equipe ficam para depois). Rotas: `GET /equipe/solicitacoes/{id}`, `POST /equipe/solicitacoes/{id}/classificar`.
 - [ ] **VM, fases 2 e 3** (Docker e aplicação).
 
 ### Semana 3 — 13/11 a 19/11: demo de verdade

@@ -37,6 +37,10 @@ const servidor = setupServer(
     const inicio = Number(url.searchParams.get('offset'))
     return HttpResponse.json({ total: itens.length, itens: itens.slice(inicio, inicio + 20) })
   }),
+  msw.get('*/api/v1/equipe/solicitacoes/:id', ({ params }) => HttpResponse.json({
+    ...item(), id: params.id, fila_id: uuid(1), data_pedido: '2026-10-31', turno_preferido: 'QUALQUER',
+    origem_encaminhamento: null, respostas: [], historico: [],
+  })),
   msw.get('*/api/v1/solicitacoes', () => HttpResponse.json({ total: 0, itens: [] })),
   msw.get('*/api/v1/avisos/contagem', () => HttpResponse.json({ nao_lidos: 0 })),
   msw.post('*/api/v1/auth/logout', ({ request }) => {
@@ -56,9 +60,9 @@ function Navegacao() {
   return <><output data-testid="url">{location.pathname}{location.search}</output>
     <button onClick={() => void navigate(-1)}>História anterior</button></>
 }
-function abrir(path = '/equipe/fila') {
+function abrir(path = '/equipe/fila', entradas = [path]) {
   const client = criarQueryClient()
-  const view = render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[path]}><Rotas /><Navegacao /></MemoryRouter></QueryClientProvider>)
+  const view = render(<QueryClientProvider client={client}><MemoryRouter initialEntries={entradas}><Rotas /><Navegacao /></MemoryRouter></QueryClientProvider>)
   return { ...view, client, user: userEvent.setup() }
 }
 const tabela = () => screen.findByRole('table', { name: /Pedidos da fila/ })
@@ -133,7 +137,7 @@ describe('RF-031/032 — layout e painel da equipe', () => {
     expect(await screen.findByText('Você ainda não tem filas liberadas. Fale com o gestor da unidade.')).toBeTruthy()
     expect(consultas).toHaveLength(0)
   })
-  it('detalhe provisório e Voltar preservam somente identificadores e filtros', async () => {
+  it('detalhe e Voltar preservam somente identificadores e filtros', async () => {
     const { user } = abrir(`/equipe/fila?fila=${uuid(1)}&ordem=chegada&status=NA_FILA&pagina=1`)
     const table = await tabela(); const link = within(table).getByRole('link', { name: itens[0]!.paciente_nome })
     expect(link.getAttribute('href')).toContain(`/equipe/solicitacoes/${itens[0]!.id}`)
@@ -241,10 +245,17 @@ describe('RF-031/032 — layout e painel da equipe', () => {
     const remover = vi.spyOn(Storage.prototype, 'removeItem'); const limpar = vi.spyOn(Storage.prototype, 'clear')
     const { user } = abrir('/equipe/fila?fila=invalida&ordem=invalida&status=toString&pagina=-1&nome=nao-copiar')
     await tabela()
-    await waitFor(() => expect(screen.getByTestId('url').textContent).toBe(`/equipe/fila?fila=${uuid(1)}&ordem=prioridade&pagina=1`))
+    await waitFor(() => expect(screen.getByTestId('url').textContent).toBe(`/equipe/fila?fila=${uuid(1)}&ordem=prioridade&status=todos&pagina=1`))
     await user.selectOptions(screen.getByRole('combobox', { name: 'Status' }), 'EM_ANALISE')
     expect(storage).not.toHaveBeenCalled(); expect(remover).not.toHaveBeenCalled(); expect(limpar).not.toHaveBeenCalled()
     expect(consultas.at(-1)?.searchParams.get('limit')).toBe('20')
+  })
+  it('URL inicial grava todos os padrões com replace: Voltar alcança a página anterior sem passo vazio', async () => {
+    const { user } = abrir('/equipe/fila', ['/entrar', '/equipe/fila']); await tabela()
+    await waitFor(() => expect(screen.getByTestId('url').textContent).toBe(`/equipe/fila?fila=${uuid(1)}&ordem=prioridade&status=todos&pagina=1`))
+    await user.click(screen.getByRole('button', { name: 'História anterior' }))
+    await screen.findByRole('heading', { name: 'Entrar' })
+    expect(screen.getByTestId('url').textContent).toBe('/entrar')
   })
   it.each(['ATENDENTE', 'GESTOR', 'ADMIN'] as const)('/ manda %s para Fila', async (valor) => {
     papel = valor; abrir('/'); await tabela()

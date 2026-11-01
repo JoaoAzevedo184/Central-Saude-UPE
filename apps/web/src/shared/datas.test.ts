@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { avisoPrazo, formatarDataHora, formatarDataPedido, formatarPrazo } from './datas'
+import { avisoPrazo, formatarDataHora, formatarDataPedido, formatarDiaMes, formatarPrazo } from './datas'
 
 describe('UC-004 — datas em America/Recife', () => {
   it('converte UTC para Recife inclusive na virada do dia e do ano', () => {
@@ -9,6 +9,11 @@ describe('UC-004 — datas em America/Recife', () => {
   })
   it('preserva a data civil do pedido, sem voltar ao dia anterior', () => {
     expect(formatarDataPedido('2026-10-24')).toBe('24/10/2026')
+  })
+  it('RF-032: dia e mês usam Recife inclusive na virada de mês e ano', () => {
+    expect(formatarDiaMes('2026-11-01T02:59:00Z')).toBe('31/10')
+    expect(formatarDiaMes('2026-11-01T03:00:00Z')).toBe('01/11')
+    expect(formatarDiaMes('2027-01-01T01:30:00Z')).toBe('31/12')
   })
   it('distingue 24h, menos de 24h, singular, minutos e prazo encerrado', () => {
     const agora = Date.parse('2026-10-24T11:00:00Z')

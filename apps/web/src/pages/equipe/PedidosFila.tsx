@@ -1,6 +1,6 @@
 import { Link } from 'react-router'
 import { Cartao } from '../../shared/ui/Cartao'
-import { formatarDataCompleta } from '../../shared/datas'
+import { formatarDataCompleta, formatarDiaMes } from '../../shared/datas'
 import type { PedidoEquipe } from './api'
 import { textosStatusEquipe } from './estado-fila'
 
@@ -20,7 +20,7 @@ function Entrada({ valor }: { valor: PedidoEquipe['data_entrada_fila'] }) {
 const mudancas: Record<string, string> = { ENTROU_NA_FILA: 'Entrou na fila', REENTROU_NA_FILA: 'Voltou à fila', RECLASSIFICADA: 'Reclassificado' }
 function UltimaMudanca({ valor }: { valor: PedidoEquipe['ultima_mudanca'] }) {
   const texto = valor && Object.hasOwn(mudancas, valor.tipo) ? mudancas[valor.tipo] : undefined
-  return valor && texto ? <>{texto} · <time dateTime={valor.ocorrido_em}>{formatarDataCompleta(valor.ocorrido_em).slice(0, 5)}</time></> : '—'
+  return valor && texto ? <>{texto} · <time dateTime={valor.ocorrido_em}>{formatarDiaMes(valor.ocorrido_em)}</time></> : '—'
 }
 export function PedidosFila({ itens, query }: { itens: PedidoEquipe[]; query: string }) {
   const destino = (pedido: PedidoEquipe) => `/equipe/solicitacoes/${encodeURIComponent(pedido.id)}?${query}`

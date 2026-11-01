@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type MouseEvent } from 'react'
-import { Link, NavLink, Outlet, useLocation, useOutletContext } from 'react-router'
+import { Link, Outlet, useLocation, useOutletContext } from 'react-router'
 import type { Papel, Sessao } from '../shared/auth/session'
 import { useSair } from '../shared/auth/useSair'
 import { Botao } from '../shared/ui/Botao'
@@ -37,7 +37,7 @@ export function EquipeLayout() {
       </div>
       <div id="menu-equipe" className={`conteudo-menu-equipe${aberto ? ' aberto' : ''}`}>
         <nav aria-label="Área da equipe">{itensMenu.filter((item) => item.papeis.includes(sessao.papel)).map((item) =>
-          <NavLink key={item.rota} to={`${item.rota}?${query}`} onClick={navegar}>{item.texto}</NavLink>)}
+          <Link key={item.rota} to={`${item.rota}?${query}`} aria-current={location.pathname === item.rota || (item.rota === '/equipe/fila' && location.pathname.startsWith('/equipe/solicitacoes/')) ? 'page' : undefined} onClick={navegar}>{item.texto}</Link>)}
         </nav>
         <div className="identificacao-equipe"><p>{papeis[sessao.papel]}</p><Botao variante="secundario" carregando={saindo} onClick={() => void sair()}>Sair</Botao></div>
       </div>

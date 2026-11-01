@@ -35,6 +35,7 @@
 .tabela-fila th:last-child { width: 17%; }
 .tabela-fila tbody tr:hover { background: #f5f8f8; }
 .tabela-fila a, .cartoes-fila h2 a { display: inline-flex; align-items: center; min-height: 44px; font-weight: 650; }
+.tabela-fila a { align-items: flex-start; }
 .cpf-equipe { font-variant-numeric: tabular-nums; }
 .risco-equipe { display: inline-block; padding: 4px 8px; border-radius: 5px; font-size: .8125rem; font-weight: 700; }
 .risco-alto { color: #8c2525; background: #fce8e8; }
@@ -43,12 +44,50 @@
 .risco-neutro { color: #4f6168; background: #edf1f2; }
 .cartoes-fila { display: none; }
 .voltar-fila { display: inline-flex; align-items: center; min-height: 44px; margin-bottom: 16px; }
+.detalhe-equipe > h1 { font-size: 1.25rem; color: var(--color-text-muted); margin-bottom: 20px; }
+.topo-detalhe-equipe { display: flex; justify-content: space-between; gap: 24px; padding-bottom: 24px; margin-bottom: 24px; border-bottom: 1px solid var(--color-divider); }
+.topo-detalhe-equipe h2 { font-size: 1.75rem; margin: 0 0 8px; }
+.topo-detalhe-equipe p { margin: 4px 0; }
+.data-detalhe-equipe { color: var(--color-text-muted); font-size: .875rem; }
+.situacao-detalhe-equipe { display: flex; flex-direction: column; align-items: flex-end; gap: 12px; }
+.status-detalhe-equipe { font-weight: 650; }
+.conteudo-detalhe-equipe { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(300px, 1fr); gap: 24px; align-items: start; }
+.blocos-respostas-equipe { display: grid; gap: 24px; }
+.bloco-detalhe-equipe { min-width: 0; padding: 24px; background: white; border: 1px solid var(--color-divider); border-radius: 10px; overflow-wrap: anywhere; }
+.bloco-detalhe-equipe h2 { font-size: 1.125rem; margin: 0 0 20px; }
+.bloco-detalhe-equipe p { max-width: 75ch; }
+.respostas-equipe { margin: 0; }
+.respostas-equipe > div + div { margin-top: 20px; }
+.respostas-equipe dt { font-weight: 650; margin-bottom: 4px; }
+.respostas-equipe dd { margin: 0; white-space: pre-wrap; }
+.preferencias-equipe { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--color-divider); }
+.opcoes-risco-equipe { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; border: 0; margin: 24px 0; }
+.opcoes-risco-equipe legend { font-weight: 650; margin-bottom: 10px; }
+.opcao-risco-equipe { display: flex; gap: 8px; align-items: center; min-height: 48px; padding: 10px 12px; border: 1px solid currentColor; border-radius: 6px; font-weight: 650; cursor: pointer; }
+.opcao-risco-equipe input { margin: 0; width: 18px; height: 18px; accent-color: var(--color-brand); }
+.area-classificacao-equipe textarea { display: block; width: 100%; padding: 12px; font: inherit; font-size: 1rem; color: var(--color-text); border: 1px solid var(--color-control-border); border-radius: var(--radius-control); resize: vertical; min-height: 120px; }
+.area-classificacao-equipe textarea:disabled { opacity: .7; }
+.area-classificacao-equipe textarea[aria-invalid='true'] { border: 2px solid var(--color-error); }
+.historico-equipe { margin-top: 24px; }
+.eventos-equipe { list-style: none; padding: 0; margin: 0; }
+.eventos-equipe li { position: relative; padding: 0 0 24px 24px; border-left: 2px solid var(--color-divider); margin-left: 5px; }
+.eventos-equipe li:last-child { padding-bottom: 0; }
+.eventos-equipe li::before { content: ''; position: absolute; left: -6px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--color-brand); }
+.eventos-equipe .evento-titulo { font-weight: 650; margin: 0 0 4px; }
+.eventos-equipe time { font-size: .875rem; color: var(--color-text-muted); }
+.eventos-equipe .evento-motivo { margin: 8px 0 0; white-space: pre-wrap; }
 @media (max-width: 1100px) and (min-width: 900px) {
+  .conteudo-detalhe-equipe { grid-template-columns: minmax(0, 1fr) minmax(280px, 1fr); gap: 16px; }
+  .bloco-detalhe-equipe { padding: 20px; }
   .equipe-principal { padding-inline: 16px; }
   .controles-fila { padding: 16px; gap: 12px; font-size: .875rem; }
   .tabela-fila th, .tabela-fila td { padding: 12px 6px; }
 }
 @media (max-width: 899px) {
+  .conteudo-detalhe-equipe { grid-template-columns: minmax(0, 1fr); }
+  .topo-detalhe-equipe { flex-direction: column; gap: 16px; }
+  .situacao-detalhe-equipe { align-items: flex-start; }
+  .bloco-detalhe-equipe { padding: 20px 16px; }
   .area-equipe { display: flex; flex-direction: column; }
   .lateral-equipe { border-right: 0; border-bottom: 1px solid var(--color-divider); padding: 12px 16px; position: static; height: auto; align-self: stretch; }
   .marca-equipe { display: flex; align-items: center; justify-content: space-between; gap: 12px; }

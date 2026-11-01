@@ -27,7 +27,7 @@ export function paramsFila(estado: EstadoFila) {
   const params = new URLSearchParams()
   if (estado.fila) params.set('fila', estado.fila)
   params.set('ordem', estado.ordem)
-  if (estado.status !== 'todos') params.set('status', estado.status)
+  params.set('status', estado.status)
   params.set('pagina', String(estado.pagina))
   return params
 }

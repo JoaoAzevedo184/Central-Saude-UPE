@@ -1,11 +1,13 @@
 import { useEffect, useId, useRef } from 'react'
-import type { ReactNode } from 'react'
+import type { ReactNode, RefObject } from 'react'
 
-export function Dialogo({ titulo, children, aoFechar }: { titulo: string; children: ReactNode; aoFechar: () => void }) {
+export function Dialogo({ titulo, children, aoFechar, retornarFoco }: {
+  titulo: string; children: ReactNode; aoFechar: () => void; retornarFoco?: RefObject<HTMLElement | null>
+}) {
   const ref = useRef<HTMLDialogElement>(null)
   const id = useId()
   useEffect(() => {
-    const anterior = document.activeElement
+    const anterior = retornarFoco?.current ?? document.activeElement
     const dialogo = ref.current!
     dialogo.showModal()
     dialogo.querySelector<HTMLElement>('[data-foco-inicial]')?.focus()
@@ -13,7 +15,7 @@ export function Dialogo({ titulo, children, aoFechar }: { titulo: string; childr
       dialogo.close()
       if (anterior instanceof HTMLElement && anterior.isConnected) anterior.focus()
     }
-  }, [])
+  }, [retornarFoco])
   return <dialog ref={ref} className="dialogo" aria-labelledby={id} onCancel={(event) => { event.preventDefault(); aoFechar() }}
     onKeyDown={(event) => {
       if (event.key === 'Escape') { event.preventDefault(); aoFechar(); return }

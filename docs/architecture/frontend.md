@@ -12,7 +12,7 @@ React e TypeScript com Vite; React Router no modo declarativo; TanStack Query pa
 - `src/shared/auth`: consulta da sessão e guarda por papel.
 - `src/pages/auth`: Entrar, CriarConta, etapas, termo, layout público e validação.
 - `src/pages/paciente`: consultas tipadas, MeusAtendimentos, CartaoPedido, PropostaVaga e o wizard NovaSolicitacao.
-- `src/pages/equipe`: Fila, consultas do escopo, filtros na URL, tabela/cartões e destino provisório do detalhe.
+- `src/pages/equipe`: Fila, consultas do escopo, filtros na URL, tabela/cartões, detalhe e classificação de risco.
 - `src/shared/ui`: campos, botão, alerta, indicador de etapas, cartão, selo de status, diálogo, abas, paginação e estado vazio.
 - `src/shared/mascaras.ts`: funções pequenas de formatação, sem biblioteca de máscaras.
 - `src/shared/datas.ts`: datas civis do pedido e horários em `America/Recife`, incluindo prazo e aviso de menos de 24 horas.
@@ -60,7 +60,7 @@ A rota `/` consulta a sessão usando a guarda existente: sem sessão, encaminha 
 | `/paciente/avisos` | PACIENTE | Lista de avisos, Ver pedido e Marcar todos como lidos |
 | `/equipe` | ATENDENTE, GESTOR, ADMIN | Redireciona para `/equipe/fila` |
 | `/equipe/fila` | ATENDENTE, GESTOR, ADMIN | Filas do escopo, pedidos, ordenação, filtro e paginação |
-| `/equipe/solicitacoes/:id` | ATENDENTE, GESTOR, ADMIN | Apenas título e Voltar para a fila, preservando filtros |
+| `/equipe/solicitacoes/:id` | ATENDENTE, GESTOR, ADMIN | Detalhe, respostas e histórico; atendente classifica/reclassifica em EM_ANALISE e NA_FILA |
 | Outros caminhos | Público | Mensagem de página inexistente |
 
 Sem sessão, a guarda redireciona para `/entrar` e guarda a origem no mesmo formato usado por `GerenciarSessao`. Login usa a origem interna validada ou o destino do papel informado na resposta, validado também em runtime; registro vai para `/paciente`. Após sucesso, o cache anterior é limpo e a guarda consulta `/me`. Falha de `/me` não oferece reenvio do registro já concluído. Ao entrar na área de outro papel, a guarda redireciona para o início do papel autenticado, respeitando primeiro a troca obrigatória de senha. A guarda apenas controla a navegação: dono, papel, escopo e suspensão continuam sendo conferidos pelo servidor conforme a [matriz de permissões](../security/access-control.md). Não há regras de negócio ou cálculo de fila no frontend.
@@ -167,6 +167,21 @@ O painel usa `GET /equipe/filas/{id}/solicitacoes`, com `ordenacao=prioridade|ch
 
 A tabela tem caption e cabeçalhos com scope. Nome abreviado e CPF mascarado são apresentados literalmente como recebidos. O risco tem três níveis com texto e cor: Alto/vermelho, Médio/amarelo e Baixo/verde; ausência de classificação usa texto neutro. Entrada na fila usa `data_entrada_fila` em Recife, ou “Ainda não entrou na fila”. Última mudança mostra somente Entrou na fila, Voltou à fila ou Reclassificado com dia/mês em Recife; evento ausente ou desconhecido vira traço. Os status da equipe são Em análise, Aguardando vaga, Aguardando confirmação, Agendado, Atendimento realizado e Cancelado.
 
-Em telas estreitas, a tabela é substituída por cartões com os mesmos campos e links, sem rolagem horizontal da página. Fila, ordem, status e página são lidos da query string; trocar um filtro reinicia a página, e Voltar restaura o estado. Apenas UUIDs e filtros conhecidos são copiados para links. Uma página invalidada pela redução do total é corrigida antes de exibir a lista. Carregamento, vazio, falha com nova tentativa e acesso indisponível têm mensagens próprias; página, quantidade e filtro são anunciados por role=status.
+Em telas estreitas, a tabela é substituída por cartões com os mesmos campos e links, sem rolagem horizontal da página. Fila, ordem, status e página são lidos da query string; os padrões são gravados com replace, incluindo status=todos. Trocar um filtro reinicia a página, e Voltar restaura o estado sem um passo inicial vazio. Apenas UUIDs e filtros conhecidos são copiados para links. Uma página invalidada pela redução do total é corrigida antes de exibir a lista. Carregamento, vazio, falha com nova tentativa e acesso indisponível têm mensagens próprias; página, quantidade e filtro são anunciados por role=status.
 
-O link do nome abre `/equipe/solicitacoes/:id`, que contém somente Detalhe do pedido e Voltar para a fila com a query preservada, sem consultar o detalhe. As leituras ficam apenas no cache em memória do React Query e usam o sinal de cancelamento e o HTTP compartilhado. Sair reutiliza o fluxo de logout, limpeza e proteção por época de autenticação.
+O link do nome abre `/equipe/solicitacoes/:id`, com Voltar para a fila preservando os filtros. Fila permanece destacada no menu também nesse detalhe. As leituras ficam apenas no cache em memória do React Query e usam o sinal de cancelamento e o HTTP compartilhado. Sair reutiliza o fluxo de logout, limpeza e proteção por época de autenticação.
+
+
+## Detalhe e classificação da equipe (UC-007)
+
+`GET /equipe/solicitacoes/{id}` fornece nome completo, CPF mascarado, status, risco, data civil do pedido, encaminhamento, turno, respostas e histórico. Nome e CPF são exibidos como recebidos. A consulta existente de filas fornece nome e sigla da unidade; se a fila não estiver disponível nessa consulta, o topo mostra apenas “Fila”, sem impedir o detalhe. A tela não exibe nota, pontos, autor do histórico, posição ou agendamento ativo.
+
+As respostas de origem PACIENTE aparecem em “Respostas do paciente”, com encaminhamento e turno. As de REGULACAO/EQUIPE aparecem em “Critérios respondidos pela equipe”, somente leitura, quando existem. Cada bloco preserva a ordem recebida. Valores vazios aparecem como “Não respondida”; false e zero aparecem como “Não” e “0”. Perguntas ausentes da API não são inventadas. O histórico inclui todos os eventos, do mais recente ao mais antigo, com data e hora em Recife e motivo quando informado. RECLASSIFICADA usa “Prioridade atualizada”; tipos desconhecidos usam “Atualização do pedido”.
+
+Somente ATENDENTE vê o formulário, em EM_ANALISE ou NA_FILA. Na fila, o título passa a “Reclassificar risco” e o risco atual vem marcado. O motivo é obrigatório na interface nas duas operações, com 3 a 500 caracteres após trim e contador. Os três níveis usam cor e texto. Antes do diálogo, uma leitura nova compara status e risco com os dados apresentados: mudança incorpora os dados, avisa e preserva o motivo. Essa checagem reduz conflitos, mas não é uma garantia atômica: o contrato não possui versão e permite reclassificação em NA_FILA.
+
+A confirmação explica a entrada na fila e a possibilidade de proposta automática, ou a mudança entre riscos. O POST envia apenas classificacao_risco e motivo, pelo HTTP compartilhado com CSRF. Uma trava impede duplo envio. Sucesso anuncia a classificação, atualiza/revalida o detalhe e invalida somente as consultas de pedidos e contagens da Fila. O 409 de transição inválida recarrega o detalhe sem apagar o motivo. Erros 422 localizados são associados aos campos e recebem foco depois de fechar o diálogo; erros sem localização reconhecida ficam globais. Falhas de transporte não repetem a escrita e orientam conferir o pedido antes de tentar novamente.
+
+O formulário permanece somente na memória da página. Cancelamento e época da sessão impedem efeitos de respostas tardias após desmontar, sair ou entrar novamente. Revalidação de sessão mantém formulário e diálogo quando o acesso continua válido. O diálogo compartilhado contém o foco, fecha com Esc e o devolve ao acionador. No desktop, respostas e formulário ficam lado a lado; em telas estreitas, os blocos são empilhados.
+
+Após o MVP ficam “Critérios da regulação”, com GET dos critérios e PUT das respostas da equipe, e as melhorias de contrato: posição e agendamento ativo no detalhe, perguntas ainda não respondidas, critérios associados aos níveis de risco e controle de versão para concorrência. Não há edição de respostas nesta tela.

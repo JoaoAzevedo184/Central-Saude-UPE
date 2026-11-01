@@ -34,7 +34,10 @@ Scripts de backup e de carga de dados sintéticos ficam em `scripts/`.
 Máquinas envolvidas: **PC (Linux)** de quem implanta e **Servidor (VM Oracle, Linux)**.
 
 1. **PC (Linux):** conectar por SSH no Servidor.
-2. **Servidor (VM Oracle, Linux):** clonar o repositório e criar o `.env` a partir do `.env.example`, com segredos novos.
+2. **Servidor (VM Oracle, Linux):** clonar o repositório e criar o `.env` a partir do `.env.example`, com segredos novos:
+   - senha do Postgres (`POSTGRES_PASSWORD`), gerada nova;
+   - `JWT_SECRET_KEY` e `LOGIN_HASH_KEY`: cada um com `openssl rand -hex 32` (64 caracteres), com valores diferentes entre si;
+   - a API recusa subir em produção com chave curta (menos de 32 caracteres), com prefixo `troque-` ou com as duas chaves iguais.
 3. **Servidor (VM Oracle, Linux):** subir os containers em modo de produção.
 4. **Servidor (VM Oracle, Linux):** aplicar as migrações do Alembic.
 5. **Servidor (VM Oracle, Linux):** carregar os dados sintéticos (seed), com o roteiro do [README](../../README.md#dados-da-demonstração): parar API e Worker, ligar `DEMO_SEED_PERMITIDO`, rodar o seed com `--confirmo-banco-de-demonstracao`, **desligar a variável** e subir de novo. O limite de requisições dos indicadores (`limit_req`) deve entrar no Nginx da VM *(proposta; ainda não configurado)* ([AM-025](../security/threat-model.md)).

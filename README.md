@@ -80,7 +80,7 @@ Para executar e validar a base web, consulte [apps/web/README.md](apps/web/READM
 Requisitos: Docker com Compose v2.
 
 ```bash
-cp .env.example .env                                    # ajuste a senha e o JWT_SECRET_KEY
+cp .env.example .env                                    # ajuste a senha, o JWT_SECRET_KEY e o LOGIN_HASH_KEY
 docker compose --profile dev up -d --build              # postgres, migrate, api, worker e mailpit
 curl http://127.0.0.1:8000/api/v1/health                # {"status":"ok"}
 docker compose exec api pytest                          # testes

@@ -29,6 +29,7 @@ jobs:
       APP_ENV: test
       DATABASE_URL: postgresql+psycopg://teleagendamento:teleagendamento@localhost:5432/teleagendamento
       JWT_SECRET_KEY: segredo-somente-para-ci
+      LOGIN_HASH_KEY: chave-de-hash-de-login-somente-para-ci
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

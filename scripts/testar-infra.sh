@@ -194,10 +194,14 @@ subir_nginx "$rede_b" "$raiz_nginx/default.conf" "$raiz_nginx/snippets"
 buscar "https://127.0.0.1:$NG_HTTPS/api/v1/health"
 conferir_resposta "upstream recusa a conexão" 503 "$PROBLEMA_NGINX" 10 "$CORPO_503_NGINX"
 
-# 5 r/s com burst 40 em /auth/: sequência rápida numa só conexão estoura o limite.
-codigos=$(curl -ks -o /dev/null -w '%{http_code}\n' "https://127.0.0.1:$https/api/v1/auth/x[1-150]")
-confere "limite de /auth/ devolve 429" "$codigos" "429"
-buscar "https://127.0.0.1:$https/api/v1/auth/y"
+# 5 r/s com burst 40 em /auth/: a rajada estoura o limite. Valida-se o PRÓPRIO 429 da rajada
+# (uma requisição posterior dependeria do tempo: o limite se recupera a 5 por segundo).
+for i in $(seq 1 300); do
+    buscar "https://127.0.0.1:$https/api/v1/auth/x$i"
+    [[ $STATUS == 429 ]] && break
+done
+[[ $STATUS == 429 ]] || falhou "a rajada de 300 requisições em /auth/ não recebeu 429"
+echo "ok: a rajada em /auth/ recebeu 429 (na requisição $i)"
 conferir_resposta "429 do limite do nginx" 429 "$PROBLEMA_NGINX" 30 \
     '{"type":"/problemas/muitas-tentativas","title":"Too Many Requests","status":429,"detail":"Muitas tentativas. Aguarde alguns minutos e tente de novo."}'
 sleep 10

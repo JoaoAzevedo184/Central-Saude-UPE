@@ -28,8 +28,8 @@ Controles de segurança do sistema e onde cada um é detalhado. Documentar esses
 | Dados | Minimização, mascaramento de CPF, consentimento por finalidade, só dados sintéticos | Decidido | [proteção de dados](data-protection.md) |
 | Entrada | Validação com Pydantic; SQL só pelo ORM ou com parâmetros | Decidido | AM-010 |
 | Saída | Schemas de resposta explícitos por papel; nada de devolver o modelo do banco inteiro | Proposto | AM-013, AM-014 |
-| Transporte | HTTPS em tudo; HSTS no Nginx | Proposto | [implantação](../operations/deployment.md) |
-| Cabeçalhos | `Content-Security-Policy`, `X-Content-Type-Options`, `Referrer-Policy` no Nginx | Proposto | AM-003 |
+| Transporte | HTTPS em tudo; HSTS no Nginx | Implementado (`infra/nginx`; validar no destino) | [implantação](../operations/deployment.md) |
+| Cabeçalhos | `Content-Security-Policy`, `X-Content-Type-Options`, `Referrer-Policy` no Nginx | Implementado (`infra/nginx`; validar no destino) | AM-003 |
 | Rede | Só o Nginx exposto; API, Worker e banco na rede interna | Decidido | [ADR-012](../decisions/ADR-012-implantacao.md) |
 | Segredos | Variáveis de ambiente fora do repositório; só `.env.example` versionado | Decidido | AM-009 |
 | Dependências | Alertas do Dependabot e varredura de dependências na CI | Proposto | — |

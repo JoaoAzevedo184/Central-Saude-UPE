@@ -1,6 +1,6 @@
 # API
 
-> **Rascunho.** Sessão e conta (com a troca de senha), solicitações do paciente, resposta à proposta, painel da equipe, agenda do dia, presença, painel de vagas, indicadores do gestor e a administração de contas estão implementados; os demais endpoints são a proposta inicial e vão mudar durante a implementação. A referência definitiva será a documentação OpenAPI gerada pelo FastAPI em `/api/v1/docs`.
+> **Rascunho.** Sessão e conta (com a troca de senha), solicitações do paciente, resposta à proposta, painel da equipe, agenda do dia, presença, painel de vagas, indicadores do gestor e a administração de contas estão implementados; os demais endpoints são a proposta inicial e vão mudar durante a implementação. A referência definitiva será a documentação OpenAPI gerada pelo FastAPI em `/api/v1/docs` (só em desenvolvimento: em `APP_ENV=production` a API não serve `/api/v1/docs` nem `/api/v1/openapi.json`; use o snapshot `docs/architecture/openapi.json`).
 
 ## Convenções (propostas)
 

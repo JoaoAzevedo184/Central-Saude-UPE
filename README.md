@@ -110,8 +110,19 @@ scripts/testar.sh                     # suíte completa
 scripts/testar.sh --rapido tests/test_admin.py -q   # os demais argumentos vão para o pytest
 ```
 
-- Documentação da API: http://127.0.0.1:8000/api/v1/docs
+- Documentação da API: http://127.0.0.1:8000/api/v1/docs (só fora de produção; em produção use o snapshot `docs/architecture/openapi.json`)
 - E-mails enviados em desenvolvimento (mailpit): http://127.0.0.1:8025
+
+### Produção (nginx, HTTPS, deploy e backup)
+
+O passo a passo está em [docs/operations/deployment.md](docs/operations/deployment.md). Resumo dos comandos, no checkout principal do servidor:
+
+```bash
+scripts/certificado.sh emitir     # 1ª vez: certificado Let's Encrypt
+scripts/deploy.sh                 # atualiza código, imagens, frontend, migração e confere o HTTPS
+scripts/backup.sh                 # dump comprimido, 7 dias (teste: --testar-restauracao)
+scripts/testar-infra.sh           # nginx -t, shellcheck e testes do nginx (precisa de Docker; não sobe o compose)
+```
 
 ### Senha de um usuário da equipe pelo terminal
 

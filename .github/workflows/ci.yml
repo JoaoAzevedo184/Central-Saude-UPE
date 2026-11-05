@@ -49,3 +49,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker build apps/backend
+
+  infra:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: scripts/testar-infra.sh

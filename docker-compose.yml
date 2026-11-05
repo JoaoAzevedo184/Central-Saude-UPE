@@ -3,7 +3,9 @@
 # Uso:
 #   docker compose up -d                     # postgres + migrate + api + worker
 #   docker compose --profile dev up -d       # + mailpit (caixa de e-mail falsa em http://localhost:8025)
-#   docker compose --profile proxy up -d     # + nginx (exige infra/nginx/default.conf e o build do frontend)
+#   docker compose --profile proxy up -d     # + nginx (exige o build do frontend e o certificado: docs/operations/deployment.md)
+#   docker compose --profile build run --rm web-build     # gera apps/web/dist (npm ci + build, sem Node no host)
+#   docker compose --profile certbot up -d   # renovação automática do certificado (produção)
 #
 # API e Worker usam a MESMA imagem (apps/backend) com comandos diferentes (ADR-005).
 # O serviço "migrate" aplica as migrações uma vez antes de API e Worker subirem.
@@ -13,6 +15,9 @@ name: central-saude-upe
 x-backend: &backend
   build:
     context: ./apps/backend
+    args:
+      # false em produção: a imagem não leva pytest nem ruff.
+      INSTALL_DEV: ${INSTALL_DEV:-true}
   image: central-saude-upe/backend:local
   env_file: .env
   environment:
@@ -90,18 +95,46 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    # Recarrega a cada 6 h para pegar o certificado renovado pelo serviço certbot.
+    command: ["/bin/sh", "-c", "(while :; do sleep 21600; nginx -s reload; done) & exec nginx -g 'daemon off;'"]
     volumes:
       - ./infra/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./infra/nginx/snippets:/etc/nginx/snippets:ro
       - ./apps/web/dist:/usr/share/nginx/html:ro
       - ./infra/nginx/certs:/etc/nginx/certs:ro
+      - certbot-www:/var/www/certbot:ro
     networks:
       borda:
         # IP fixo: é o único em quem a API confia para o X-Forwarded-For (--forwarded-allow-ips).
         ipv4_address: 172.30.0.10
     restart: unless-stopped
 
+  # Renova o certificado (Let's Encrypt, desafio HTTP-01 pelo webroot do nginx).
+  certbot:
+    image: certbot/certbot
+    profiles: [certbot]
+    entrypoint: ["/bin/sh", "-c", "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 43200 & wait $${!}; done"]
+    volumes:
+      - ./infra/nginx/certs:/etc/letsencrypt
+      - ./infra/certbot:/infra:ro
+      - certbot-www:/var/www/certbot
+    networks: [interna]
+    restart: unless-stopped
+
+  # Build do frontend: escreve em ./apps/web/dist, de onde o nginx serve.
+  web-build:
+    build:
+      context: ./apps/web
+    image: central-saude-upe/web-build:local
+    profiles: [build]
+    command: ["npm", "run", "build"]
+    volumes:
+      - ./apps/web/dist:/app/dist
+    restart: "no"
+
 volumes:
   pgdata:
+  certbot-www:
 
 networks:
   # borda: nginx ↔ api. interna: api, worker, migrate, postgres, mailpit.

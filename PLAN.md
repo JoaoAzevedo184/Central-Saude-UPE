@@ -89,7 +89,7 @@ As datas são propostas; o grupo ajusta.
 
 ### Semana 3 — 13/11 a 19/11: demo de verdade
 
-- [ ] **VM, fases 4 e 5:** nginx com HTTPS e cabeçalhos de segurança, limite de taxa, backup e [`deploy.sh`](http://deploy.sh). Configuração final salva em `deploy/nginx/`.
+- [ ] **VM, fases 4 e 5:** nginx com HTTPS e cabeçalhos de segurança, limite de taxa, backup e [`deploy.sh`](http://deploy.sh). Configuração final salva em `infra/nginx/`.
 - [ ] Chave JWT de produção com 32 bytes ou mais; de preferência, a API recusa subir com chave curta (tarefa pequena de backend).
 - [ ] **Seed de demonstração na VM** (roteiro na seção 6 do README: parar API e Worker, ligar `DEMO_SEED_PERMITIDO`, rodar, desligar, subir).
 - [ ] **Ensaio ponta a ponta** com dois navegadores (seção 7), no celular e no computador.

@@ -21,11 +21,14 @@ settings = get_settings()
 configurar_logging(settings.log_level)
 logger = logging.getLogger(__name__)
 
+# Em produção a documentação interativa e o openapi.json não são servidos. `app.openapi()`
+# continua existindo (o snapshot e `npm run api:generate` o chamam direto, sem HTTP).
+_publica = settings.app_env != "production"
 app = FastAPI(
     title="Central Inteligente de Teleagendamento",
-    docs_url="/api/v1/docs",
+    docs_url="/api/v1/docs" if _publica else None,
     redoc_url=None,
-    openapi_url="/api/v1/openapi.json",
+    openapi_url="/api/v1/openapi.json" if _publica else None,
 )
 
 api_v1 = APIRouter(prefix="/api/v1")

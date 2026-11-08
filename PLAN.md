@@ -135,10 +135,11 @@ As datas são propostas; o grupo ajusta.
 
 ## 7. Roteiro da demonstração (critério de pronto)
 
+0. **Antes de começar:** preparar a fila "Consulta de demonstração" com `python -m app.infra.demonstracao preparar` (roteiro no [README](README.md#fila-de-demonstração-ao-vivo)) e anotar a data da primeira vaga que o resumo informa.
 1. **Paciente (celular):** entra com a conta de apresentação, troca a senha temporária e vê Meus atendimentos.
-2. Faz um **novo pedido**; o pedido aparece como "em análise".
+2. Faz um **novo pedido** na fila "Consulta de demonstração"; o pedido aparece como "em análise".
 3. **Equipe (computador):** atendente entra, troca a senha, abre a **fila**, acha o pedido novo e **classifica** o risco.
-4. O **Worker propõe a vaga** (na demo, dá para mostrar um pedido do seed que já está com proposta).
+4. O **Worker propõe a vaga** na "Consulta de demonstração" em cerca de 1 min. Plano B: mostrar o pedido do seed que já está com proposta (paciente de apresentação Um).
 5. **Paciente:** vê a proposta com o prazo, **confirma**; o aviso aparece no sino.
 6. **Equipe:** o pedido aparece como **agendado** na fila.
 7. (Opcional) **Gestor:** indicadores das 8 semanas do seed.

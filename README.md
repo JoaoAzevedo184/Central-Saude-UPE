@@ -180,6 +180,22 @@ Cuidados:
 - Em production a variável `SEED_SENHA` é ignorada.
 - Se a carga falhar, nada é gravado; a mensagem omite dados para não imprimir CPF nem nome.
 
+### Fila de demonstração ao vivo
+
+Num banco com o histórico de 8 semanas, todas as filas têm gente esperando e nenhuma vaga livre a 24 h ou mais: um pedido novo entra no fim e não recebe proposta. Para mostrar o fluxo inteiro ao vivo, prepare uma fila vazia com vagas:
+
+1. Ligue a trava: `DEMO_SEED_PERMITIDO=true` no `.env`. Não precisa parar a API nem o Worker.
+2. Rode (o comando também exige a flag, em qualquer ambiente):
+   ```bash
+   docker compose run --rm api python -m app.infra.demonstracao preparar --confirmo-banco-de-demonstracao
+   ```
+3. **Desligue a trava**: `DEMO_SEED_PERMITIDO=false` no `.env`.
+4. Leia o resumo: fila, vagas livres e a frase "Uma proposta feita agora oferece vaga a partir de DATA E HORA". É a data que o paciente verá.
+
+O comando cria (ou reativa) a fila **Consulta de demonstração** no CISAM, sem restrição de idade ou sexo e sem critérios, e uma agenda de segunda a sexta, 08:00 a 16:00, de 60 em 60 min, a partir de amanhã. Dá acesso à `atendente.cisam` (o `gestor.cisam` já enxerga pela unidade) e gera as vagas na hora. Rodar de novo não duplica nada. Não toca nas 5 filas do seed. Pelas regras atuais (24 h de antecedência mais 12 h de janela para responder), a proposta só oferece vagas que começam 36 h ou mais depois; o Worker propõe cerca de 1 min depois da classificação.
+
+Depois da apresentação, repita os passos 1 a 3 com `desativar` no lugar de `preparar`: a fila e a agenda saem de uso, e nada é apagado.
+
 ### Contas criadas
 
 Com `--historico`, o seed cria as contas abaixo (as de equipe que já existem de uma carga anterior são mantidas, sem trocar a senha). Sem `--historico`, só as contas básicas de desenvolvimento: `admin@`, `gestor.cisam@`, `atendente.huoc@`, um atendente suspenso e a paciente de teste.

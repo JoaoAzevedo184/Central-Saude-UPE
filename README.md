@@ -124,7 +124,7 @@ scripts/backup.sh                 # dump comprimido, 7 dias (teste: --testar-res
 scripts/testar-infra.sh           # nginx -t, shellcheck e testes do nginx (precisa de Docker; não sobe o compose)
 ```
 
-### Senha de um usuário da equipe pelo terminal
+### Senha de um usuário pelo terminal
 
 Contas da equipe nascem com senha temporária, e quem entra com ela só consegue trocar a senha. Para gerar uma nova (por exemplo, a de um ADMIN que se esqueceu, que a API não redefine), no servidor:
 
@@ -133,6 +133,12 @@ docker compose exec api python -m app.infra.admin redefinir-senha --email admin@
 ```
 
 A senha temporária aparece **uma única vez** na saída, nunca em log nem na auditoria, e todas as sessões da conta são revogadas. A pessoa troca a senha no primeiro acesso. Para atendente e gestor, o ADMIN também faz isso pela API (`POST /admin/usuarios/{id}/redefinir-senha`).
+
+Para um **paciente**, use o CPF (com ou sem pontuação) no lugar do e-mail; `--cpf` e `--email` não valem juntos, e o `--cpf` só alcança conta de paciente:
+
+```bash
+docker compose exec api python -m app.infra.admin redefinir-senha --cpf 111.444.777-35
+```
 
 ## Dados da demonstração
 

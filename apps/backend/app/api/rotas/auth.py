@@ -31,6 +31,7 @@ from app.api.tipos import Papel
 from app.config import get_settings
 from app.dominio.acesso import (
     SENHA_MINIMA,
+    login_bloqueado,
     normalizar_identificador,
     pode_autenticar,
     refresh_na_tolerancia,
@@ -135,7 +136,7 @@ class RegistroEntrada(BaseModel):
     @classmethod
     def _telefone(cls, valor: str) -> str:
         valor = re.sub(r"[\s()\-+]", "", valor)
-        if not valor.isdigit() or not 10 <= len(valor) <= 13:
+        if not (valor.isascii() and valor.isdigit()) or not 10 <= len(valor) <= 13:
             raise ValueError("Telefone inválido.")
         return valor
 
@@ -347,8 +348,11 @@ def login(
     tipo, identificador = normalizar_identificador(dados.identificador)
     identificador_hash = hash_identificador(identificador)
     desde = agora - timedelta(minutes=settings.login_janela_min)
-    falhas = falhas_de_login(session, desde, ip, identificador_hash)
-    if tentativas_esgotadas(falhas, settings.login_max_tentativas):
+    if login_bloqueado(
+        *falhas_de_login(session, desde, ip, identificador_hash),
+        settings.login_max_tentativas,
+        settings.login_max_tentativas_ip,
+    ):
         raise _muitas_tentativas()
 
     senha = dados.senha.get_secret_value()
@@ -408,8 +412,11 @@ def trocar_senha(
         raise _nao_autenticado()
     identificador_hash = hash_identificador(str(usuario.id))
     desde = agora - timedelta(minutes=settings.login_janela_min)
-    falhas = falhas_de_login(session, desde, ip, identificador_hash, "TROCA_SENHA")
-    if tentativas_esgotadas(falhas, settings.login_max_tentativas):
+    if login_bloqueado(
+        *falhas_de_login(session, desde, ip, identificador_hash, "TROCA_SENHA"),
+        settings.login_max_tentativas,
+        settings.login_max_tentativas_ip,
+    ):
         raise _muitas_tentativas()
 
     atual = dados.senha_atual.get_secret_value()

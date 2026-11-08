@@ -203,8 +203,8 @@ def falhas_de_login(
     ip: str | None,
     identificador_hash: str,
     tipo: str = "LOGIN",
-) -> int:
-    """Maior número de falhas na janela: pelo IP ou pelo identificador (AM-004, AM-020)."""
+) -> tuple[int, int]:
+    """Falhas na janela `(pelo identificador, pelo IP)`, cada uma com seu limite (AM-004)."""
     base = select(func.count()).where(
         TentativaLogin.tipo == tipo,
         TentativaLogin.sucesso.is_(False),
@@ -214,7 +214,7 @@ def falhas_de_login(
         base.where(TentativaLogin.identificador_hash == identificador_hash)
     )
     pelo_ip = session.scalar(base.where(TentativaLogin.ip == ip)) if ip else 0
-    return max(pelo_identificador or 0, pelo_ip or 0)
+    return pelo_identificador or 0, pelo_ip or 0
 
 
 def registros_do_ip(session: Session, desde: datetime, ip: str) -> int:

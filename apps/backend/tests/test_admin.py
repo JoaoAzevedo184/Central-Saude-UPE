@@ -22,6 +22,7 @@ from app.infra.modelos import (
     usuario_fila,
     usuario_unidade,
 )
+from tests.conftest import IP_DO_CLIENTE
 from tests.fila_sintetica import montar_mundo
 from tests.test_auth import (
     CPF_PACIENTE,
@@ -352,6 +353,34 @@ def test_am020_erros_na_troca_de_senha_bloqueiam_sem_revogar_nada(
     relogio.avancar(timedelta(minutes=settings.login_janela_min, seconds=1))
     depois = api.post("/api/v1/auth/trocar-senha", json=certa, headers=com_csrf(api))
     assert depois.status_code == 204
+
+
+def test_am020_troca_de_senha_respeita_o_limite_do_ip_e_o_da_conta(
+    api, sessao, relogio, admin, monkeypatch
+):
+    settings = get_settings()
+    monkeypatch.setattr(settings, "login_max_tentativas_ip", 7)
+    errada = {"senha_atual": "errada", "senha_nova": "uma-senha-nova-forte"}
+    certa = {"senha_atual": SENHA, "senha_nova": "uma-senha-nova-forte"}
+    # Falhas de outras contas no mesmo IP: abaixo do limite do IP, a troca segue livre.
+    for i in range(6):
+        sessao.add(
+            TentativaLogin(
+                tipo="TROCA_SENHA",
+                identificador_hash=f"outro{i}",
+                ip=IP_DO_CLIENTE,
+                sucesso=False,
+                ocorrido_em=relogio.agora(),
+            )
+        )
+    sessao.commit()
+    assert (
+        api.post("/api/v1/auth/trocar-senha", json=errada, headers=com_csrf(api)).status_code == 422
+    )
+    # Agora o IP está no limite (7): bloqueia mesmo a senha certa.
+    bloqueada = api.post("/api/v1/auth/trocar-senha", json=certa, headers=com_csrf(api))
+    assert bloqueada.status_code == 429
+    assert bloqueada.headers["retry-after"] == "900"
 
 
 # --- redefinir senha ----------------------------------------------------------------------

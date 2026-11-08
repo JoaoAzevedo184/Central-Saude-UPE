@@ -95,7 +95,17 @@ scripts/backup.sh --testar-restauracao ARQUIVO   # idem, para um dump específic
 | gzip | Só nos estáticos (a API não é comprimida) |
 | Erros do nginx | `429` com `application/problem+json` e o mesmo `type` da API (`/problemas/muitas-tentativas`); `502` e `504` viram `503` Problem Details neutro; `413` idem. Nada da página padrão do nginx |
 
-Os limites foram pensados para uma sala inteira atrás do mesmo IP público (NAT do Wi-Fi). Eles só seguram rajadas. **Atenção:** o limite de login da **API** (AM-004) é bem mais apertado e conta por IP **ou** por CPF/e-mail (vale o maior): `LOGIN_MAX_TENTATIVAS=5` falhas de login vindas do mesmo IP em `LOGIN_JANELA_MIN=15` minutos bloqueiam o login de **todos** que compartilham aquele IP, e o registro tem `REGISTRO_MAX_TENTATIVAS=20` por IP. Numa apresentação com a plateia no mesmo Wi-Fi, suba esses dois valores no `.env` antes (por exemplo 60 e 100) e volte aos padrões depois. O limite por CPF/e-mail continua protegendo cada conta com o mesmo valor, então ele também sobe: é a troca consciente de uma demonstração.
+Os limites do nginx foram pensados para uma sala inteira atrás do mesmo IP público (NAT do Wi-Fi). Eles só seguram rajadas. O limite de login da **API** (AM-004) tem dois contadores separados: `LOGIN_MAX_TENTATIVAS=5` falhas por **conta** (CPF/e-mail) e `LOGIN_MAX_TENTATIVAS_IP=50` falhas por **IP**, ambos em `LOGIN_JANELA_MIN=15` minutos. Erros de várias pessoas no mesmo Wi-Fi não bloqueiam ninguém enquanto ficarem abaixo de 50, e cada conta continua travando em 5 falhas. No dia da apresentação dá para subir `LOGIN_MAX_TENTATIVAS_IP` para 100 no `.env` sem afrouxar o limite por conta. O registro tem `REGISTRO_MAX_TENTATIVAS=50` por IP; suba esse valor no `.env` para uma oficina ou apresentação com cadastro em massa (o nginx e o CPF/CNS únicos continuam segurando a criação em massa). Volte aos padrões depois. O bloqueio responde `429` com `Retry-After: 900`.
+
+### Senha de paciente pelo terminal
+
+Paciente não tem tela de recuperação. Se uma senha vazou, no servidor (checkout principal):
+
+```bash
+docker compose exec api python -m app.infra.admin redefinir-senha --cpf 111.444.777-35
+```
+
+(use o CPF real da conta; o exemplo é fictício). A senha temporária aparece uma única vez na saída, a troca é obrigatória no primeiro acesso e todas as sessões da conta são revogadas. CPF inválido, inexistente ou de conta da equipe dão o mesmo erro neutro. Para a equipe, use `--email`.
 
 A API **não serve** `/api/v1/docs` nem `/api/v1/openapi.json` em `APP_ENV=production`. O contrato versionado é `docs/architecture/openapi.json`.
 

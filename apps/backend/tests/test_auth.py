@@ -154,13 +154,44 @@ def test_am004_bloqueio_por_identificador_inclusive_inexistente(api, sessao, rel
     assert login(clientes[limite], "fantasma@exemplo.com", "x").status_code == 401
 
 
-def test_am004_bloqueio_por_ip_vale_ate_com_a_senha_certa(api, sessao):
+def test_am004_falhas_de_contas_diferentes_no_mesmo_ip_nao_bloqueiam_abaixo_do_limite_do_ip(
+    api, sessao, monkeypatch
+):
+    monkeypatch.setattr(get_settings(), "login_max_tentativas_ip", 8)
     criar_usuario(sessao, "GESTOR", email="gestor.x@exemplo.com")
-    for i in range(get_settings().login_max_tentativas):
+    for i in range(6):  # acima do limite por conta (5), abaixo do limite do IP (8)
         assert login(api, f"tentativa{i}@exemplo.com", "x").status_code == 401
 
-    assert login(api, "gestor.x@exemplo.com").status_code == 429
-    assert login(novo_cliente(), "gestor.x@exemplo.com").status_code == 200
+    assert login(api, "gestor.x@exemplo.com").status_code == 200
+
+
+def test_am004_ip_bloqueado_ao_passar_do_limite_do_ip_mesmo_com_a_senha_certa(
+    api, sessao, relogio, monkeypatch
+):
+    settings = get_settings()
+    monkeypatch.setattr(settings, "login_max_tentativas_ip", 8)
+    criar_usuario(sessao, "GESTOR", email="gestor.x@exemplo.com")
+    for i in range(8):
+        assert login(api, f"tentativa{i}@exemplo.com", "x").status_code == 401
+
+    bloqueada = login(api, "gestor.x@exemplo.com")
+
+    assert bloqueada.status_code == 429
+    assert bloqueada.json()["type"] == "/problemas/muitas-tentativas"
+    assert bloqueada.headers["retry-after"] == "900"
+    assert login(novo_cliente(), "gestor.x@exemplo.com").status_code == 200  # outro IP
+    relogio.avancar(timedelta(minutes=settings.login_janela_min, seconds=1))
+    assert login(api, "gestor.x@exemplo.com").status_code == 200
+
+
+def test_am004_limites_padrao_separados_por_conta_e_por_ip(monkeypatch):
+    for nome in ("LOGIN_MAX_TENTATIVAS", "LOGIN_MAX_TENTATIVAS_IP", "REGISTRO_MAX_TENTATIVAS"):
+        monkeypatch.delenv(nome, raising=False)
+    from app.config import Settings
+
+    padrao = Settings()
+    assert (padrao.login_max_tentativas, padrao.login_max_tentativas_ip) == (5, 50)
+    assert padrao.registro_max_tentativas == 50
 
 
 def test_am004_tentativa_guarda_hash_e_nao_o_identificador(api, sessao):
@@ -636,6 +667,69 @@ def test_uc001_registro_sem_email_e_com_lembrete(api, sessao):
     assert sorted(finalidades) == ["AGENDAMENTO", "LEMBRETE_EMAIL"]
 
 
+CPFS_NAO_ASCII = ["¹1144477735", "１１１４４４７７７３５", "١١١", "١١١٢٢٢٣٣٣٤٤"]
+
+
+@pytest.mark.parametrize("valor", CPFS_NAO_ASCII)
+def test_am005_registro_com_cpf_de_digitos_nao_ascii_responde_como_cpf_invalido(api, sessao, valor):
+    comum = registrar(api, cpf="22233344400")  # CPF inválido comum
+
+    resposta = registrar(api, cpf=valor)
+
+    assert resposta.status_code == comum.status_code == 422
+    assert resposta.json()["type"] == comum.json()["type"]
+    assert [e["msg"] for e in resposta.json()["errors"]] == [
+        e["msg"] for e in comum.json()["errors"]
+    ]
+    assert contar(sessao, Usuario) == 0
+
+
+CNS_NAO_ASCII = ["¹" * 15, "１" * 15, "١" * 15, "١٠٠٠٠٠٠٠٠٠٠٠٠٠٠"]
+
+
+@pytest.mark.parametrize("valor", CNS_NAO_ASCII)
+def test_am005_registro_com_cns_de_digitos_nao_ascii_responde_como_cns_invalido(api, sessao, valor):
+    comum = registrar(api, cns="123456789019999")  # CNS inválido comum
+
+    resposta = registrar(api, cns=valor)
+
+    assert resposta.status_code == comum.status_code == 422
+    assert resposta.json()["type"] == comum.json()["type"]
+    assert [e["msg"] for e in resposta.json()["errors"]] == [
+        e["msg"] for e in comum.json()["errors"]
+    ]
+    assert contar(sessao, Usuario) == 0
+
+
+TELEFONES_NAO_ASCII = ["٩٩٩٩٩٩٩٩٩٩٩", "８１９９９９９９９９９９", "(８１) ９９９９９-９９９９"]
+
+
+@pytest.mark.parametrize("valor", TELEFONES_NAO_ASCII)
+def test_am005_registro_com_telefone_de_digitos_nao_ascii_responde_como_telefone_invalido(
+    api, sessao, valor
+):
+    comum = registrar(api, telefone="abcdefghijk")  # inválido comum, passa do min_length
+
+    resposta = registrar(api, telefone=valor)
+
+    assert resposta.status_code == comum.status_code == 422
+    assert resposta.json()["type"] == comum.json()["type"]
+    assert [e["msg"] for e in resposta.json()["errors"]] == [
+        e["msg"] for e in comum.json()["errors"]
+    ]
+    assert contar(sessao, Usuario) == 0
+
+
+@pytest.mark.parametrize("valor", CPFS_NAO_ASCII)
+def test_am005_login_com_cpf_de_digitos_nao_ascii_responde_como_cpf_invalido(api, sessao, valor):
+    comum = login(api, "22233344400")  # CPF inválido comum
+
+    resposta = login(api, valor)
+
+    assert resposta.status_code == comum.status_code == 401
+    assert resposta.json()["type"] == comum.json()["type"]
+
+
 @pytest.mark.parametrize(
     "mudanca",
     [
@@ -706,7 +800,7 @@ def test_am005_registro_duplicado_tem_resposta_generica(api, sessao, repetido):
 
 
 def test_am004_registro_limitado_por_ip(api, sessao, monkeypatch):
-    limite = 3  # o padrão é REGISTRO_MAX_TENTATIVAS=20; menor para o teste ser rápido
+    limite = 3  # o padrão é REGISTRO_MAX_TENTATIVAS=50; menor para o teste ser rápido
     monkeypatch.setattr(get_settings(), "registro_max_tentativas", limite)
     for i in range(limite):
         resposta = registrar(

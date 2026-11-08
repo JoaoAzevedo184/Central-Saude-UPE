@@ -34,9 +34,10 @@ class Settings(BaseSettings):
     cookie_samesite: Literal["lax", "strict"] = "lax"
     cookie_domain: str = ""
     csrf_header_name: str = "X-CSRF-Token"
-    login_max_tentativas: int = 5  # AM-004: falhas por IP ou identificador dentro da janela
+    login_max_tentativas: int = 5  # AM-004: falhas por conta (identificador) dentro da janela
+    login_max_tentativas_ip: int = 50  # AM-004: falhas por IP; maior, pois uma sala divide o IP
     login_janela_min: int = 15
-    registro_max_tentativas: int = 20  # AM-004: registros por IP na mesma janela (recepção)
+    registro_max_tentativas: int = 50  # AM-004: registros por IP na mesma janela (oficina)
     # HMAC do CPF/e-mail em tentativa_login: sem a chave, o hash não é revertido por força bruta.
     login_hash_key: SecretStr
     refresh_tolerancia_s: int = 10  # ADR-003: duas abas renovando juntas não contam como roubo

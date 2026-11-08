@@ -21,13 +21,17 @@ def cpf_com_digitos(base: str) -> str:
 def cpf_valido(cpf: str) -> bool:
     """11 dígitos, verificadores corretos e não todos iguais (111.111.111-11 passa no cálculo)."""
     return (
-        len(cpf) == 11 and cpf.isdigit() and len(set(cpf)) > 1 and cpf_com_digitos(cpf[:9]) == cpf
+        len(cpf) == 11
+        and cpf.isascii()  # isdigit() aceita '¹', '５' e '١', que o int() não converte ou muda
+        and cpf.isdigit()
+        and len(set(cpf)) > 1
+        and cpf_com_digitos(cpf[:9]) == cpf
     )
 
 
 def cns_valido(cns: str) -> bool:
     """Cartão do SUS: definitivo (começa com 1 ou 2) ou provisório (7, 8 ou 9)."""
-    if len(cns) != 15 or not cns.isdigit():
+    if len(cns) != 15 or not cns.isascii() or not cns.isdigit():  # ASCII: ver cpf_valido
         return False
     if cns[0] in "789":
         return sum(int(d) * (15 - i) for i, d in enumerate(cns)) % 11 == 0

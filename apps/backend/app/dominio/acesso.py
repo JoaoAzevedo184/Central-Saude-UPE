@@ -67,6 +67,12 @@ def tentativas_esgotadas(falhas_na_janela: int, maximo: int) -> bool:
     return falhas_na_janela >= maximo
 
 
+def login_bloqueado(falhas_conta: int, falhas_ip: int, max_conta: int, max_ip: int) -> bool:
+    """AM-004: limites separados. A conta barra força bruta; o IP só segura rajadas, para uma
+    sala atrás do mesmo Wi-Fi não travar o login de todo mundo."""
+    return tentativas_esgotadas(falhas_conta, max_conta) or tentativas_esgotadas(falhas_ip, max_ip)
+
+
 def verificar_suspensao(
     ator_id: UUID, alvo_id: UUID, alvo_papel: str, alvo_situacao: str, admins_ativos: int
 ) -> None:
@@ -136,8 +142,8 @@ def verificar_troca_de_senha(senha_atual: str, senha_nova: str) -> None:
 
 
 def verificar_redefinicao_de_senha(alvo_papel: str) -> None:
-    """O admin redefine só ATENDENTE e GESTOR. Recuperar um ADMIN é pelo terminal
-    (`python -m app.infra.admin redefinir-senha`), que não depende de outro admin logado."""
+    """O admin redefine só ATENDENTE e GESTOR. Recuperar um ADMIN ou um paciente é pelo
+    terminal (`python -m app.infra.admin redefinir-senha`), que não depende de admin logado."""
     if alvo_papel not in ("ATENDENTE", "GESTOR"):
         raise OperacaoNaoPermitida(
             "A senha de administrador só é redefinida pelo terminal do servidor."
@@ -151,6 +157,6 @@ def normalizar_identificador(valor: str) -> tuple[str, str]:
     """
     valor = valor.strip()
     digitos = valor.replace(".", "").replace("-", "")
-    if len(digitos) == 11 and digitos.isdigit():
+    if len(digitos) == 11 and digitos.isascii() and digitos.isdigit():
         return "CPF", digitos
     return "EMAIL", valor.lower()

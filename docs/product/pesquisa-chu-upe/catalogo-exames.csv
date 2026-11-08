@@ -1,0 +1,24 @@
+unidade,exame_procedimento,tipo,status_evidencia,disponibilidade_2026,codigo_sigtap,fonte_referencia
+CISAM,Ultrassonografia,exame/procedimento,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Exames laboratoriais,exame/procedimento,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Teste do Pezinho,exame/procedimento,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Teste da Orelhinha,exame/procedimento,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Histeroscopia,exame/procedimento,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Colposcopia,exame/procedimento,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Citologia oncótica,exame/procedimento,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Cirurgia de alta frequência,exame/procedimento,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Videolaparoscopia ginecológica,exame/procedimento,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Teste rápido de gravidez,exame/procedimento,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Pequenas cirurgias ambulatoriais,exame/procedimento,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+PROCAPE,Eletrocardiograma,exame/procedimento,historico_2010_2011,nao_verificada,,README.md#fontes
+PROCAPE,Ecocardiograma transtorácico,exame/procedimento,historico_2010_2011,nao_verificada,,README.md#fontes
+PROCAPE,Ecocardiograma transesofágico,exame/procedimento,historico_2010_2011,nao_verificada,,README.md#fontes
+PROCAPE,Ecocardiografia de estresse,exame/procedimento,historico_2010_2011,nao_verificada,,README.md#fontes
+PROCAPE,Teste ergométrico,exame/procedimento,historico_2010_2011,nao_verificada,,README.md#fontes
+PROCAPE,Holter 24 horas,exame/procedimento,historico_2010_2011,nao_verificada,,README.md#fontes
+PROCAPE,Cateterismo cardíaco,exame/procedimento,historico_2010_2011,nao_verificada,,README.md#fontes
+PROCAPE,Tomografia computadorizada,exame/procedimento,historico_2010_2011,nao_verificada,,README.md#fontes
+PROCAPE,Cintilografia,exame/procedimento,historico_2010_2011,nao_verificada,,README.md#fontes
+PROCAPE,Angiografia/arteriografia,exame/procedimento,historico_2010_2011,nao_verificada,,README.md#fontes
+PROCAPE,Cardioversão elétrica,exame/procedimento,historico_2010_2011,nao_verificada,,README.md#fontes
+PROCAPE,Marca-passo temporário,exame/procedimento,historico_2010_2011,nao_verificada,,README.md#fontes

@@ -4,7 +4,7 @@ Cada documento responde a uma pergunta. Para a mesma informação não ficar rep
 
 | Pasta | Pergunta que responde | Documentos |
 | --- | --- | --- |
-| [product/](product/) | **O que** construir e **por quê** | [PRD](product/PRD.md), [escopo e roadmap](product/scope-and-roadmap.md) |
+| [product/](product/) | **O que** construir e **por quê** | [PRD](product/PRD.md), [escopo e roadmap](product/scope-and-roadmap.md), [pesquisa pública sobre o CHU/UPE](product/pesquisa-chu-upe/README.md) (preliminar, não verificada) |
 | [requirements/](requirements/) | **Como o sistema deve se comportar** | [requisitos funcionais](requirements/functional-requirements.md), [não funcionais](requirements/non-functional-requirements.md), [regras de negócio](requirements/business-rules.md), [casos de uso](requirements/use-cases/README.md), [questões em aberto](requirements/open-questions.md) |
 | [architecture/](architecture/) | **Como** o software é organizado | [SDD](architecture/SDD.md), [modelo de dados](architecture/data-model.md), [API](architecture/api-design.md), [diagramas](architecture/diagrams/) |
 | [security/](security/) | Como os riscos são **prevenidos, detectados e tratados** | [visão geral](security/security-overview.md), [modelo de ameaças](security/threat-model.md), [controle de acesso](security/access-control.md), [proteção de dados](security/data-protection.md), [resposta a incidentes](security/incident-response.md) |

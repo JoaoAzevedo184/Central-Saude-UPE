@@ -1,0 +1,65 @@
+unidade,servico,tipo,status_evidencia,disponibilidade_2026,codigo_sigtap,fonte_referencia
+CISAM,Ginecologia,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Pré-natal,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Medicina fetal,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Climatério,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Reprodução humana,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Planejamento reprodutivo,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Patologia cervical,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Uroginecologia,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Pediatria,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Puericultura,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Neurologia pediátrica,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Cardiopediatria,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Genética,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Dermatologia pediátrica,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Neonatologia,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,UTI neonatal,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Método Canguru,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Endocrinologia,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Hematologia,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Nutrição,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Psicologia,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Fisioterapia,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Fonoaudiologia,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Terapia ocupacional,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Odontologia,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Serviço social,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Banco de Leite Humano,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Atendimento a pessoas em situação de violência,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+CISAM,Atenção IST/HIV/AIDS,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+HUOC,Clínica médica,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+HUOC,Geriatria,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+HUOC,Cuidados paliativos,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+HUOC,Infectologia,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+HUOC,Oncologia,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+HUOC,Mastologia,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+HUOC,Neurologia,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+HUOC,Endocrinologia,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+HUOC,Reumatologia,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+HUOC,Nefrologia,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+HUOC,Hematologia,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+HUOC,Gastroenterologia,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+HUOC,Pneumologia,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+HUOC,Psiquiatria,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+HUOC,Dermatologia,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+HUOC,Ortopedia,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+HUOC,Urologia,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+HUOC,Cirurgia geral,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+HUOC,Cirurgia vascular,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+HUOC,Cirurgia pediátrica,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+HUOC,Cirurgia bariátrica,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+HUOC,Transplante hepático,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+HUOC,Quimioterapia,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+HUOC,Radioterapia,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+HUOC,Radiologia,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+HUOC,CRIE,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+HUOC,Hospital-dia HIV/AIDS,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+PROCAPE,Emergência cardiológica,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+PROCAPE,Cirurgia de aorta,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+PROCAPE,Revascularização do miocárdio,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+PROCAPE,Tratamento valvar,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+PROCAPE,Cardiopatias congênitas,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+PROCAPE,Arritmias,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+PROCAPE,Marca-passo e desfibriladores,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes
+PROCAPE,Ablação,especialidade/servico,catalogo_institucional_preliminar,nao_verificada,,README.md#fontes

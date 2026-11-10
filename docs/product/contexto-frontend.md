@@ -90,7 +90,7 @@
 8. **Detalhe da solicitação (equipe):** respostas, histórico completo, **classificar risco** e responder os critérios da regulação.
 9. **Agenda do dia:** registrar presença ou falta.
 10. **Vagas:** visão do período, com destaque para as vagas livres que não puderam ser propostas.
-11. **Indicadores** (gestor): taxa de confirmação, faltas, tempo médio e vagas aproveitadas. **A API ainda vai ser criada**; deixe a tela com dados de exemplo e o lugar das chamadas marcado.
+11. **Indicadores** (gestor e administrador): taxa de confirmação, faltas, mediana e P90 do tempo de espera, vagas reaproveitadas e perdidas, pedidos e desistências. A API já existe em `GET /equipe/indicadores`; use os campos do OpenAPI, com período e filtro por fila do escopo.
 
 ## 6. Regras que as telas NÃO podem quebrar
 
@@ -113,7 +113,7 @@ As imagens das telas mostram o **visual** (cores, espaçamentos, componentes), m
 
 ## 8. Lacunas conhecidas da API (não invente; marque com `// TODO(api)`)
 
-- Indicadores (ainda sem rota).
+- Indicadores já têm rota: `GET /equipe/indicadores`, com totais, semanas, tempo de espera e fila atual; o contrato é o OpenAPI.
 
 Já resolvidos no backend (21/10): termo vigente (`GET /termos/vigente`), proposta ativa na lista de "Meus atendimentos", critérios da equipe (`GET /equipe/filas/{id}/criterios`), paginação uniforme `{ total, itens }`, enums e erros declarados no OpenAPI. Confira sempre o OpenAPI antes de cada tela.
 

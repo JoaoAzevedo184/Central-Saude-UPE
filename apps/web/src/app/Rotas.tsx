@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes, useOutletContext } from 'react-router'
 import { EquipeLayout } from '../layouts/EquipeLayout'
 import { PacienteLayout } from '../layouts/PacienteLayout'
@@ -15,6 +16,8 @@ import { TrocarSenha } from '../pages/auth/TrocarSenha'
 import { rotaTrocarSenha } from '../shared/auth/troca-de-senha'
 import { rotaInicial } from '../shared/auth/retorno'
 import type { Sessao } from '../shared/auth/session'
+
+const Indicadores = lazy(() => import('../pages/equipe/Indicadores'))
 
 function Inicio() {
   const sessao = useOutletContext<Sessao>()
@@ -47,6 +50,9 @@ export function Rotas() {
             <Route index element={<Navigate to="/equipe/fila" replace />} />
             <Route path="fila" element={<Fila />} />
             <Route path="solicitacoes/:id" element={<DetalhePedidoEquipe />} />
+            <Route element={<ExigirPapel papeis={['GESTOR', 'ADMIN']} />}>
+              <Route path="indicadores" element={<Suspense fallback={<p role="status">Carregando indicadores…</p>}><Indicadores /></Suspense>} />
+            </Route>
           </Route>
         </Route>
         <Route path="*" element={<main><p role="alert">Página não encontrada.</p></main>} />

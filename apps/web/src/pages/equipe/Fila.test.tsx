@@ -76,7 +76,7 @@ describe('RF-031/032 — layout e painel da equipe', () => {
     expect(screen.getByText(texto)).toBeTruthy()
     expect(screen.queryByText(`${texto} · PROCAPE`)).toBeNull()
     expect(screen.getByRole('link', { name: 'Fila' }).getAttribute('aria-current')).toBe('page')
-    expect(screen.queryByRole('link', { name: 'Indicadores' })).toBeNull()
+    expect(Boolean(screen.queryByRole('link', { name: 'Indicadores' }))).toBe(valor !== 'ATENDENTE')
     expect(screen.getByRole('link', { name: 'Pular para o conteúdo' })).toBeTruthy()
     await user.click(screen.getByRole('button', { name: 'Sair' }))
     await screen.findByRole('heading', { name: 'Entrar' })
@@ -259,7 +259,7 @@ describe('RF-031/032 — layout e painel da equipe', () => {
   })
   it.each(['ATENDENTE', 'GESTOR', 'ADMIN'] as const)('/ manda %s para Fila', async (valor) => {
     papel = valor; abrir('/'); await tabela()
-    expect(screen.getByTestId('url').textContent).toMatch(/^\/equipe\/fila\?/)
+    await waitFor(() => expect(screen.getByTestId('url').textContent).toMatch(/^\/equipe\/fila\?/))
   })
   it('paciente em rota da equipe vai para Meus atendimentos', async () => {
     papel = 'PACIENTE'; abrir('/equipe/fila')

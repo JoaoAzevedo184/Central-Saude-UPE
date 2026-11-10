@@ -7,8 +7,9 @@ import { lerEstadoFila, paramsFila } from '../pages/equipe/estado-fila'
 
 const papeis: Record<Papel, string> = { PACIENTE: 'Paciente', ATENDENTE: 'Atendente', GESTOR: 'Gestor', ADMIN: 'Administrador' }
 // Novas telas entram aqui com os papéis permitidos quando a rota existir.
-const itensMenu: { texto: string; rota: string; papeis: readonly Papel[] }[] = [
-  { texto: 'Fila', rota: '/equipe/fila', papeis: ['ATENDENTE', 'GESTOR', 'ADMIN'] },
+const itensMenu: { texto: string; rota: string; destino: (queryFila: string) => string; papeis: readonly Papel[] }[] = [
+  { texto: 'Fila', rota: '/equipe/fila', destino: (query) => `/equipe/fila?${query}`, papeis: ['ATENDENTE', 'GESTOR', 'ADMIN'] },
+  { texto: 'Indicadores', rota: '/equipe/indicadores', destino: () => '/equipe/indicadores', papeis: ['GESTOR', 'ADMIN'] },
 ]
 export function EquipeLayout() {
   const sessao = useOutletContext<Sessao>()
@@ -28,7 +29,8 @@ export function EquipeLayout() {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
     setAberto(false); focarConteudo.current = true
   }
-  const query = paramsFila(lerEstadoFila(new URLSearchParams(location.search))).toString()
+  const naFila = location.pathname === '/equipe/fila' || location.pathname.startsWith('/equipe/solicitacoes/')
+  const query = paramsFila(lerEstadoFila(new URLSearchParams(naFila ? location.search : ''))).toString()
   return <div className="area-equipe">
     <a className="pular-conteudo" href="#conteudo-equipe">Pular para o conteúdo</a>
     <header className="lateral-equipe" onKeyDown={(event) => { if (aberto && event.key === 'Escape') fechar() }}>
@@ -37,7 +39,7 @@ export function EquipeLayout() {
       </div>
       <div id="menu-equipe" className={`conteudo-menu-equipe${aberto ? ' aberto' : ''}`}>
         <nav aria-label="Área da equipe">{itensMenu.filter((item) => item.papeis.includes(sessao.papel)).map((item) =>
-          <Link key={item.rota} to={`${item.rota}?${query}`} aria-current={location.pathname === item.rota || (item.rota === '/equipe/fila' && location.pathname.startsWith('/equipe/solicitacoes/')) ? 'page' : undefined} onClick={navegar}>{item.texto}</Link>)}
+          <Link key={item.rota} to={item.destino(query)} aria-current={location.pathname === item.rota || (item.rota === '/equipe/fila' && location.pathname.startsWith('/equipe/solicitacoes/')) ? 'page' : undefined} onClick={navegar}>{item.texto}</Link>)}
         </nav>
         <div className="identificacao-equipe"><p>{papeis[sessao.papel]}</p><Botao variante="secundario" carregando={saindo} onClick={() => void sair()}>Sair</Botao></div>
       </div>

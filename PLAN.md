@@ -90,7 +90,7 @@ Entraram depois de 29/10:
 
 ### Semana 3 — 09/11 a 19/11: demo de verdade
 
-- [ ] **Tela de Indicadores:** implementação, revisão cruzada, E2E com o gestor e deploy. Prazo 15/11.
+- [ ] **Tela de Indicadores:** implementação pronta; revisão cruzada, E2E manual com o gestor e deploy pendentes. Prazo 15/11.
 - [ ] **Testes manuais que faltam:** recusa de proposta, cancelamento, reclassificação, escopo entre unidades pela URL e celular. Prazo 15/11.
 - [ ] **Revalidar a pesquisa:** reabrir as fontes 1, 3, 4, 5 e 8 da pesquisa, registrar data de acesso e trecho, e confirmar se a Central de Teleagendamento do NUTES-CISAM está ativa. Prazo 15/11.
 - [ ] **Ensaio ponta a ponta** com dois navegadores (seção 7), no celular e no computador, preparando e desativando a fila de demonstração. 16 a 18/11.

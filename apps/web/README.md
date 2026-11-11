@@ -47,6 +47,8 @@ npm run api:generate -- --check
 
 `lint` inclui ESLint e verificação TypeScript. Vitest cobre HTTP/CSRF/refresh, erros, guardas de rota, login, cadastro, máscaras, layout do paciente, lista, resposta à proposta e datas em Recife, com respostas sintéticas. O build fica em `dist/` (ignorado pelo Git). `npm run preview` permite inspecionar esses arquivos, sem proxy de API. O [proxy de desenvolvimento](https://vite.dev/config/server-options#server-proxy) não substitui a configuração do Nginx em produção.
 
+O CI roda esses quatro comandos no job `web`. O `api:generate -- --check` usa `apps/backend/.venv` (o job cria com as dependências de execução do backend) e compara os tipos com o OpenAPI gerado pela aplicação.
+
 Para os testes existentes do backend, use `scripts/testar.sh` a partir da raiz; cada worktree recebe seu próprio banco de teste.
 
 ## Entrar e criar conta

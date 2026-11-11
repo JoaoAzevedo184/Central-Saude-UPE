@@ -7,7 +7,7 @@ Roteiro de produção da demonstração ([ADR-012](../decisions/ADR-012-implanta
 | Ambiente | Onde | Para quê |
 | --- | --- | --- |
 | Desenvolvimento | Computador de cada integrante, com Docker Compose | Programar e rodar os testes |
-| CI | GitHub Actions | Lint, testes e `scripts/testar-infra.sh` em todo pull request |
+| CI | GitHub Actions | Lint, testes e `scripts/testar-infra.sh` em todo pull request; o job `web` roda lint, testes, build e a conferência dos tipos do OpenAPI do frontend |
 | Produção (demo) | Servidor com Docker Compose (VM ou máquina local) | Apresentação, testes de usabilidade e avaliação |
 
 Todos usam o mesmo `docker-compose.yml`, na raiz. O que muda é o `.env` e os **perfis** do Compose:
@@ -55,7 +55,7 @@ Máquinas: **PC (Linux)** de quem implanta e **Servidor** (VM ou máquina local)
 
 ## Atualização
 
-1. Pull request aprovado e CI verde na `main`.
+1. Pull request aprovado e CI verde na `main` (jobs `backend`, `web`, `docker` e `infra`).
 2. **Servidor:** `scripts/deploy.sh`. Ele roda `git pull --ff-only`, constrói imagens e frontend, aplica as migrações, sobe de novo e confere o HTTPS. Para no primeiro erro (`set -euo pipefail`); a mensagem diz o que olhar (`docker compose logs --tail 50 nginx api`).
 3. Conferir um fluxo do paciente.
 

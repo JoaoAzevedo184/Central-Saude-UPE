@@ -173,6 +173,63 @@
         "title": "AgendamentoResumo",
         "type": "object"
       },
+      "AtorAuditoria": {
+        "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Só para EQUIPE.",
+            "title": "Email"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Só para EQUIPE.",
+            "title": "Id"
+          },
+          "papel": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Papel"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Nulo para SISTEMA."
+          },
+          "tipo": {
+            "enum": [
+              "EQUIPE",
+              "PACIENTE",
+              "SISTEMA"
+            ],
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tipo",
+          "id",
+          "papel",
+          "email"
+        ],
+        "title": "AtorAuditoria",
+        "type": "object"
+      },
       "AvisoSaida": {
         "properties": {
           "corpo": {
@@ -231,6 +288,73 @@
           "lido_em"
         ],
         "title": "AvisoSaida",
+        "type": "object"
+      },
+      "CampoAuditoria": {
+        "properties": {
+          "antes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Antes"
+          },
+          "campo": {
+            "title": "Campo",
+            "type": "string"
+          },
+          "depois": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Depois"
+          },
+          "oculto": {
+            "description": "Campo sensível (`nota`, `respostas`): mudou, mas o valor nunca sai.",
+            "title": "Oculto",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "campo",
+          "antes",
+          "depois",
+          "oculto"
+        ],
+        "title": "CampoAuditoria",
         "type": "object"
       },
       "CancelamentoEntrada": {
@@ -966,6 +1090,60 @@
         "title": "IndicadoresSaida",
         "type": "object"
       },
+      "ItemAuditoria": {
+        "properties": {
+          "acao": {
+            "title": "Acao",
+            "type": "string"
+          },
+          "ator": {
+            "$ref": "#/components/schemas/AtorAuditoria"
+          },
+          "campos": {
+            "items": {
+              "$ref": "#/components/schemas/CampoAuditoria"
+            },
+            "title": "Campos",
+            "type": "array"
+          },
+          "detalhes_omitidos": {
+            "description": "Chave fora da lista, valor fora do formato ou ação desconhecida.",
+            "title": "Detalhes Omitidos",
+            "type": "boolean"
+          },
+          "entidade": {
+            "title": "Entidade",
+            "type": "string"
+          },
+          "entidade_id": {
+            "format": "uuid",
+            "title": "Entidade Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "ocorrido_em": {
+            "description": "ISO 8601 com fuso.",
+            "title": "Ocorrido Em",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "ocorrido_em",
+          "acao",
+          "entidade",
+          "entidade_id",
+          "ator",
+          "campos",
+          "detalhes_omitidos"
+        ],
+        "title": "ItemAuditoria",
+        "type": "object"
+      },
       "ItemPainel": {
         "properties": {
           "classificacao_risco": {
@@ -1226,6 +1404,27 @@
           "itens"
         ],
         "title": "Pagina[FilaAdmin]",
+        "type": "object"
+      },
+      "Pagina_ItemAuditoria_": {
+        "properties": {
+          "itens": {
+            "items": {
+              "$ref": "#/components/schemas/ItemAuditoria"
+            },
+            "title": "Itens",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "itens"
+        ],
+        "title": "Pagina[ItemAuditoria]",
         "type": "object"
       },
       "Pagina_UsuarioAdmin_": {
@@ -2653,6 +2852,227 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/admin/auditoria": {
+      "get": {
+        "description": "Trilha de auditoria, da mais recente para a mais antiga.\n\n`entidade=solicitacao` com `entidade_id` traz também os registros dos agendamentos dessa\nsolicitação. Cada leitura grava `CONSULTAR_AUDITORIA` só com os filtros (AM-007).",
+        "operationId": "consultar_auditoria_api_v1_admin_auditoria_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "entidade",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "solicitacao",
+                    "agendamento",
+                    "usuario",
+                    "paciente",
+                    "fila",
+                    "unidade"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Entidade"
+            }
+          },
+          {
+            "in": "query",
+            "name": "entidade_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Entidade Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "acao",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "CRIAR_SOLICITACAO",
+                    "CLASSIFICAR",
+                    "RECLASSIFICAR",
+                    "RESPONDER_CRITERIOS",
+                    "CANCELAR_SOLICITACAO",
+                    "CANCELAR_AGENDAMENTO",
+                    "CONFIRMAR_AGENDAMENTO",
+                    "RECUSAR_PROPOSTA",
+                    "EXPIRAR_PROPOSTA",
+                    "REGISTRAR_COMPARECIMENTO",
+                    "REGISTRAR_FALTA",
+                    "PROPOR_VAGA",
+                    "CRIAR_USUARIO",
+                    "REDEFINIR_SENHA",
+                    "ATRIBUIR_FILAS",
+                    "ATRIBUIR_UNIDADES",
+                    "SUSPENDER",
+                    "REATIVAR",
+                    "LOGIN",
+                    "TROCAR_SENHA",
+                    "REGISTRO",
+                    "CONSULTAR_PAINEL",
+                    "CONSULTAR_SOLICITACAO",
+                    "CONSULTAR_AGENDAMENTOS",
+                    "CONSULTAR_VAGAS",
+                    "CONSULTAR_INDICADORES",
+                    "CONSULTAR_AUDITORIA"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Acao"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ator_usuario_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ator Usuario Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "de",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Dia inicial, em Recife.",
+              "title": "De"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ate",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Dia final (inclusive), em Recife.",
+              "title": "Ate"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_ItemAuditoria_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unauthorized: `/problemas/nao-autenticado`"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Forbidden: `/problemas/sem-permissao`, `/problemas/troca-de-senha-obrigatoria`"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "cookieSessao": []
+          }
+        ],
+        "summary": "Consultar Auditoria",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/v1/admin/filas": {
       "get": {
         "description": "Todas as filas, com unidade e especialidade, para a tela de atribuição.",

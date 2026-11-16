@@ -32,6 +32,7 @@ from sqlalchemy.dialects.postgresql import INET, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.dominio.vocabulario import (
+    FINALIDADES_CONSENTIMENTO,
     MOTIVOS_CANCELAMENTO,
     MOTIVOS_CANCELAMENTO_AGENDAMENTO,
     ORIGENS_CRITERIO,
@@ -48,7 +49,6 @@ from app.dominio.vocabulario import (
 from app.infra.db import Base
 
 SEXOS = ("FEMININO", "MASCULINO")
-FINALIDADES_CONSENTIMENTO = ("AGENDAMENTO", "LEMBRETE_EMAIL")
 CANAIS = ("IN_APP", "EMAIL")
 STATUS_ENVIO = ("PENDENTE", "ENVIADA", "FALHOU", "CANCELADA")
 STATUS_OUTBOX = ("PENDENTE", "PROCESSADO", "FALHOU")
@@ -410,6 +410,8 @@ class Agendamento(Base):
             unique=True,
             postgresql_where=text("status IN ('PROPOSTO', 'CONFIRMADO')"),
         ),
+        # Trilha da auditoria (RF-023): todos os agendamentos da solicitação, inclusive encerrados.
+        Index("ix_agendamento_solicitacao_id", "solicitacao_id"),
         Index(
             "ix_agendamento_expiracao",
             "expira_em",
@@ -511,6 +513,12 @@ class Auditoria(Base):
     """Append-only (gatilho na migração). ADR-028: o ator nunca é apagado, só suspenso."""
 
     __tablename__ = "auditoria"
+    __table_args__ = (
+        Index(
+            "ix_auditoria_entidade_ocorrido_em", "entidade", "entidade_id", text("ocorrido_em DESC")
+        ),
+        Index("ix_auditoria_ocorrido_em", text("ocorrido_em DESC")),
+    )
 
     id: Mapped[UUID] = pk_uuid()
     ator_usuario_id: Mapped[UUID | None] = fk("usuario.id")  # nulo = sistema ou Worker

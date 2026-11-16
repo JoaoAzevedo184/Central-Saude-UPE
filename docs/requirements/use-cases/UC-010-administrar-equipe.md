@@ -4,7 +4,7 @@
 | --- | --- |
 | **Ator principal** | Admin |
 | **Objetivo** | Criar as contas da equipe, controlar o acesso e o escopo de cada pessoa e permitir que ela troque a senha temporária |
-| **Requisitos** | RF-033, RF-035, RF-036 |
+| **Requisitos** | RF-023, RF-033, RF-035, RF-036 |
 | **Regras** | RN-022, RN-010 |
 
 > **Escopo desta versão.** Este caso de uso detalha a parte **implementada**: contas, senhas, atribuições e suspensão. Unidades, especialidades, filas (protocolo e elegibilidade), agendas e bloqueio de vagas (RF-005 a RF-007 e RF-022) também são do UC-010, mas continuam *propostas* (veja a [API](../../architecture/api-design.md#administração)) e serão detalhadas quando forem implementadas.
@@ -29,6 +29,7 @@
 - **A2 — Atribuir unidades a um gestor** (`PUT /admin/usuarios/{id}/unidades`): substitui as unidades. Lista vazia faz o gestor ver a central inteira e exige `confirmar_visao_central: true`; a auditoria marca `visao_central`.
 - **A3 — Redefinir a senha** (`POST /admin/usuarios/{id}/redefinir-senha`): só de atendente e gestor. O sistema gera outra senha temporária (devolvida uma vez), **revoga todas as sessões** da conta e liga a troca obrigatória de novo. A senha de um admin é redefinida só pelo terminal do servidor (`python -m app.infra.admin redefinir-senha --email <email>`).
 - **A4 — Suspender e reativar** (`POST /admin/usuarios/{id}/suspender` com `{motivo}` e `/reativar`): suspender revoga todas as sessões; a conta nunca é apagada (ADR-028).
+- **A6 — Consultar a auditoria** (`GET /admin/auditoria`): lista a trilha com filtros por entidade, ator, ação e período; para uma solicitação, inclui os registros dos agendamentos dela. A resposta nunca traz os dados crus nem o IP: só campos de uma lista permitida por ação, com `nota` e `respostas` ocultos. A leitura grava `CONSULTAR_AUDITORIA` só com os filtros. `de` e `ate` aceitam datas de 2000-01-01 a 2100-12-31 (fora disso, `422`). O ator paciente sai sem `id` e sem e-mail, mas o UUID da conta aparece em `entidade_id` de `LOGIN` e `TROCAR_SENHA` e pode ser usado em `ator_usuario_id`: o admin consegue correlacionar as ações de uma conta, sem nome, CPF ou e-mail. É pseudonimização, não anonimização, e foi aceito no MVP.
 - **A5 — Listar** contas da equipe e filas (`GET /admin/usuarios`, `GET /admin/filas`), com filas e unidades atribuídas e `senha_temporaria`, sem nunca trazer hash nem senha.
 
 ## Exceções
@@ -63,7 +64,14 @@
 - **Dado** qualquer escrita, **quando** a auditoria é lida, **então** ela nunca guarda senha nem hash (`test_rf036_auditoria_nunca_guarda_senha_nem_hash`).
 - **Dado** as listagens, **quando** o admin as consulta, **então** vêm só a equipe, com filtros e atribuições, e as filas com unidade e especialidade (`test_rf035_lista_so_a_equipe_com_filtros_e_atribuicoes`, `test_rf035_lista_filas_com_unidade_e_especialidade`).
 
+- **Dado** a trilha, **quando** só o admin a consulta, **então** os demais papéis recebem `403` e sem sessão `401` (`test_rf023_sem_login_retorna_401`, `test_rf023_equipe_que_nao_e_admin_retorna_403`, `test_rf023_paciente_retorna_403`).
+- **Dado** a lista, **quando** o admin a pagina, **então** `total`, `limit`, `offset` e a ordem `ocorrido_em DESC, id DESC` valem (`test_rf023_lista_com_total_limit_offset_e_ordem`).
+- **Dado** uma solicitação, **quando** o admin filtra por ela, **então** vê criação, classificação, proposta e confirmação, com os registros dos agendamentos (`test_rf023_trilha_da_solicitacao_inclui_os_agendamentos`); filtros por ação, ator e período em Recife (`test_rf023_filtra_por_acao_e_por_ator`, `test_rf023_periodo_usa_o_dia_de_recife`); filtro inválido, `422` (`test_rf023_filtro_invalido_retorna_422`).
+- **Dado** dados sensíveis na trilha, **quando** o admin a lê, **então** nenhum texto livre, IP, nota ou resposta sai (`test_rf023_sentinela_nenhuma_marca_sai_na_resposta`, `test_rf023_acao_fora_da_lista_permitida_nao_expoe_nada`, `test_rf023_resposta_nao_tem_o_ip_no_contrato`); o ator paciente não traz id nem e-mail e o ator nulo é `SISTEMA` (`test_rf023_ator_paciente_sem_id_e_sem_email_e_sistema_quando_nulo`).
+- **Dado** a leitura, **quando** o admin consulta, **então** só se grava a própria `CONSULTAR_AUDITORIA` (`test_rf023_a_leitura_so_grava_a_propria_auditoria`). A função que monta os campos tem teste por ação (`tests/dominio/test_auditoria.py`).
+
 ## Segurança
 
+- A consulta da auditoria (RF-023) nunca devolve `dados_antes`/`dados_depois` crus nem o IP; `nota` e `respostas` saem só como "mudou".
 - Só ADMIN, em toda a rota (`exige_papel("ADMIN")`); `Cache-Control: no-store` em `/admin/` ([controle de acesso](../../security/access-control.md)).
 - A senha temporária é exposta uma única vez e não tem validade (AM-021); a troca é limitada por tentativas (AM-020); a visão da central exige confirmação (AM-022) — veja o [modelo de ameaças](../../security/threat-model.md).

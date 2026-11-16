@@ -193,6 +193,7 @@ Prefixo `/admin`, só `ADMIN` (`exige_papel("ADMIN")`), todas com `Cache-Control
 | PUT | `/admin/usuarios/{id}/unidades` | Substitui as unidades do GESTOR (`{unidade_ids, confirmar_visao_central?}`). Lista vazia faz o gestor ver a central inteira e exige `confirmar_visao_central: true`. Outro papel → `409`. Auditoria `ATRIBUIR_UNIDADES` (com `visao_central`). `204` |
 | POST | `/admin/usuarios/{id}/suspender` | Corpo `{motivo}` (3 a 500 caracteres). `204`. Regras e erros em [controle de acesso](../security/access-control.md) |
 | POST | `/admin/usuarios/{id}/reativar` | `204`. Conta já ativa → `409` `transicao-invalida` |
+| GET | `/admin/auditoria?entidade=&entidade_id=&acao=&ator_usuario_id=&de=&ate=&limit&offset` | `{total, itens}` da trilha, de `ocorrido_em DESC, id DESC` (RF-023). Filtros opcionais; `entidade_id` exige `entidade` e `de` > `ate` dá `422`; `de` e `ate` são dias de Recife, inclusive. `entidade=solicitacao` com `entidade_id` traz também os registros dos agendamentos dessa solicitação (`acao`, período e ator valem sobre o conjunto). Item: `id`, `ocorrido_em`, `acao`, `entidade`, `entidade_id`, `ator` (`EQUIPE` com `id`, `papel` e `email`; `PACIENTE` só com `papel`; `SISTEMA` quando não há ator), `campos` (`{campo, antes, depois, oculto}`) e `detalhes_omitidos`. **Nunca traz `dados_antes`/`dados_depois` crus nem o IP:** `campos` sai de uma lista permitida por ação (`app/dominio/auditoria.py`). `nota` e `respostas` aparecem com `oculto: true` e sem valor; chave inesperada, valor fora do formato ou ação desconhecida ligam `detalhes_omitidos`. Cada leitura grava `CONSULTAR_AUDITORIA` só com os filtros |
 | GET | `/admin/filas?limit&offset` | `{total, itens}` de todas as filas (inclui inativas) com `unidade` `{id, sigla}` e `especialidade` `{id, nome}`, para a tela de atribuição |
 
 - Usuário inexistente → `404`. Toda alteração trava a conta alvo com `FOR UPDATE`.
@@ -209,7 +210,6 @@ Prefixo `/admin`, só `ADMIN` (`exige_papel("ADMIN")`), todas com `Cache-Control
 | GET, POST, PATCH | `/admin/filas/{id}/criterios` | Protocolo da fila: critérios, tipos, pesos e parâmetros |
 | GET, POST, PATCH | `/admin/agendas` | Agendas; criar uma agenda gera as vagas da vigência |
 | POST | `/admin/vagas/{id}/bloquear` e `/admin/vagas/{id}/desbloquear` | Estado administrativo da vaga |
-| GET | `/admin/auditoria?entidade=&entidade_id=` | Trilha de auditoria |
 
 ### Operação
 | Método | Rota | Descrição |

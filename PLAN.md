@@ -34,7 +34,7 @@ Tudo rodando na VM, com HTTPS, e com o seed de demonstração carregado.
 
 ### Backend (`apps/backend`): pronto para o MVP
 
-Autenticação com papéis e cookies (CSRF, refresh, troca obrigatória de senha), cadastro com LGPD, filas e critérios, solicitação, classificação, proposta automática de vaga (Worker), confirmação, recusa e expiração, presença e falta, avisos e e-mail via outbox, indicadores, administração, auditoria e seed com histórico de 8 semanas. O contrato está em `docs/architecture/openapi.json`.
+Autenticação com papéis e cookies (CSRF, refresh, troca obrigatória de senha), cadastro com LGPD, filas e critérios, solicitação, classificação, proposta automática de vaga (Worker), confirmação, recusa e expiração, presença e falta, avisos e e-mail via outbox, indicadores, administração, auditoria e seed com histórico de 8 semanas. O contrato está em `docs/architecture/openapi.json`. A consulta da auditoria para o admin (`GET /admin/auditoria`, RF-023) existe no backend; a tela é uma tarefa separada.
 
 Entraram depois de 29/10:
 

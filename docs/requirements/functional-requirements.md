@@ -26,7 +26,7 @@
 | RF-020 | Paciente acompanha o status das solicitações e dos agendamentos, sem posição na fila | Paciente | M | — | RN-007 |
 | RF-021 | Gestor consulta indicadores: confirmação, faltas, tempo até confirmação, vagas reaproveitadas, fila por especialidade (detalhado no RF-037) | Gestor | M | UC-009 | RN-021 |
 | RF-022 | Admin configura o protocolo de cada fila: critérios, tipos, pesos e faixas, marcados como simulados | Admin | M | UC-010 | RN-006 |
-| RF-023 | Admin consulta a trilha de auditoria de uma solicitação ou agendamento | Admin | M | — | RN-010 |
+| RF-023 | Admin consulta a trilha de auditoria de uma solicitação ou agendamento | Admin | M | UC-010 | RN-010 |
 | RF-024 | O sistema envia lembrete antes do atendimento confirmado: aviso no site e, com `LEMBRETE_EMAIL`, e-mail, para consultas nas próximas `LEMBRETE_ANTECEDENCIA_HORAS` (padrão 24). Implementado (job `enviar_lembretes`) | Sistema | D | — | RN-009 |
 | RF-025 | Paciente ouve em voz alta os detalhes do agendamento | Paciente | D | — | — |
 | RF-026 | ~~Avisos por Telegram~~ Descartado ([ADR-013](../decisions/ADR-013-n8n-telegram.md)) | Sistema | — | — | — |

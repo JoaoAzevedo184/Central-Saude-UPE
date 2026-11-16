@@ -288,6 +288,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/auditoria": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Consultar Auditoria
+         * @description Trilha de auditoria, da mais recente para a mais antiga.
+         *
+         *     `entidade=solicitacao` com `entidade_id` traz também os registros dos agendamentos dessa
+         *     solicitação. Cada leitura grava `CONSULTAR_AUDITORIA` só com os filtros (AM-007).
+         */
+        get: operations["consultar_auditoria_api_v1_admin_auditoria_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/filas": {
         parameters: {
             query?: never;
@@ -837,6 +860,26 @@ export interface components {
             /** Profissional */
             profissional: string;
         };
+        /** AtorAuditoria */
+        AtorAuditoria: {
+            /**
+             * Tipo
+             * @enum {string}
+             */
+            tipo: "EQUIPE" | "PACIENTE" | "SISTEMA";
+            /**
+             * Id
+             * @description Só para EQUIPE.
+             */
+            id: string | null;
+            /** @description Nulo para SISTEMA. */
+            papel: components["schemas"]["Papel"] | null;
+            /**
+             * Email
+             * @description Só para EQUIPE.
+             */
+            email: string | null;
+        };
         /** AvisoSaida */
         AvisoSaida: {
             /**
@@ -858,6 +901,20 @@ export interface components {
             criado_em: string;
             /** Lido Em */
             lido_em: string | null;
+        };
+        /** CampoAuditoria */
+        CampoAuditoria: {
+            /** Campo */
+            campo: string;
+            /** Antes */
+            antes: string | number | boolean | string[] | null;
+            /** Depois */
+            depois: string | number | boolean | string[] | null;
+            /**
+             * Oculto
+             * @description Campo sensível (`nota`, `respostas`): mudou, mas o valor nunca sai.
+             */
+            oculto: boolean;
         };
         /**
          * CancelamentoEntrada
@@ -1133,6 +1190,36 @@ export interface components {
                 [key: string]: number;
             };
         };
+        /** ItemAuditoria */
+        ItemAuditoria: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Ocorrido Em
+             * @description ISO 8601 com fuso.
+             */
+            ocorrido_em: string;
+            /** Acao */
+            acao: string;
+            /** Entidade */
+            entidade: string;
+            /**
+             * Entidade Id
+             * Format: uuid
+             */
+            entidade_id: string;
+            ator: components["schemas"]["AtorAuditoria"];
+            /** Campos */
+            campos: components["schemas"]["CampoAuditoria"][];
+            /**
+             * Detalhes Omitidos
+             * @description Chave fora da lista, valor fora do formato ou ação desconhecida.
+             */
+            detalhes_omitidos: boolean;
+        };
         /** ItemPainel */
         ItemPainel: {
             /**
@@ -1226,6 +1313,13 @@ export interface components {
             total: number;
             /** Itens */
             itens: components["schemas"]["FilaAdmin"][];
+        };
+        /** Pagina[ItemAuditoria] */
+        Pagina_ItemAuditoria_: {
+            /** Total */
+            total: number;
+            /** Itens */
+            itens: components["schemas"]["ItemAuditoria"][];
         };
         /** Pagina[UsuarioAdmin] */
         Pagina_UsuarioAdmin_: {
@@ -2631,6 +2725,62 @@ export interface operations {
             };
             /** @description Conflict: `/problemas/transicao-invalida` */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+        };
+    };
+    consultar_auditoria_api_v1_admin_auditoria_get: {
+        parameters: {
+            query?: {
+                entidade?: ("solicitacao" | "agendamento" | "usuario" | "paciente" | "fila" | "unidade") | null;
+                entidade_id?: string | null;
+                acao?: ("CRIAR_SOLICITACAO" | "CLASSIFICAR" | "RECLASSIFICAR" | "RESPONDER_CRITERIOS" | "CANCELAR_SOLICITACAO" | "CANCELAR_AGENDAMENTO" | "CONFIRMAR_AGENDAMENTO" | "RECUSAR_PROPOSTA" | "EXPIRAR_PROPOSTA" | "REGISTRAR_COMPARECIMENTO" | "REGISTRAR_FALTA" | "PROPOR_VAGA" | "CRIAR_USUARIO" | "REDEFINIR_SENHA" | "ATRIBUIR_FILAS" | "ATRIBUIR_UNIDADES" | "SUSPENDER" | "REATIVAR" | "LOGIN" | "TROCAR_SENHA" | "REGISTRO" | "CONSULTAR_PAINEL" | "CONSULTAR_SOLICITACAO" | "CONSULTAR_AGENDAMENTOS" | "CONSULTAR_VAGAS" | "CONSULTAR_INDICADORES" | "CONSULTAR_AUDITORIA") | null;
+                ator_usuario_id?: string | null;
+                de?: string | null;
+                ate?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Pagina_ItemAuditoria_"];
+                };
+            };
+            /** @description Unauthorized: `/problemas/nao-autenticado` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Forbidden: `/problemas/sem-permissao`, `/problemas/troca-de-senha-obrigatoria` */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

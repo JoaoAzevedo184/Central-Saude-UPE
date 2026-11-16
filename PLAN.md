@@ -1,6 +1,6 @@
 # PLAN — MVP da Central de Teleagendamento (CH/UPE)
 
-> Plano de trabalho até a entrega do MVP (novembro de 2026). Vale para o grupo e para os agentes (Claude Code e Codex): leia junto com o [`AGENTS.md`](AGENTS.md) antes de qualquer tarefa. Atualize este arquivo quando o escopo ou a ordem mudarem. **Estado em 08/11/2026, `main` em `0f54af7`, no ar em https://central-saude-upe.duckdns.org.**
+> Plano de trabalho até a entrega do MVP (novembro de 2026). Vale para o grupo e para os agentes (Claude Code e Codex): leia junto com o [`AGENTS.md`](http://AGENTS.md) antes de qualquer tarefa. Atualize este arquivo quando o escopo ou a ordem mudarem. **Estado em 16/11/2026,** `main` **em** `ab3ce69`**, no ar em [https://central-saude-upe.duckdns.org](https://central-saude-upe.duckdns.org) (deploy de 16/11).**
 
 ## 1. Objetivo do MVP
 
@@ -12,6 +12,7 @@ paciente cria conta e faz o pedido
   → o sistema propõe uma vaga sozinho, pela ordem da fila
   → paciente confirma (ou diz "esta data não serve" e volta à fila)
   → equipe vê o pedido agendado
+
 ```
 
 Tudo rodando na VM, com HTTPS, e com o seed de demonstração carregado.
@@ -20,46 +21,51 @@ Tudo rodando na VM, com HTTPS, e com o seed de demonstração carregado.
 
 ## 2. Fora do MVP
 
-| Item | Para onde vai |
-| --- | --- |
-| **Módulo de documentos** (envio e conferência) | **Projeto novo, separado, em Rust**, pensado para vários centros hospitalares. A branch `backend/documents` (`136a8d8`) **não entra na `main`**: fica guardada como referência (ADR-031, regras de validação de arquivo, modelo de dados) |
-| Agenda do dia e presença (equipe) | Leva 1, depois da apresentação (a API já existe) |
-| Cadastro de agendas e painel de vagas | Leva 1. Hoje as agendas só vêm do seed; o Worker gera as vagas delas |
-| Telas de administração | Leva 1. As rotas `/admin` existem, mas **a documentação da API (`/api/v1/docs`) fica desligada em produção**; na apresentação, a administração só aparece rodando local |
-| Meus dados e edição de contato | Leva 2 (não há rota para editar) |
-| Recuperação de senha do paciente | Leva 2, depois de decisão do grupo. Hoje a equipe redefine pelo terminal (`redefinir-senha --cpf`) |
-| Prontuário, teleconsulta e regras por unidade | Depois de validar a [pesquisa sobre o CHU/UPE](docs/product/pesquisa-chu-upe/README.md) com o hospital |
+
+| Item                                                | Para onde vai                                                                                                                                                                                                                             |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Módulo de documentos** (envio e conferência)      | **Projeto novo, separado, em Rust**, pensado para vários centros hospitalares. A branch `backend/documents` (`136a8d8`) **não entra na** `main`: fica guardada como referência (ADR-031, regras de validação de arquivo, modelo de dados) |
+| Agenda do dia e presença (equipe)                   | Leva 1, depois da apresentação (a API já existe)                                                                                                                                                                                          |
+| Cadastro de agendas e painel de vagas               | Leva 1. Hoje as agendas só vêm do seed; o Worker gera as vagas delas                                                                                                                                                                      |
+| Telas de administração (inclui a tela de auditoria) | Leva 1. As rotas `/admin` existem, inclusive a consulta da auditoria, mas **a documentação da API (**`/api/v1/docs`**) fica desligada em produção**; na apresentação, a administração só aparece rodando local                            |
+| Meus dados e edição de contato                      | Leva 2 (não há rota para editar)                                                                                                                                                                                                          |
+| Recuperação de senha do paciente                    | Leva 2, depois de decisão do grupo. Hoje a equipe redefine pelo terminal (`redefinir-senha --cpf`)                                                                                                                                        |
+| Prontuário, teleconsulta e regras por unidade       | Depois de validar a [pesquisa sobre o CHU/UPE](https://claude.ai/chat/docs/product/pesquisa-chu-upe/README.md) com o hospital                                                                                                             |
+
 
 ## 3. Estado atual
 
 ### Backend (`apps/backend`): pronto para o MVP
 
-Autenticação com papéis e cookies (CSRF, refresh, troca obrigatória de senha), cadastro com LGPD, filas e critérios, solicitação, classificação, proposta automática de vaga (Worker), confirmação, recusa e expiração, presença e falta, avisos e e-mail via outbox, indicadores, administração, auditoria e seed com histórico de 8 semanas. O contrato está em `docs/architecture/openapi.json`. A consulta da auditoria para o admin (`GET /admin/auditoria`, RF-023) existe no backend; a tela é uma tarefa separada.
+Autenticação com papéis e cookies (CSRF, refresh, troca obrigatória de senha), cadastro com LGPD, filas e critérios, solicitação, classificação, proposta automática de vaga (Worker), confirmação, recusa e expiração, presença e falta, avisos e e-mail via outbox, indicadores, administração, auditoria e seed com histórico de 8 semanas. O contrato está em `docs/architecture/openapi.json`. A consulta da auditoria para o admin (`GET /admin/auditoria`, RF-023) entrou em 16/11, com a migração 0008 (só índices), e está em produção; a tela fica para a Leva 1.
 
 Entraram depois de 29/10:
 
-- **Pacote de produção:** nginx no Docker Compose (HTTPS, cabeçalhos de segurança, limite de requisições), certificado Let's Encrypt com renovação, build do frontend em contêiner, `scripts/deploy.sh`, `scripts/backup.sh` com teste de restauração, e `/api/v1/docs` desligado em produção.
+- **Pacote de produção:** nginx no Docker Compose (HTTPS, cabeçalhos de segurança, limite de requisições), certificado Let's Encrypt com renovação, build do frontend em contêiner, `scripts/[deploy.sh](http://deploy.sh)`, `scripts/[backup.sh](http://backup.sh)` com teste de restauração, e `/api/v1/docs` desligado em produção.
 - **Limite de login separado:** 5 falhas por conta e 50 por IP em 15 minutos (`LOGIN_MAX_TENTATIVAS_IP`), também na troca de senha; registro com 50 por IP. Validação de CPF, CNS e telefone só com dígitos 0 a 9.
 - **Senha de paciente pelo terminal:** `python -m app.infra.admin redefinir-senha --cpf CPF`.
 - **Fila de demonstração:** `python -m app.infra.demonstracao preparar|desativar`, com as mesmas travas do seed, para a apresentação ao vivo (seção 7).
+- **Consulta da auditoria (16/11):** `GET /admin/auditoria`, só ADMIN. Mostra os campos por lista permitida e validados um a um; `nota` e `respostas` aparecem só como ocultos; a trilha de uma solicitação inclui os agendamentos dela; cada leitura grava `CONSULTAR_AUDITORIA`. O ator paciente sai sem id e sem e-mail, mas o UUID da conta aparece em outros registros: é pseudonimização, não anonimização (UC-010).
 
 **Daqui até a entrega, o backend só recebe correções.**
 
 ### Frontend (`apps/web`)
 
-| Tela | Estado |
-| --- | --- |
-| Entrar, Criar conta (3 etapas) | Pronto |
-| Trocar senha (obrigatória) | Pronto |
-| "/" redireciona conforme a sessão | Pronto |
-| Meus atendimentos, com a proposta de vaga | Pronto |
-| Novo pedido (3 etapas) | Pronto |
-| Detalhe do pedido, linha do tempo e cancelamento (paciente) | Pronto |
-| Avisos | Pronto |
-| Layout da equipe | Pronto |
-| Fila (equipe) | Pronto |
-| Detalhe do pedido e classificação de risco (equipe) | Pronto |
-| **Indicadores (gestor)** | **Em andamento**, com carregamento sob demanda (traz o pacote de volta para menos de 500 kB) |
+
+| Tela                                                        | Estado                                                                                           |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Entrar, Criar conta (3 etapas)                              | Pronto                                                                                           |
+| Trocar senha (obrigatória)                                  | Pronto                                                                                           |
+| "/" redireciona conforme a sessão                           | Pronto                                                                                           |
+| Meus atendimentos, com a proposta de vaga                   | Pronto                                                                                           |
+| Novo pedido (3 etapas)                                      | Pronto                                                                                           |
+| Detalhe do pedido, linha do tempo e cancelamento (paciente) | Pronto                                                                                           |
+| Avisos                                                      | Pronto                                                                                           |
+| Layout da equipe                                            | Pronto                                                                                           |
+| Fila (equipe)                                               | Pronto                                                                                           |
+| Detalhe do pedido e classificação de risco (equipe)         | Pronto                                                                                           |
+| Indicadores (gestor)                                        | Pronto, com carregamento sob demanda; em produção desde 16/11. Falta conferir na VM com o gestor |
+
 
 ### Infra
 
@@ -70,37 +76,40 @@ Entraram depois de 29/10:
 - Backup diário às 3h, com teste de restauração.
 - Seed histórico de 8 semanas carregado. Todas as filas do seed estão cheias e sem vaga livre, como num hospital lotado; por isso a demonstração ao vivo usa a fila de demonstração.
 - Senhas da equipe e dos pacientes de apresentação trocadas em 08/11, depois de aparecerem em capturas de tela.
-- Passo a passo em [`docs/operations/deployment.md`](docs/operations/deployment.md).
+- Checkout de produção em `/opt/containers/central-saude-upe`. Até 16/11 a VM estava em `0f54af7`; o deploy de 16/11 levou Indicadores, auditoria e a pesquisa.
+- Passo a passo em `[docs/operations/](https://claude.ai/chat/docs/operations/deployment.md)[deployment.md](http://deployment.md)`.
 
 ### Referências
 
 - Wireframes dos fluxos do paciente e da equipe (Excalidraw) e protótipo no Claude Design.
-- [Pesquisa pública sobre o CHU/UPE](docs/product/pesquisa-chu-upe/README.md): catálogo preliminar de serviços e exames, regras encontradas e comparação com o MVP. **Ainda não verificada.**
+- [Pesquisa pública sobre o CHU/UPE](https://claude.ai/chat/docs/product/pesquisa-chu-upe/README.md): catálogo preliminar de serviços e exames, regras encontradas e comparação com o MVP. **Ainda não verificada.**
 
 ## 4. Plano por semana
 
 ### Semanas 1 e 2 — 30/10 a 12/11: telas e VM (concluídas)
 
-- [x] Detalhe do pedido, avisos e "Ver detalhes" (paciente).
+- [x]  Detalhe do pedido, avisos e "Ver detalhes" (paciente).
 - [x] Layout da equipe, fila, detalhe e classificação de risco.
-- [x] VM, fases 0 a 6: segurança, Docker, aplicação, nginx com HTTPS, backup, deploy e seed.
+- [x] \[x\] VM, fases 0 a 6: segurança, Docker, aplicação, nginx com HTTPS, backup, deploy e seed.
 - [x] Chave JWT de produção com 32 caracteres ou mais (a API recusa subir com chave curta).
 - [x] Limite de login por IP, senha de paciente pelo terminal e fila de demonstração.
 - [x] Troca das senhas expostas.
 
 ### Semana 3 — 09/11 a 19/11: demo de verdade
 
-- [ ] **Tela de Indicadores:** implementação pronta; revisão cruzada, E2E manual com o gestor e deploy pendentes. Prazo 15/11.
-- [ ] **Testes manuais que faltam:** recusa de proposta, cancelamento, reclassificação, escopo entre unidades pela URL e celular. Prazo 15/11.
-- [ ] **Revalidar a pesquisa:** reabrir as fontes 1, 3, 4, 5 e 8 da pesquisa, registrar data de acesso e trecho, e confirmar se a Central de Teleagendamento do NUTES-CISAM está ativa. Prazo 15/11.
+- [x]  **Tela de Indicadores:** revisão cruzada aprovada em 09/11; na `main` e em produção desde 16/11.
+- [x] **Consulta da auditoria (backend):** revisão do Codex aprovada, teste manual local e deploy em 16/11.
+- [ ] **Conferir Indicadores na VM** logado como gestor. 17/11.
+- [ ] **Testes manuais que faltam:** recusa de proposta, cancelamento, reclassificação, escopo entre unidades pela URL e celular, pelo roteiro [`roteiro-testes-manuais.md`](http://roteiro-testes-manuais.md) (enviado ao colega fora do repositório, sem senhas). Prazo adiado para 18/11.
+- [ ] **Revalidar a pesquisa:** reabrir as fontes 1, 3, 4, 5 e 8 da pesquisa, registrar data de acesso e trecho, e confirmar se a Central de Teleagendamento do NUTES-CISAM está ativa. Prazo adiado para 18/11.
 - [ ] **Ensaio ponta a ponta** com dois navegadores (seção 7), no celular e no computador, preparando e desativando a fila de demonstração. 16 a 18/11.
 - [ ] **Teste de usabilidade** com 2 ou 3 pessoas de fora do grupo, no celular; anotar para o relatório. Até 19/11.
 - [ ] **Vídeo da demonstração** como plano B. Até 19/11.
-- [ ] Backup novo, último deploy e **congelamento da `main`**. 19/11.
+- [ ] Backup novo, último deploy e **congelamento da** `main`. 19/11.
 
 ### Semana 4 — 20/11 a 26/11: apresentação
 
-- [ ] Só correções de defeito na `main`.
+- [ ]  Só correções de defeito na `main`.
 - [ ] Ensaio da apresentação (quem fala o quê; plano B com o vídeo).
 - [ ] Slides, incluindo "o que é regra oficial e o que é proposta do MVP" (classes da pesquisa).
 - [ ] Relatório do Projeto de Intervenção: problema, contexto (pesquisa revalidada), solução, resultados do teste de usabilidade e próximos passos (validação institucional e módulo de documentos).
@@ -110,13 +119,14 @@ Entraram depois de 29/10:
 - **Uma tarefa = um worktree = uma branch**, criado no Orca a partir da `main` atualizada (`git pull --ff-only origin main` no checkout principal). Colegas sem Orca trabalham numa branch própria e abrem um Pull Request.
 - **Revisão cruzada:** quem implementa com o Codex é revisado pelo Claude Code, e vice-versa. Um modelo nunca revisa o próprio trabalho. Todo prompt começa por um Passo 0 com plano e espera aprovação.
 - **Agentes nunca fazem commit, push, merge, rebase, stash nem criam branch.** Quem faz é a pessoa. Se o trabalho precisar ser commitado antes de um merge da `main`, a pessoa commita na branch da tarefa, e a revisão olha `git diff main...HEAD`.
-- **Os worktrees compartilham o mesmo banco de teste:** nunca rode o `scripts/testar.sh` em dois worktrees ao mesmo tempo.
+- **Os worktrees compartilham o mesmo banco de teste:** nunca rode o `scripts/[testar.sh](http://testar.sh)` em dois worktrees ao mesmo tempo.
 - **Docker Compose só no checkout principal.** No worktree do frontend, só `npm run dev`. Antes de um E2E, confira se o Vite é do worktree certo (`ss -ltnp | grep 517`).
-- **O contrato é o `openapi.json`, e quem muda o contrato é o backend.** O backend entra primeiro; depois, o frontend faz `git merge main` e roda `npm run api:generate`.
-- **Nunca refazer (amend ou rebase) um commit que já foi para a `main` ou para o `origin`.** Arquivos gerados (`openapi.json`, `schema.d.ts`) não se resolvem à mão num conflito: regenere.
-- **Depois de todo push, confira o CI** na aba Actions (jobs `backend`, `docker` e `infra`).
-- **Senhas, tokens e o `.env` nunca vão para chat, print ou repositório.** Ao mostrar a saída de um comando que gera senha, mostre só a linha com o `id=`.
-- **Na VM**, o Docker roda pelo atalho `PATH="$HOME/bin:$PATH"`, e o deploy é sempre pelo `scripts/deploy.sh`.
+- **O contrato é o** `openapi.json`**, e quem muda o contrato é o backend.** O backend entra primeiro; depois, o frontend faz `git merge main` e roda `npm run api:generate`.
+- **Nunca refazer (amend ou rebase) um commit que já foi para a** `main` **ou para o** `origin`**.** Arquivos gerados (`openapi.json`, `schema.d.ts`) não se resolvem à mão num conflito: regenere.
+- **Depois de todo push, confira o CI** na aba Actions (jobs `backend`, `web`, `docker` e `infra`).
+- **Mudou o contrato no backend? Regenere os tipos do frontend na mesma entrega** (`npm run api:generate` em `apps/web`, que precisa do `.venv` do backend). Senão o job `web` falha no `api:generate -- --check`, como aconteceu em 16/11.
+- **Senhas, tokens e o** `.env` **nunca vão para chat, print ou repositório.** Ao mostrar a saída de um comando que gera senha, mostre só a linha com o `id=`.
+- **Na VM**, o Docker roda pelo atalho `PATH="$HOME/bin:$PATH"`, e o deploy é sempre pelo `scripts/[deploy.sh](http://deploy.sh)`, rodado em `/opt/containers/central-saude-upe`.
 - **Toda tela entrega:** lint, testes, build, `npm run api:generate -- --check`, conferência em 360 px e desktop e E2E real contra a API da `main`. README e documentação descrevem a tela, sem contagem de testes nem relato de E2E.
 - **Regras de produto que nenhuma tela quebra:**
   - o paciente nunca vê posição, tamanho da fila, nota nem risco;
@@ -129,16 +139,18 @@ Entraram depois de 29/10:
 
 ## 6. Riscos
 
-| Risco | Efeito | O que fazer |
-| --- | --- | --- |
-| Pedido feito ao vivo não recebe vaga (todas as filas do seed estão cheias) | O passo central da demo não acontece | Preparar a fila de demonstração antes da apresentação; plano B: a proposta já aberta de um paciente do seed |
-| A VM cai ou a Oracle recupera a instância por ociosidade | Sem demo ao vivo | Usar o sistema todo dia até a apresentação; vídeo da demo como plano B |
-| A plateia erra a senha no mesmo Wi-Fi | Login travado | Resolvido: 50 falhas por IP e 5 por conta; no dia, dá para subir o limite por IP no `.env` |
-| A banca pergunta se as regras são do hospital | Projeto parece desconectado da realidade | Slide com as classes da pesquisa; dizer o que é proposta (matching automático, nota, prazos) e o que falta validar |
-| Pesquisa usada sem conferência | Afirmação errada no relatório | Só usar como fato o que for revalidado com URL, data e trecho |
-| Decisões pendentes (RN-020: a primeira recusa mantém a posição?; ADR-030: histórico familiar) | Regra diferente do que a UPE espera | Manter o comportamento atual e registrar como pendência no relatório |
-| Dados que parecem reais na apresentação | Confusão com dados da UPE | Dizer que os números e as filas são simulados |
-| Credenciais expostas de novo | Acesso indevido à demo | Senhas só no gerenciador; trocar de novo pelo terminal se vazarem |
+
+| Risco                                                                                         | Efeito                                   | O que fazer                                                                                                        |
+| --------------------------------------------------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Pedido feito ao vivo não recebe vaga (todas as filas do seed estão cheias)                    | O passo central da demo não acontece     | Preparar a fila de demonstração antes da apresentação; plano B: a proposta já aberta de um paciente do seed        |
+| A VM cai ou a Oracle recupera a instância por ociosidade                                      | Sem demo ao vivo                         | Usar o sistema todo dia até a apresentação; vídeo da demo como plano B                                             |
+| A plateia erra a senha no mesmo Wi-Fi                                                         | Login travado                            | Resolvido: 50 falhas por IP e 5 por conta; no dia, dá para subir o limite por IP no `.env`                         |
+| A banca pergunta se as regras são do hospital                                                 | Projeto parece desconectado da realidade | Slide com as classes da pesquisa; dizer o que é proposta (matching automático, nota, prazos) e o que falta validar |
+| Pesquisa usada sem conferência                                                                | Afirmação errada no relatório            | Só usar como fato o que for revalidado com URL, data e trecho                                                      |
+| Decisões pendentes (RN-020: a primeira recusa mantém a posição?; ADR-030: histórico familiar) | Regra diferente do que a UPE espera      | Manter o comportamento atual e registrar como pendência no relatório                                               |
+| Dados que parecem reais na apresentação                                                       | Confusão com dados da UPE                | Dizer que os números e as filas são simulados                                                                      |
+| Credenciais expostas de novo                                                                  | Acesso indevido à demo                   | Senhas só no gerenciador; trocar de novo pelo terminal se vazarem                                                  |
+
 
 ## 7. Roteiro da demonstração (critério de pronto)
 
@@ -158,9 +170,10 @@ Entraram depois de 29/10:
 
 - **Leva 1 (dezembro, proposta):** backend de agendas e vagas, versão do pedido nas escritas (concorrência), nome e unidade da equipe no `/me`, autor no histórico, data do pedido no painel; telas de agenda do dia e presença, cadastro e painel de vagas, e usuários da equipe.
 - **Leva 2:** critérios da regulação (respostas da equipe), cadastro de filas e unidades, Meus dados, recuperação de senha, termos públicos e página de erro, CAPTCHA no cadastro se o sistema abrir ao público.
-- **Validação institucional** (a partir da [pesquisa](docs/product/pesquisa-chu-upe/README.md)): prontuário antes do pedido no CISAM, teleconsulta com consentimento, prazos de cancelamento e remarcação, reaproveitamento de vaga recusada (ADR-021 e RN-020) e códigos SIGTAP no catálogo. Revisar as filas do seed com o catálogo (por exemplo, mamografia no CISAM).
+- **Validação institucional** (a partir da [pesquisa](https://claude.ai/chat/docs/product/pesquisa-chu-upe/README.md)): prontuário antes do pedido no CISAM, teleconsulta com consentimento, prazos de cancelamento e remarcação, reaproveitamento de vaga recusada (ADR-021 e RN-020) e códigos SIGTAP no catálogo. Revisar as filas do seed com o catálogo (por exemplo, mamografia no CISAM).
 - **Módulo de documentos**, como projeto próprio em Rust, para vários centros hospitalares. Ponto de partida:
   - a branch `backend/documents` (ADR-031, regras de validação e recodificação de arquivo, estados do item e a trava "documentos antes da fila");
   - o plano "Situação atual e plano do módulo de documentos";
   - as telas D1 a D4 no Claude Design.
+- **Correções pequenas da Leva 1:** data extrema nos indicadores pode dar 500 (`de=9999-12-30&ate=9999-12-31` estoura `limites_do_periodo`; usar o intervalo 2000–2100 da auditoria); avisos do `npm audit` (9 moderados); pacote principal do frontend acima de 500 kB.
 - **Operação:** cópia do backup fora da VM, monitoramento, SMTP real, acesso de emergência documentado, antivírus e criptografia em repouso.

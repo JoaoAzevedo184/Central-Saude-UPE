@@ -1,6 +1,6 @@
 # PLAN — MVP da Central de Teleagendamento (CH/UPE)
 
-> Plano de trabalho até a entrega do MVP (novembro de 2026). Vale para o grupo e para os agentes (Claude Code e Codex): leia junto com o [`AGENTS.md`](http://AGENTS.md) antes de qualquer tarefa. Atualize este arquivo quando o escopo ou a ordem mudarem. **Estado em 16/11/2026,** `main` **em** `ab3ce69`**, no ar em [https://central-saude-upe.duckdns.org](https://central-saude-upe.duckdns.org) (deploy de 16/11).**
+> Plano de trabalho até a entrega do MVP (novembro de 2026). Vale para o grupo e para os agentes (Claude Code e Codex): leia junto com o [`AGENTS.md`](http://AGENTS.md) antes de qualquer tarefa. Atualize este arquivo quando o escopo ou a ordem mudarem. **Estado em 16/11/2026, 22h40,** `main` **em** `f08b504`**, no ar em [https://central-saude-upe.duckdns.org](https://central-saude-upe.duckdns.org) (deploy de 16/11, com a agenda do dia).**
 
 ## 1. Objetivo do MVP
 
@@ -12,6 +12,7 @@ paciente cria conta e faz o pedido
   → o sistema propõe uma vaga sozinho, pela ordem da fila
   → paciente confirma (ou diz "esta data não serve" e volta à fila)
   → equipe vê o pedido agendado
+
 
 ```
 
@@ -40,7 +41,7 @@ Autenticação com papéis e cookies (CSRF, refresh, troca obrigatória de senha
 
 Entraram depois de 29/10:
 
-- **Pacote de produção:** nginx no Docker Compose (HTTPS, cabeçalhos de segurança, limite de requisições), certificado Let's Encrypt com renovação, build do frontend em contêiner, `scripts/[deploy.sh](http://deploy.sh)`, `scripts/[backup.sh](http://backup.sh)` com teste de restauração, e `/api/v1/docs` desligado em produção.
+- **Pacote de produção:** nginx no Docker Compose (HTTPS, cabeçalhos de segurança, limite de requisições), certificado Let's Encrypt com renovação, build do frontend em contêiner, `scripts/[[deploy.sh](http://deploy.sh)]([http://deploy.sh](http://deploy.sh))`, `scripts/[[backup.sh](http://backup.sh)]([http://backup.sh](http://backup.sh))` com teste de restauração, e `/api/v1/docs` desligado em produção.
 - **Limite de login separado:** 5 falhas por conta e 50 por IP em 15 minutos (`LOGIN_MAX_TENTATIVAS_IP`), também na troca de senha; registro com 50 por IP. Validação de CPF, CNS e telefone só com dígitos 0 a 9.
 - **Senha de paciente pelo terminal:** `python -m app.infra.admin redefinir-senha --cpf CPF`.
 - **Fila de demonstração:** `python -m app.infra.demonstracao preparar|desativar`, com as mesmas travas do seed, para a apresentação ao vivo (seção 7).
@@ -63,8 +64,8 @@ Entraram depois de 29/10:
 | Layout da equipe                                            | Pronto                                                                                           |
 | Fila (equipe)                                               | Pronto                                                                                           |
 | Detalhe do pedido e classificação de risco (equipe)         | Pronto                                                                                           |
-| Agenda do dia (equipe)                                     | Implementada; em validação local e aguardando revisão cruzada                                    |
-| Indicadores (gestor)                                        | Pronto, com carregamento sob demanda; em produção desde 16/11. Falta conferir na VM com o gestor |
+| Agenda do dia (equipe)                                      | Pronta (16/11): revisão cruzada aprovada, E2E local e em produção. Falta o T8 na VM              |
+| Indicadores (gestor)                                        | Pronto, com carregamento sob demanda; em produção e conferido na VM com os dois gestores (16/11) |
 
 
 ### Infra
@@ -76,8 +77,8 @@ Entraram depois de 29/10:
 - Backup diário às 3h, com teste de restauração.
 - Seed histórico de 8 semanas carregado. Todas as filas do seed estão cheias e sem vaga livre, como num hospital lotado; por isso a demonstração ao vivo usa a fila de demonstração.
 - Senhas da equipe e dos pacientes de apresentação trocadas em 08/11, depois de aparecerem em capturas de tela.
-- Checkout de produção em `/opt/containers/central-saude-upe`. Até 16/11 a VM estava em `0f54af7`; o deploy de 16/11 levou Indicadores, auditoria e a pesquisa.
-- Passo a passo em `[docs/operations/](https://claude.ai/chat/docs/operations/deployment.md)[deployment.md](http://deployment.md)`.
+- Checkout de produção em `/opt/containers/central-saude-upe`. Até 16/11 a VM estava em `0f54af7`; os deploys de 16/11 levaram Indicadores, auditoria, a pesquisa e a agenda do dia (`f08b504`).
+- Passo a passo em `[docs/operations/]([https://claude.ai/chat/docs/operations/deployment.md)[deployment.md](http://deployment.md)](https://claude.ai/chat/docs/operations/deployment.md)[deployment.md](http://deployment.md))`.
 
 ### Referências
 
@@ -88,45 +89,46 @@ Entraram depois de 29/10:
 
 ### Semanas 1 e 2 — 30/10 a 12/11: telas e VM (concluídas)
 
-- [x]  Detalhe do pedido, avisos e "Ver detalhes" (paciente).
-- [x] Layout da equipe, fila, detalhe e classificação de risco.
-- [x] \[x\] VM, fases 0 a 6: segurança, Docker, aplicação, nginx com HTTPS, backup, deploy e seed.
-- [x] Chave JWT de produção com 32 caracteres ou mais (a API recusa subir com chave curta).
-- [x] Limite de login por IP, senha de paciente pelo terminal e fila de demonstração.
-- [x] Troca das senhas expostas.
+- \[x\] Detalhe do pedido, avisos e "Ver detalhes" (paciente).
+- \[x\] Layout da equipe, fila, detalhe e classificação de risco.
+- \[x\] \[x\] VM, fases 0 a 6: segurança, Docker, aplicação, nginx com HTTPS, backup, deploy e seed.
+- \[x\] Chave JWT de produção com 32 caracteres ou mais (a API recusa subir com chave curta).
+- \[x\] Limite de login por IP, senha de paciente pelo terminal e fila de demonstração.
+- \[x\] Troca das senhas expostas.
 
 ### Semana 3 — 09/11 a 19/11: demo de verdade
 
-- [x]  **Tela de Indicadores:** revisão cruzada aprovada em 09/11; na `main` e em produção desde 16/11.
-- [x] **Consulta da auditoria (backend):** revisão do Codex aprovada, teste manual local e deploy em 16/11.
-- [ ] **Conferir Indicadores na VM** logado como gestor. 17/11.
-- [ ] **Testes manuais que faltam:** recusa de proposta, cancelamento, reclassificação, escopo entre unidades pela URL e celular, pelo roteiro [`roteiro-testes-manuais.md`](http://roteiro-testes-manuais.md) (enviado ao colega fora do repositório, sem senhas). Prazo adiado para 18/11.
-- [ ] **Revalidar a pesquisa:** reabrir as fontes 1, 3, 4, 5 e 8 da pesquisa, registrar data de acesso e trecho, e confirmar se a Central de Teleagendamento do NUTES-CISAM está ativa. Prazo adiado para 18/11.
-- [ ] **Ensaio ponta a ponta** com dois navegadores (seção 7), no celular e no computador, preparando e desativando a fila de demonstração. 16 a 18/11.
-- [ ] **Teste de usabilidade** com 2 ou 3 pessoas de fora do grupo, no celular; anotar para o relatório. Até 19/11.
-- [ ] **Vídeo da demonstração** como plano B. Até 19/11.
-- [ ] Backup novo, último deploy e **congelamento da** `main`. 19/11.
+- \[x\] **Tela de Indicadores:** revisão cruzada aprovada em 09/11; na `main` e em produção desde 16/11.
+- \[x\] **Consulta da auditoria (backend):** revisão do Codex aprovada, teste manual local e deploy em 16/11.
+- \[x\] **Conferir Indicadores na VM** com `gestor.cisam` e `gestor.central`: escopo, filtros e celular OK (16/11).
+- \[x\] **Agenda do dia (equipe):** entrou no MVP em 16/11. Codex implementou, Claude Code revisou (aprovado), E2E local (falta registrada, URL, 360 px, console) e deploy em 16/11.
+- \[ \] **Testes manuais que faltam:** recusa de proposta, cancelamento, reclassificação, escopo entre unidades pela URL, celular e agenda do dia (T8), pelo roteiro [`roteiro-testes-manuais.md`](http://roteiro-testes-manuais.md) (enviado ao colega fora do repositório, sem senhas). Prazo adiado para 18/11.
+- \[x\] **Revalidar a pesquisa:** feito em 16/11 (seção 7 do README da pesquisa). Contatos externos ficam para depois de dezembro.
+- \[ \] **Ensaio ponta a ponta** com dois navegadores (seção 7), no celular e no computador, com a fila de demonstração já ligada (16/11). 18/11.
+- \[ \] **Teste de usabilidade** com 2 ou 3 pessoas de fora do grupo, no celular; anotar para o relatório. Até 19/11.
+- \[ \] **Vídeo da demonstração** como plano B. Até 19/11.
+- \[ \] Backup novo, último deploy e **congelamento da** `main`. 19/11.
 
 ### Semana 4 — 20/11 a 26/11: apresentação
 
-- [ ]  Só correções de defeito na `main`.
-- [ ] Ensaio da apresentação (quem fala o quê; plano B com o vídeo).
-- [ ] Slides, incluindo "o que é regra oficial e o que é proposta do MVP" (classes da pesquisa).
-- [ ] Relatório do Projeto de Intervenção: problema, contexto (pesquisa revalidada), solução, resultados do teste de usabilidade e próximos passos (validação institucional e módulo de documentos).
+- \[ \] Só correções de defeito na `main`.
+- \[ \] Ensaio da apresentação (quem fala o quê; plano B com o vídeo).
+- \[ \] Slides, incluindo "o que é regra oficial e o que é proposta do MVP" (classes da pesquisa).
+- \[ \] Relatório do Projeto de Intervenção: problema, contexto (pesquisa revalidada), solução, resultados do teste de usabilidade e próximos passos (validação institucional e módulo de documentos).
 
 ## 5. Como trabalhamos
 
 - **Uma tarefa = um worktree = uma branch**, criado no Orca a partir da `main` atualizada (`git pull --ff-only origin main` no checkout principal). Colegas sem Orca trabalham numa branch própria e abrem um Pull Request.
 - **Revisão cruzada:** quem implementa com o Codex é revisado pelo Claude Code, e vice-versa. Um modelo nunca revisa o próprio trabalho. Todo prompt começa por um Passo 0 com plano e espera aprovação.
 - **Agentes nunca fazem commit, push, merge, rebase, stash nem criam branch.** Quem faz é a pessoa. Se o trabalho precisar ser commitado antes de um merge da `main`, a pessoa commita na branch da tarefa, e a revisão olha `git diff main...HEAD`.
-- **Os worktrees compartilham o mesmo banco de teste:** nunca rode o `scripts/[testar.sh](http://testar.sh)` em dois worktrees ao mesmo tempo.
+- **Os worktrees compartilham o mesmo banco de teste:** nunca rode o `scripts/[[testar.sh](http://testar.sh)]([http://testar.sh](http://testar.sh))` em dois worktrees ao mesmo tempo.
 - **Docker Compose só no checkout principal.** No worktree do frontend, só `npm run dev`. Antes de um E2E, confira se o Vite é do worktree certo (`ss -ltnp | grep 517`).
 - **O contrato é o** `openapi.json`**, e quem muda o contrato é o backend.** O backend entra primeiro; depois, o frontend faz `git merge main` e roda `npm run api:generate`.
 - **Nunca refazer (amend ou rebase) um commit que já foi para a** `main` **ou para o** `origin`**.** Arquivos gerados (`openapi.json`, `schema.d.ts`) não se resolvem à mão num conflito: regenere.
 - **Depois de todo push, confira o CI** na aba Actions (jobs `backend`, `web`, `docker` e `infra`).
 - **Mudou o contrato no backend? Regenere os tipos do frontend na mesma entrega** (`npm run api:generate` em `apps/web`, que precisa do `.venv` do backend). Senão o job `web` falha no `api:generate -- --check`, como aconteceu em 16/11.
 - **Senhas, tokens e o** `.env` **nunca vão para chat, print ou repositório.** Ao mostrar a saída de um comando que gera senha, mostre só a linha com o `id=`.
-- **Na VM**, o Docker roda pelo atalho `PATH="$HOME/bin:$PATH"`, e o deploy é sempre pelo `scripts/[deploy.sh](http://deploy.sh)`, rodado em `/opt/containers/central-saude-upe`.
+- **Na VM**, o Docker roda pelo atalho `PATH="$HOME/bin:$PATH"`, e o deploy é sempre pelo `scripts/[[deploy.sh](http://deploy.sh)]([http://deploy.sh](http://deploy.sh))`, rodado em `/opt/containers/central-saude-upe`.
 - **Toda tela entrega:** lint, testes, build, `npm run api:generate -- --check`, conferência em 360 px e desktop e E2E real contra a API da `main`. README e documentação descrevem a tela, sem contagem de testes nem relato de E2E.
 - **Regras de produto que nenhuma tela quebra:**
   - o paciente nunca vê posição, tamanho da fila, nota nem risco;
@@ -162,7 +164,8 @@ Entraram depois de 29/10:
 4. O **Worker propõe a vaga** em cerca de 1 minuto. Plano B: mostrar o pedido do seed que já está com proposta.
 5. **Paciente:** vê a proposta com o prazo e **confirma**; o aviso aparece no sino.
 6. **Equipe:** o pedido aparece como **agendado** na fila.
-7. **Gestor:** indicadores das 8 semanas do seed.
+7. **Equipe (opcional):** a **agenda do dia** mostra os confirmados; a presença só pode ser marcada a partir do horário da vaga, e a falta depois da tolerância.
+8. **Gestor:** indicadores das 8 semanas do seed (use "Últimas 8 semanas" ou um período até 08/11).
 
 **Depois da apresentação:** `python -m app.infra.demonstracao desativar`.
 
@@ -175,5 +178,5 @@ Entraram depois de 29/10:
   - a branch `backend/documents` (ADR-031, regras de validação e recodificação de arquivo, estados do item e a trava "documentos antes da fila");
   - o plano "Situação atual e plano do módulo de documentos";
   - as telas D1 a D4 no Claude Design.
-- **Correções pequenas da Leva 1:** data extrema nos indicadores pode dar 500 (`de=9999-12-30&ate=9999-12-31` estoura `limites_do_periodo`; usar o intervalo 2000–2100 da auditoria); avisos do `npm audit` (9 moderados); pacote principal do frontend acima de 500 kB.
+- **Correções pequenas da Leva 1:** data extrema nos indicadores pode dar 500 (`de=9999-12-30&ate=9999-12-31` estoura `limites_do_periodo`; usar o intervalo 2000–2100 da auditoria); avisos do `npm audit` (9 moderados); pacote principal do frontend acima de 500 kB (522,9 kB depois da agenda do dia); rótulos de risco diferentes entre Indicadores (Alto/Médio/Baixo) e fila (Vermelho/Amarelo/Verde); "Atualizado às" encostado na borda em 360 px; espaço vazio no cartão da agenda quando não há botão de presença.
 - **Operação:** cópia do backup fora da VM, monitoramento, SMTP real, acesso de emergência documentado, antivírus e criptografia em repouso.

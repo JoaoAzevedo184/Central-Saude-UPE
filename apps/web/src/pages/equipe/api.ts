@@ -2,10 +2,18 @@ import { queryOptions, type QueryClient } from '@tanstack/react-query'
 import type { components } from '../../shared/api/generated/schema'
 import { http } from '../../shared/api/http'
 import type { EstadoFila } from './estado-fila'
+import type { EstadoAgenda } from './estado-agenda'
 
 export type FilaEquipe = components['schemas']['FilaEquipeSaida']
 export type PedidoEquipe = components['schemas']['ItemPainel']
 export type DetalheEquipe = components['schemas']['SolicitacaoEquipeSaida']
+export type AgendamentoDoDia = components['schemas']['AgendamentoDoDia']
+export const agendaEquipeOptions = (estado: EstadoAgenda) => queryOptions({
+  queryKey: ['agenda-equipe', estado.fila, estado.data],
+  queryFn: ({ signal }) => http.request<AgendamentoDoDia[]>(`/equipe/filas/${encodeURIComponent(estado.fila)}/agendamentos?${new URLSearchParams({ data: estado.data })}`, { signal }),
+  enabled: Boolean(estado.fila),
+  refetchOnWindowFocus: 'always',
+})
 export const detalheEquipeOptions = (id: string) => queryOptions({
   queryKey: ['pedido-equipe', id],
   queryFn: ({ signal }) => buscarDetalheEquipe(id, signal),

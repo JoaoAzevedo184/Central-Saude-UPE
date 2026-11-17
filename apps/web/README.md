@@ -183,7 +183,7 @@ Os comandos de desenvolvimento e verificação estão em [Executar](#executar) e
 
 ## Equipe — layout e Fila
 
-`/equipe` leva a `/equipe/fila` para atendente, gestor e administrador. A raiz e o login usam o mesmo destino por papel; acessar a área de outro papel redireciona para a própria área. A troca obrigatória de senha tem prioridade. O menu lateral do desktop contém Fila, Indicadores para gestor/administrador e, no rodapé, o papel e Sair. Cada item declara seu destino; só Fila leva os parâmetros da Fila. Em telas estreitas, Menu abre e fecha a navegação com teclado e Esc. Há link Pular para o conteúdo e indicação da página atual.
+`/equipe` leva a `/equipe/fila` para atendente, gestor e administrador. A raiz e o login usam o mesmo destino por papel; acessar a área de outro papel redireciona para a própria área. A troca obrigatória de senha tem prioridade. O menu lateral do desktop contém Fila e Agenda do dia para os três papéis, Indicadores para gestor/administrador e, no rodapé, o papel e Sair. Cada item declara seu destino; só Fila leva os parâmetros da Fila. Em telas estreitas, Menu abre e fecha a navegação com teclado e Esc. Há link Pular para o conteúdo e indicação da página atual.
 
 A Fila carrega as filas do escopo em páginas de até cem. Uma fila é exibida como texto, várias usam seletor e nenhuma orienta procurar o gestor. Inativas aparecem depois das ativas, com “(inativa)”. O filtro mostra as contagens por status; Todos apresenta a soma. Prioridade é a ordenação inicial; Ordem de chegada preserva a ordem recebida da API e explica que as posições continuam seguindo a prioridade.
 
@@ -203,6 +203,16 @@ Atendente pode classificar em Em análise e reclassificar em Aguardando vaga. Ge
 Sucesso anuncia o risco e atualiza o detalhe e a Fila. Conflito de estado recarrega sem perder o motivo. Validação localizada associa erro e foco ao campo; erros sem localização ficam no alerta global. Escritas usam CSRF, não repetem falhas automaticamente e bloqueiam clique duplo. Dados e motivo ficam somente em memória, com proteção contra respostas de sessões antigas. O formulário fica ao lado das respostas no desktop e abaixo delas no celular.
 
 “Critérios da regulação”, com consulta de perguntas e edição das respostas da equipe, fica para depois do MVP. Também ficam pendentes no contrato posição e agendamento ativo no detalhe, perguntas não respondidas, critérios por nível de risco e controle de versão. A tela não inventa esses dados.
+
+## Agenda do dia — equipe (UC-008)
+
+`/equipe/agenda?fila=<id>&data=AAAA-MM-DD` consulta os agendamentos da fila e do dia selecionados. O padrão é hoje em Recife e a primeira fila ativa do escopo; filas inativas continuam disponíveis para consulta. Os controles oferecem dia anterior, Hoje, próximo dia e campo de data, no intervalo de 2000 a 2100. A URL permite restaurar o recorte pelo histórico do navegador.
+
+A agenda ordena os horários e mostra início, fim, profissional, nome abreviado como recebido da API, situação e link para o pedido. O resumo conta o total, os confirmados com presença pendente, os comparecimentos e as faltas. A tabela se apresenta como cartões no celular. Há carregamento, agenda vazia e erro com nova tentativa.
+
+Só a atendente registra presença em agendamentos confirmados e pendentes. Compareceu registra diretamente; Faltou abre uma confirmação na própria linha explicando a volta ao fim da fila e o aviso ao paciente. Voltar fecha a confirmação sem enviar. Antes do início, os botões ficam desabilitados e informam o horário de liberação. O relógio local é atualizado a cada 30 segundos; a API decide os prazos, inclusive a tolerância da fila, que não é presumida pelo frontend. Todo conflito 409 recarrega a agenda; a tolerância ainda não encerrada mantém o agendamento e orienta tentar mais tarde.
+
+Durante o registro, os botões daquela linha ficam bloqueados. O sucesso atualiza agenda, fila, contagens e detalhe do pedido, anuncia o resultado e devolve o foco à linha. Gestor e administrador consultam sem botões de presença. As escritas usam o cliente HTTP com CSRF, sem repetição automática; dados ficam em memória e requisições da linha são canceladas ao desmontar.
 
 ## Indicadores — gestor e administrador
 

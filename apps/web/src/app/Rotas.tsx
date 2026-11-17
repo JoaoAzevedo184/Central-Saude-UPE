@@ -10,6 +10,7 @@ import { NovaSolicitacao } from '../pages/paciente/NovaSolicitacao'
 import { DetalhePedido } from '../pages/paciente/DetalhePedido'
 import { Avisos } from '../pages/paciente/Avisos'
 import { Fila } from '../pages/equipe/Fila'
+import { AgendaDoDia } from '../pages/equipe/AgendaDoDia'
 import { DetalhePedidoEquipe } from '../pages/equipe/DetalhePedidoEquipe'
 import { CriarConta } from '../pages/auth/CriarConta'
 import { TrocarSenha } from '../pages/auth/TrocarSenha'
@@ -49,6 +50,7 @@ export function Rotas() {
           <Route path="/equipe" element={<EquipeLayout />}>
             <Route index element={<Navigate to="/equipe/fila" replace />} />
             <Route path="fila" element={<Fila />} />
+            <Route path="agenda" element={<AgendaDoDia />} />
             <Route path="solicitacoes/:id" element={<DetalhePedidoEquipe />} />
             <Route element={<ExigirPapel papeis={['GESTOR', 'ADMIN']} />}>
               <Route path="indicadores" element={<Suspense fallback={<p role="status">Carregando indicadores…</p>}><Indicadores /></Suspense>} />

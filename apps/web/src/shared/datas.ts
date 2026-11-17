@@ -5,6 +5,12 @@ const hora = new Intl.DateTimeFormat('pt-BR', { timeZone: fuso, hour: '2-digit',
 const semana = new Intl.DateTimeFormat('pt-BR', { timeZone: fuso, weekday: 'long' })
 const extensa = new Intl.DateTimeFormat('pt-BR', { timeZone: fuso, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
+export function hojeRecife(agora = new Date()) {
+  const partes = new Intl.DateTimeFormat('en', { timeZone: 'America/Recife', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(agora)
+  const parte = (tipo: Intl.DateTimeFormatPartTypes) => partes.find((p) => p.type === tipo)!.value
+  return `${parte('year')}-${parte('month')}-${parte('day')}`
+}
+
 // data_pedido é uma data civil, sem horário: não interpretar como meia-noite UTC.
 export function formatarDataPedido(valor: string) {
   const [ano, mes, dia] = valor.split('-')

@@ -25,7 +25,6 @@ Tudo rodando na VM, com HTTPS, e com o seed de demonstração carregado.
 | Item                                                | Para onde vai                                                                                                                                                                                                                             |
 | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Módulo de documentos** (envio e conferência)      | **Projeto novo, separado, em Rust**, pensado para vários centros hospitalares. A branch `backend/documents` (`136a8d8`) **não entra na** `main`: fica guardada como referência (ADR-031, regras de validação de arquivo, modelo de dados) |
-| Agenda do dia e presença (equipe)                   | Leva 1, depois da apresentação (a API já existe)                                                                                                                                                                                          |
 | Cadastro de agendas e painel de vagas               | Leva 1. Hoje as agendas só vêm do seed; o Worker gera as vagas delas                                                                                                                                                                      |
 | Telas de administração (inclui a tela de auditoria) | Leva 1. As rotas `/admin` existem, inclusive a consulta da auditoria, mas **a documentação da API (**`/api/v1/docs`**) fica desligada em produção**; na apresentação, a administração só aparece rodando local                            |
 | Meus dados e edição de contato                      | Leva 2 (não há rota para editar)                                                                                                                                                                                                          |
@@ -64,6 +63,7 @@ Entraram depois de 29/10:
 | Layout da equipe                                            | Pronto                                                                                           |
 | Fila (equipe)                                               | Pronto                                                                                           |
 | Detalhe do pedido e classificação de risco (equipe)         | Pronto                                                                                           |
+| Agenda do dia (equipe)                                     | Implementada; em validação local e aguardando revisão cruzada                                    |
 | Indicadores (gestor)                                        | Pronto, com carregamento sob demanda; em produção desde 16/11. Falta conferir na VM com o gestor |
 
 
@@ -168,7 +168,7 @@ Entraram depois de 29/10:
 
 ## 8. Depois do MVP
 
-- **Leva 1 (dezembro, proposta):** backend de agendas e vagas, versão do pedido nas escritas (concorrência), nome e unidade da equipe no `/me`, autor no histórico, data do pedido no painel; telas de agenda do dia e presença, cadastro e painel de vagas, e usuários da equipe.
+- **Leva 1 (dezembro, proposta):** backend de agendas e vagas, versão do pedido nas escritas (concorrência), nome e unidade da equipe no `/me`, autor no histórico, data do pedido no painel; telas de cadastro e painel de vagas, e usuários da equipe.
 - **Leva 2:** critérios da regulação (respostas da equipe), cadastro de filas e unidades, Meus dados, recuperação de senha, termos públicos e página de erro, CAPTCHA no cadastro se o sistema abrir ao público.
 - **Validação institucional** (a partir da [pesquisa](https://claude.ai/chat/docs/product/pesquisa-chu-upe/README.md)): prontuário antes do pedido no CISAM, teleconsulta com consentimento, prazos de cancelamento e remarcação, reaproveitamento de vaga recusada (ADR-021 e RN-020) e códigos SIGTAP no catálogo. Revisar as filas do seed com o catálogo (por exemplo, mamografia no CISAM).
 - **Módulo de documentos**, como projeto próprio em Rust, para vários centros hospitalares. Ponto de partida:

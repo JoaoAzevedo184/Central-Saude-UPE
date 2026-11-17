@@ -88,7 +88,10 @@
    - Ordenação por prioridade ou por chegada, e filtro por status.
    - Status para a equipe: **"Aguardando confirmação"** (proposta enviada) e **"Agendado"** (confirmado).
 8. **Detalhe da solicitação (equipe):** respostas, histórico completo, **classificar risco** e responder os critérios da regulação.
-9. **Agenda do dia:** registrar presença ou falta.
+9. **Agenda do dia** (`/equipe/agenda?fila=<id>&data=AAAA-MM-DD`): filas do escopo, com padrão na primeira ativa e no dia atual em Recife. Dia anterior, Hoje, próximo dia e campo de data mantêm o recorte na URL. Lista em ordem de horário com profissional, nome abreviado recebido da API, situação e link para o pedido; resumo de total, confirmados pendentes, comparecimentos e faltas. Em celular, os agendamentos aparecem como cartões.
+   - Atendente registra **Compareceu** diretamente ou **Faltou** com confirmação na linha e opção Voltar, que não envia nada. Só em `CONFIRMADO` com presença pendente; antes do início, botões desabilitados informam “Disponível a partir de HH:MM”. Gestor e administrador só consultam.
+   - O relógio local é atualizado a cada 30 segundos e só orienta a habilitação. A API decide o prazo; a tolerância não vem no contrato e não deve ser presumida. `409 tolerancia-nao-encerrada` orienta tentar mais tarde sem alterar o agendamento; todo 409 recarrega a agenda.
+   - Sucesso anuncia o resultado, devolve o foco à linha e invalida agenda, fila, contagens e detalhe do pedido. Durante a escrita, os botões daquela linha ficam bloqueados. Toda escrita usa CSRF; dados permanecem em memória. Há estados de carregamento, vazio e erro com tentativa manual.
 10. **Vagas:** visão do período, com destaque para as vagas livres que não puderam ser propostas.
 11. **Indicadores** (gestor e administrador): taxa de confirmação, faltas, mediana e P90 do tempo de espera, vagas reaproveitadas e perdidas, pedidos e desistências. A API já existe em `GET /equipe/indicadores`; use os campos do OpenAPI, com período e filtro por fila do escopo.
 

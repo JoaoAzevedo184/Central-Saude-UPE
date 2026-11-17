@@ -1,15 +1,11 @@
 import { formatarDataPedido } from '../../shared/datas'
+export { hojeRecife } from '../../shared/datas'
 
 export interface EstadoIndicadores { de: string; ate: string; fila: string }
 export type PeriodoIndicadores = '4' | '8' | 'mes' | 'personalizado'
 const diaMs = 86_400_000
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-export function hojeRecife(agora = new Date()) {
-  const partes = new Intl.DateTimeFormat('en', { timeZone: 'America/Recife', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(agora)
-  const parte = (tipo: Intl.DateTimeFormatPartTypes) => partes.find((p) => p.type === tipo)!.value
-  return `${parte('year')}-${parte('month')}-${parte('day')}`
-}
 function instanteCivil(valor: string) { return new Date(`${valor}T12:00:00Z`) }
 function dataValida(valor: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(valor)) return false

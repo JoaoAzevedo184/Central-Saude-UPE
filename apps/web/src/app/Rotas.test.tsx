@@ -146,6 +146,20 @@ describe('ADR-003/ADR-025/ADR-028 — rotas e proteção por papel', () => {
     expect(screen.queryByRole('main')).toBeNull()
   })
 
+  it.each(['ATENDENTE', 'GESTOR', 'ADMIN'])('UC-008: permite %s na agenda da equipe', async (papel) => {
+    responderPapel(papel)
+    abrir('/equipe/agenda')
+    expect(await screen.findByRole('heading', { name: 'Agenda do dia' })).toBeTruthy()
+  })
+
+  it('UC-008: paciente não acessa a agenda nem recebe o item de menu', async () => {
+    responderPapel('PACIENTE')
+    abrir('/equipe/agenda')
+    await screen.findByRole('heading', { name: 'Meus atendimentos' })
+    expect(screen.queryByRole('link', { name: 'Agenda do dia' })).toBeNull()
+    expect(JSON.parse(screen.getByTestId('localizacao').textContent!).pathname).toBe('/paciente')
+  })
+
   it('redireciona sessão ausente ou revogada para entrar preservando a origem', async () => {
     const fetcher = vi.fn<typeof fetch>().mockImplementation(async () => new Response(null, { status: 401 }))
     vi.stubGlobal('fetch', fetcher)

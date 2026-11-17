@@ -9,6 +9,7 @@ const papeis: Record<Papel, string> = { PACIENTE: 'Paciente', ATENDENTE: 'Atende
 // Novas telas entram aqui com os papéis permitidos quando a rota existir.
 const itensMenu: { texto: string; rota: string; destino: (queryFila: string) => string; papeis: readonly Papel[] }[] = [
   { texto: 'Fila', rota: '/equipe/fila', destino: (query) => `/equipe/fila?${query}`, papeis: ['ATENDENTE', 'GESTOR', 'ADMIN'] },
+  { texto: 'Agenda do dia', rota: '/equipe/agenda', destino: () => '/equipe/agenda', papeis: ['ATENDENTE', 'GESTOR', 'ADMIN'] },
   { texto: 'Indicadores', rota: '/equipe/indicadores', destino: () => '/equipe/indicadores', papeis: ['GESTOR', 'ADMIN'] },
 ]
 export function EquipeLayout() {

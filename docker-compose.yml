@@ -87,7 +87,7 @@ services:
     restart: unless-stopped
 
   nginx:
-    image: nginx:stable-alpine
+    image: nginx:1.30.7-alpine
     profiles: [proxy]
     depends_on:
       api:
